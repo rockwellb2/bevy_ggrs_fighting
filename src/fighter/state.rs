@@ -1,7 +1,6 @@
 use std::{rc::Rc, borrow::Borrow};
 
-use bevy::{utils::HashMap, math::Vec3, prelude::{Component, Query, With, Transform, Handle, Res, World, NonSend}};
-use ruwren::{Handle as WrenHandle, VMConfig, FunctionSignature, VMWrapper, FunctionHandle};
+use bevy::{utils::{HashMap}, math::Vec3, prelude::{Component, Query, With, Transform, Handle, Res, World, NonSend}, reflect::Reflect};
 use serde::{Serialize, Deserialize};
 
 use super::Fighter;
@@ -10,7 +9,7 @@ use super::Fighter;
 
 #[derive(Serialize, Deserialize, Component)]
 pub struct StateMap {
-    map: HashMap<u8, State>,
+    map: HashMap<u16, State>,
 }
 
 impl StateMap {
@@ -32,31 +31,48 @@ impl StateMap {
         map
     }
 
-    pub fn get<'a>(&'a self, key: &u8) -> Option<&'a State> {
+    pub fn get<'a>(&'a self, key: &u16) -> Option<&'a State> {
         self.map.get(key)
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub enum StateFlags {
+    Movement
+    //Movement(Fn(&mut Transform))
+}
+
+
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct State {
-    pub id: u8,
+    pub id: u16,
     #[serde(skip)]
     debug_name: Option<String>,
     #[serde(default)]
-    script: Option<String>,
+    duration: Option<u8>,
     #[serde(default)]
-    hitboxes: Option<Vec<HitboxData>>,
+    damage: u8,
+    #[serde(default)]
+    script: Option<String>,
+    #[serde(default, alias = "hitboxes")]
+    unsorted_hitboxes: Option<Vec<HitboxData>>,
+    #[serde(default)]
+    pub flags: Option<Vec<StateFlags>>
 
 }
 
 impl State {
-    pub fn new(id: u8, script: Option<String>) -> Self {
+    pub fn new(id: u16, damage: u8, script: Option<String>) -> Self {
         Self {
             id,
             script,
+            damage,
+            duration: None,
             debug_name: None,
-            hitboxes: None,
+            unsorted_hitboxes: None,
+            flags: None
         }
     }
 }
@@ -69,8 +85,6 @@ pub struct HitboxData {
 
 impl HitboxData {
     fn new(dimensions: Vec3, offset: Vec3) -> Self {
-        //dimensions.x
-
         Self { 
             dimensions, 
             offset 
@@ -79,15 +93,35 @@ impl HitboxData {
 }
 
 
-#[derive(Component)]
-pub struct CurrentState(pub u8);
+#[derive(Component, Reflect, Default)]
+pub struct Variables(HashMap<String, u32>);
+
+
+#[derive(Component, Reflect)]
+pub struct CurrentState(pub u16);
+
+impl Default for CurrentState {
+    fn default() -> Self {
+        Self(1)
+    }
+}
 
 pub fn state_system(
     mut query: Query<(&mut CurrentState, &StateMap, &mut Transform), With<Fighter>>,
-    res: NonSend<WrenVM>
+    
 ) {
     for (current, map, tf) in query.iter_mut() {
         if let Some(state) = map.get(&current.0) {
+            // flags
+            if let Some(flags) = &state.flags {
+                for flag in flags {
+                    match flag {
+                        StateFlags::Movement => print!("Movement!"),
+                    }
+                }
+            }
+
+            // hitboxes
             
 
         }
@@ -95,24 +129,3 @@ pub fn state_system(
 }
 
 
-pub struct HandleWrapper(Rc<FunctionHandle<'static>>);
-
-pub struct WrenVM(VMWrapper);
-
-
-pub fn setup_wren_vm(world: &mut World) {
-    let vm = VMConfig::new().build();
-    world.insert_non_send_resource(WrenVM(vm));
-
-}
-
-pub fn setup_wren_handle(world: &mut World, vm: NonSend<WrenVM>) {
-//     let handle = vm.0.make_call_handle(FunctionSignature::new_function("processState", 2)).clone();
-//     world.insert_non_send_resource(handle)
-
-    // let handle = vm.0.make_call_handle(FunctionSignature::new_function("processState", 2));
-    // world.insert_non_send_resource(HandleWrapper(handle));
-
-
-
-}

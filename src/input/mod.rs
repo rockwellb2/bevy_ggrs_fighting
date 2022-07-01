@@ -2,39 +2,7 @@ use bevy::render::render_resource::internal::bytemuck;
 use bevy::prelude::*;
 use bytemuck::{Pod, Zeroable};
 use ggrs::PlayerHandle;
-use ruwren::Class;
-//use bitflags:: bitflags;
 
-// bitflags! {
-//     pub struct Buttons: u8 {
-//         const LP = 1 << 0;
-//         const MP = 1 << 1;
-//         const HP = 1 << 2;
-//         const LK = 1 << 3;
-//         const MK = 1 << 4;
-//         const HK = 1 << 5;
-//     }
-
-//     pub struct Directionals: u8 {
-//         const LEFT = 1 << 0;
-//         const RIGHT = 1 << 1;
-//         const UP = 1 << 2;
-//         const DOWN = 1 << 3;
-//     }
-// }
-
-// unsafe impl Pod for Buttons {}
-// unsafe impl Zeroable for Buttons {}
-
-// unsafe impl Pod for Directionals {}
-// unsafe impl Zeroable for Directionals {}
-
-// #[repr(C)]
-// #[derive(Debug, Copy, Clone, PartialEq, Pod, Zeroable)]
-// pub struct Input {
-//     buttons: Buttons,
-//     direectionals: Directionals
-// }
 
 const LP: u16 = 1 << 0;
 const MP: u16 = 1 << 1;
@@ -51,14 +19,6 @@ pub const DOWN: u16 = 1 << 9;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Pod, Zeroable)]
 pub struct Input(pub u16);
-
-impl Class for Input {
-    fn initialize(_: &ruwren::VM) -> Self
-    where
-        Self: Sized {
-        todo!()
-    }
-}
 
 
 

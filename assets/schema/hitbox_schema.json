@@ -1,0 +1,62 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Hitbox",
+    "type": "object",
+    "properties": {
+        "startFrame": {
+            "description": "The first active frame for the hitbox",
+            "type": "integer",
+            "minimum": 0
+        },
+        "endFrame": {
+            "description": "The final active frame for the hitbox",
+            "type": "integer",
+            "minimum": 0
+        },
+        "damage": {
+            "description": "The damage the hitbox deals",
+            "type": "integer",
+            "minimum": 0
+        },
+
+        "dimensions": {
+            "description": "The dimensions describing the shape of the hitbox",
+            "type": "array",
+            "prefixItems": [
+                {
+                    "title": "x",
+                    "type": "number"
+                },
+                {
+                    "title": "y",
+                    "type": "number"
+                },
+                {
+                    "title": "z",
+                    "type": "number"
+                }
+            ]
+        },
+
+        "offset": {
+            "description": "The offset describing the distance away from the center of the fighter",
+            "type": "array",
+            "prefixItems": [
+                {
+                    "title": "x",
+                    "type": "number"
+                },
+                {
+                    "title": "y",
+                    "type": "number"
+                },
+                {
+                    "title": "z",
+                    "type": "number"
+                }
+            ]
+
+        }
+    },
+    "required": ["startFrame", "endFrame", "dimensions"]
+}

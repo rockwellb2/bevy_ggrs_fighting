@@ -4,12 +4,16 @@
         "debug_name": "LP",
         "hitboxes": [
             {
+                "startFrame": 3,
+                "endFrame": 6,
+                "damage": 30,
                 "dimensions": [1, 1, 1],
                 "offset": [0, 0, 0]
             }
         ]
     },
     {
+        "id": 101
 
     }
 ]
