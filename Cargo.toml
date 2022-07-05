@@ -12,6 +12,7 @@ bevy_ggrs = { git = "https://github.com/gschup/bevy_ggrs"}
 ggrs = { git = "https://github.com/gschup/ggrs", features=["sync-send"]}
 
 ruwren = "0.4.2"
+ruwren-sys = "0.4.0"
 
 bitflags = "1.3"
 ux = "0.1.4"

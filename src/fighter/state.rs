@@ -1,10 +1,12 @@
-use std::{rc::Rc, borrow::Borrow};
+use std::{rc::Rc, borrow::Borrow, sync::Arc, ffi, marker, cell::RefCell};
 
-use bevy::{utils::HashMap, math::Vec3, prelude::{Component, Query, With, Transform, Handle, Res, World, NonSend}};
-use ruwren::{Handle as WrenHandle, VMConfig, FunctionSignature, VMWrapper, FunctionHandle};
+use bevy::{utils::HashMap, math::Vec3, prelude::{Component, Query, With, Transform, Handle, Res, World, NonSend, Commands}};
+use ruwren::{Handle as WrenHandle, VMConfig, FunctionSignature, VMWrapper, FunctionHandle, VM};
 use serde::{Serialize, Deserialize};
 
 use super::Fighter;
+
+use wren_sys::WrenVM;
 
 
 
@@ -84,7 +86,7 @@ pub struct CurrentState(pub u8);
 
 pub fn state_system(
     mut query: Query<(&mut CurrentState, &StateMap, &mut Transform), With<Fighter>>,
-    res: NonSend<WrenVM>
+    res: NonSend<VMWren>
 ) {
     for (current, map, tf) in query.iter_mut() {
         if let Some(state) = map.get(&current.0) {
@@ -95,24 +97,38 @@ pub fn state_system(
 }
 
 
-pub struct HandleWrapper(Rc<FunctionHandle<'static>>);
+#[derive(Component)]
+pub struct HandleWrapper<'a>(Arc<Rc<FunctionHandle<'a>>>);
 
-pub struct WrenVM(VMWrapper);
+pub struct VMWren<'a>(Arc<VMWrapper>, Rc<FunctionHandle<'a>>);
 
 
 pub fn setup_wren_vm(world: &mut World) {
-    let vm = VMConfig::new().build();
-    world.insert_non_send_resource(WrenVM(vm));
+    let vm = Arc::new(VMConfig::new().build());
+    let handle = unsafe { Arc::<VMWrapper>::as_ptr(&vm).as_ref().unwrap().make_call_handle(FunctionSignature::new_function("processState", 2)) };
+    
+    
+    world.insert_non_send_resource(VMWren(vm.clone(), handle));
 
 }
 
-pub fn setup_wren_handle(world: &mut World, vm: NonSend<WrenVM>) {
-//     let handle = vm.0.make_call_handle(FunctionSignature::new_function("processState", 2)).clone();
-//     world.insert_non_send_resource(handle)
+pub fn setup_wren_handle(world: &mut World, vm: NonSend<VMWren>) {
 
-    // let handle = vm.0.make_call_handle(FunctionSignature::new_function("processState", 2));
-    // world.insert_non_send_resource(HandleWrapper(handle));
+    //let handle = Arc::new(vm.0.make_call_handle(FunctionSignature::new_function("processState", 2)));
+    //commands.spawn().insert(HandleWrapper(handle));
+    //world.insert_non_send_resource(HandleWrapper(handle));
+
+
+    // let handle = 
+    //     Arc::new(vm.0.make_call_handle(FunctionSignature::new_function("processState", 2)));
+        
+
+    //world.insert_non_send_resource(HandleWrapper(handle));
 
 
 
 }
+
+
+
+
