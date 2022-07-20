@@ -1,6 +1,14 @@
 use std::{rc::Rc, borrow::Borrow};
+use std::fmt::Debug;
 
-use bevy::{utils::{HashMap}, math::Vec3, prelude::{Component, Query, With, Transform, Handle, Res, World, NonSend}, reflect::Reflect};
+use bevy::reflect::reflect_trait;
+use bevy::{
+    utils::{HashMap}, 
+    math::Vec3, 
+    prelude::{Component, Query, With, Transform}, 
+    reflect::{Reflect, ReflectDeserialize},
+    ecs::reflect::ReflectComponent
+};
 use serde::{Serialize, Deserialize};
 
 use super::Fighter;
@@ -36,11 +44,15 @@ impl StateMap {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum StateFlags {
-    Movement
-    //Movement(Fn(&mut Transform))
-}
+#[typetag::serde(tag = "type")]
+#[reflect_trait]
+pub trait StateModifier: Sync + Send + 'static + Debug + Reflect {}
+
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component)]
+#[reflect(Component, Deserialize, StateModifier)]
+pub struct JumpCancel;
+#[typetag::serde]
+impl StateModifier for JumpCancel {}
 
 
 
@@ -59,7 +71,7 @@ pub struct State {
     #[serde(default, alias = "hitboxes")]
     unsorted_hitboxes: Option<Vec<HitboxData>>,
     #[serde(default)]
-    pub flags: Option<Vec<StateFlags>>
+    pub modifiers: Option<Vec<Box<dyn StateModifier>>>
 
 }
 
@@ -72,7 +84,7 @@ impl State {
             duration: None,
             debug_name: None,
             unsorted_hitboxes: None,
-            flags: None
+            modifiers: None
         }
     }
 }
@@ -112,14 +124,6 @@ pub fn state_system(
 ) {
     for (current, map, tf) in query.iter_mut() {
         if let Some(state) = map.get(&current.0) {
-            // flags
-            if let Some(flags) = &state.flags {
-                for flag in flags {
-                    match flag {
-                        StateFlags::Movement => print!("Movement!"),
-                    }
-                }
-            }
 
             // hitboxes
             

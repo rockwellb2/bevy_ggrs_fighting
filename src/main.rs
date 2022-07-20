@@ -1,12 +1,13 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, reflect::{TypeRegistryInternal, TypeRegistry, FromType}};
 use bevy_ggrs::GGRSPlugin;
-use fighter::state::{CurrentState, Variables};
+use fighter::state::{CurrentState, Variables, JumpCancel, StateModifier};
 use ggrs::Config;
 
 
-use std::mem::{size_of, self};
 
-use crate::{fighter::state::{State as FightState, state_system}, input::{LEFT, Input as FightInput}};
+use std::{mem::{size_of, self}, any::Any};
+
+use crate::{fighter::state::{State as FightState, state_system, ReflectStateModifier}, input::{LEFT, Input as FightInput}};
 
 mod fighter;
 mod input;
@@ -29,12 +30,6 @@ impl Config for GGRSConfig {
 pub struct Player(u8);
 
 fn main() {
-
-    
-
-    //let deserialized: Vec<FightState> = serde_json::from_str(include_str!("../assets/data/test.sl.json")).unwrap();
-    //println!("Deserialized file: {:?}", deserialized);
-
     let mut app = App::new();
 
     GGRSPlugin::<GGRSConfig>::new()
@@ -56,8 +51,42 @@ fn main() {
 
     app
         .add_plugins(DefaultPlugins)
+        .add_startup_system(startup.exclusive_system())
+        .register_type::<JumpCancel>()
         .insert_resource(Msaa { samples: 4 });
 
     app.run();
 
+}
+
+fn startup(world: &mut World ) {
+    let deserialized: Vec<FightState> = serde_json::from_str(include_str!("../assets/data/fighters/tahu/states.sl.json")).unwrap();
+    println!("Deserialized file: {:?}", deserialized);
+
+    let modifier= deserialized.get(0).unwrap().modifiers.as_ref().unwrap().get(0).unwrap();
+    //let modifier: &Box<dyn Reflect> = &*modifier.any().downcast_ref::<Box<dyn Reflect>>().unwrap();
+    let modifier: Box<dyn Reflect> = modifier.clone_value();
+    
+    let type_registry = world.get_resource::<TypeRegistry>().unwrap().clone();
+    let type_registry = type_registry.read();
+
+    // let reflect_thing = type_registry
+    //     .get_type_data::<ReflectStateModifier>(modifier.type_id())
+    //     .unwrap();
+
+    // Needs check if entity already has component of type_id()
+
+    let registration = type_registry.get_with_name(modifier.type_name()).unwrap();
+    //let reflect_state = type_registry.get_type_data::<ReflectStateModifier>(modifier.type_id()).unwrap();
+    let reflect_component = registration.data::<ReflectComponent>().unwrap();
+
+
+    //let reflect_component = registration.data::<ReflectComponent>().unwrap();
+    let entity = world.spawn().id();
+
+    //let something: &Box<dyn Reflect> = modifier.any().downcast_ref::<Box<dyn Reflect>>().unwrap();
+
+    reflect_component.add_component(world, entity,&**&modifier);
+    
+    //command.spawn().insert(reflect_thing);
 }
