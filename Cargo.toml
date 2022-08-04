@@ -15,7 +15,7 @@ opt-level = 3
 
 [dependencies]
 structopt = "0.3"
-bevy = {version = "0.7", features = ["serialize"]}
+bevy = {version = "0.8.0", features = ["serialize"]}
 bevy_ggrs = { git = "https://github.com/gschup/bevy_ggrs"}
 ggrs = { git = "https://github.com/gschup/ggrs", features=["sync-send"]}
 
@@ -32,9 +32,9 @@ serde = "1.0.137"
 serde_json = "1.0.81"
 serde_closure = "0.3.2"
 typetag = "0.2.0"
-bevy_common_assets = "0.2.0"
+bevy_common_assets = "0.3.0"
 
-bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls" }
+#bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls" }
 
 #required because above doesn't reimport Inspectable
 #bevy-inspector-egui = "0.8.0"
