@@ -1,5 +1,66 @@
 [
     {
+        "id": 0,
+        "debug_name": "Idle",
+        "modifiers": [
+            {
+                "InputTransition": [
+                    [
+                        {
+                            "list": [
+                                {
+                                    "with": "0b1000000",
+                                    "without": "0b1100000000"
+                                }
+                            ],
+                            "window": 1
+                        }, 
+                        5
+                    ],
+                    [
+                        {
+                            "list": [
+                                {
+                                    "with": "0b10000000",
+                                    "without": "0b1100000000"
+                                }
+                            ],
+                            "window": 1
+                        },
+                        5
+                    ]
+
+                ]
+            }
+        ]
+    },
+
+    {
+        "id": 5,
+        "debug_name": "Walk",
+        "modifiers": [
+            {
+                "Movement": null
+            },
+            {
+                "InputTransition": [
+                    [
+                        {
+                            "list": [
+                                {
+                                    "with": "0b0",
+                                    "without": "0b1111111111"
+                                }
+                            ],
+                            "window": 1
+                        },
+                        0
+                    ]
+                ]
+            }
+        ]
+    },
+    {
         "id": 100,
         "debug_name": "LP",
         "hitboxes": [
@@ -10,16 +71,7 @@
                 "dimensions": [1, 1, 1],
                 "offset": [0, 0, 0]
             }
-        ],
-        "modifiers": [
-            {
-                "type": "JumpCancel"
-                
-            }
         ]
-    },
-    {
-        "id": 101
 
     }
 ]

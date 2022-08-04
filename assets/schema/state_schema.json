@@ -2,33 +2,99 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "State",
     "type": "object",
-
     "properties": {
         "id": {
             "description": "An integer representing a unique id for a state",
             "type": "integer",
             "minimum": 0
         },
-
         "debug_name": {
             "description": "A name visible only from the JSON file for the state",
             "type": "string"
         },
-
         "duration": {
             "description": "The number of frames the state lasts",
             "type": "integer",
             "minimum": 1
         },
-
         "hitboxes": {
             "description": "A list of the hitboxes that are active during the state",
             "type": "array",
             "items": {
                 "$ref": "hitbox_schema.json"
             }
-
+        },
+        "modifiers": {
+            "description": "A list of modifiers to be applied to the state that change its function",
+            "type": "array",
+            "items": {
+                "anyOf": [
+                    {
+                        "type": "object",
+                        "properties": {
+                            "Movement": {
+                                "type": null
+                            }
+                        },
+                        "required": [
+                            "Movement"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "InputTransition": {
+                                "type": "array",
+                                "items": {
+                                    "type": "array",
+                                    "prefixItems": [
+                                        {
+                                            "title": "CommandInput",
+                                            "type": "object",
+                                            "properties": {
+                                                "list": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "title": "MatchExpressions",
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "with": {
+                                                                "type": "string"
+                                                            },
+                                                            "without": {
+                                                                "type": "string"
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                "window": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "list",
+                                                "window"
+                                            ]
+                                        },
+                                        {
+                                            "title": "StateID",
+                                            "type": "integer",
+                                            "minimum": 0
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "InputTransition"
+                        ]
+                    }
+                ]
+            }
         }
     },
-    "required": ["id"]
+    "required": [
+        "id"
+    ]
 }
