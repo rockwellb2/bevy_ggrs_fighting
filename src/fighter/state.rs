@@ -4,7 +4,7 @@ use std::process::Output;
 use std::{borrow::Borrow, rc::Rc};
 
 use bevy::prelude::Entity;
-use bevy::reflect::{reflect_trait, FromReflect};
+use bevy::reflect::{reflect_trait, FromReflect, TypeUuid};
 use bevy::{
     ecs::reflect::ReflectComponent,
     math::Vec3,
@@ -122,6 +122,10 @@ impl SerializedState {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, TypeUuid)]
+#[uuid = "57ae9bea-139e-11ed-861d-0242ac120002"]
+pub struct SerializedStateVec(pub Vec<SerializedState>);
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
 #[reflect(Component)]

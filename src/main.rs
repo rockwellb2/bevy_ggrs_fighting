@@ -1,9 +1,13 @@
-use battle::spawn_fighters;
+use battle::{spawn_fighters, load_fighters};
 use bevy::{prelude::*, reflect::{TypeRegistryInternal, TypeRegistry, FromType}, diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}, utils::{HashMap, HashSet}, window::PresentMode};
 use bevy_ggrs::{GGRSPlugin, SessionType};
-use fighter::{state::{CurrentState, Variables, Movement, StateModifier, HitboxData, InputTransition}, systems::{movement_system, InputBuffer, buffer_insert_system, process_input_system}, FighterPlugin};
+use fighter::{state::{CurrentState, Variables, Movement, StateModifier, HitboxData, InputTransition, SerializedStateVec}, systems::{movement_system, InputBuffer, buffer_insert_system, process_input_system}, FighterPlugin};
 use ggrs::{Config, SessionBuilder, PlayerType};
 use bevy_editor_pls::prelude::*;
+
+use bevy_common_assets::json::JsonAssetPlugin;
+use iyes_loopless::prelude::{IntoConditionalSystem, AppLooplessStateExt, ConditionSet};
+use iyes_progress::ProgressPlugin;
 
 
 
@@ -19,6 +23,13 @@ mod util;
 
 const FPS: usize = 60;
 const ROLLBACK_DEFAULT: &str = "rollback_default";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GameStates {
+    Menu,
+    LoadingFight,
+    Fight,
+}
 
 #[derive(Debug)]
 pub struct GGRSConfig;
@@ -60,15 +71,15 @@ fn main() {
             Schedule::default().with_stage(
                 ROLLBACK_DEFAULT,
                 SystemStage::parallel()
-                .with_system(buffer_insert_system.label("InputBuffer"))
-                .with_system(process_input_system.label("Process").after("InputBuffer"))
-                .with_system(movement_system.after("Process"))
+                .with_system(buffer_insert_system.run_in_state(GameStates::Fight).label("InputBuffer"))
+                .with_system(process_input_system.run_in_state(GameStates::Fight).label("Process").after("InputBuffer"))
+                .with_system(movement_system.run_in_state(GameStates::Fight).after("Process"))
             )
             .with_stage_after(
                 ROLLBACK_DEFAULT,
                  "Second Rollback Stage", 
                  SystemStage::parallel()
-                 .with_system(state_system)
+                 .with_system(state_system.run_in_state(GameStates::Fight))
                 // .with_system(component_insert_system)
             )
         )
@@ -76,25 +87,40 @@ fn main() {
     
 
     app
+        .add_plugins(DefaultPlugins)
         .insert_resource(WindowDescriptor {
             present_mode: PresentMode::Immediate,
             ..default()
         })
 
+        .add_plugin(JsonAssetPlugin::<SerializedStateVec>::new(&["sl.json"]))
+        .add_plugin(JsonAssetPlugin::<FighterData>::new(&["json"]))
+
+        // Game State Systems and Related Plugins
+        .add_loopless_state(GameStates::LoadingFight)
+        .add_plugin(
+            ProgressPlugin::new(GameStates::LoadingFight)
+                .continue_to(GameStates::Fight)
+                .track_assets()
+            )
+        .add_enter_system(GameStates::LoadingFight, load_fighters)
 
 
-        .add_plugins(DefaultPlugins)
+       
+        .add_exit_system(GameStates::LoadingFight, spawn_fighters)
+        .add_enter_system(GameStates::Fight, startup.exclusive_system())
+        //.add_startup_system(startup.exclusive_system().after("Spawn"))
+        //.add_startup_system(spawn_fighters.exclusive_system().label("Spawn"))
+       
 
-        //.add_plugin(FrameTimeDiagnosticsPlugin::default())
-        //.add_plugin(LogDiagnosticsPlugin::default())
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        .add_plugin(LogDiagnosticsPlugin::default())
         //.add_plugin(EditorPlugin)
 
         .insert_resource(sess)
         .insert_resource(SessionType::SyncTestSession)
         .add_plugin(FighterPlugin)
-        .add_startup_system(startup.exclusive_system().after("Spawn"))
-        .add_startup_system(spawn_fighters.exclusive_system().label("Spawn"))
-        //.add_system(movement_system)
+
         .register_type::<Movement>()
         .register_type::<InputTransition>()
         // These registers below are purely for inspector

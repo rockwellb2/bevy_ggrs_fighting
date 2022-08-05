@@ -32,7 +32,10 @@ serde = "1.0.137"
 serde_json = "1.0.81"
 serde_closure = "0.3.2"
 typetag = "0.2.0"
-bevy_common_assets = "0.2.0"
+bevy_common_assets = {version = "0.2.0", features = ["json"]}
+iyes_loopless = "0.6.0"
+iyes_progress = {version = "0.3.0", features = ["assets", "iyes_loopless"]}
+#iyes_progress = { git = "https://github.com/IyesGames/iyes_progress", rev = "4db0576", features = ["assets", "iyes_loopless"] }
 
 bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls" }
 

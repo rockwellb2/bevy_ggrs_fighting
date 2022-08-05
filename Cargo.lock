@@ -367,6 +367,7 @@ dependencies = [
  "anyhow",
  "bevy",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -537,6 +538,8 @@ dependencies = [
  "bitflags",
  "bytemuck",
  "ggrs",
+ "iyes_loopless 0.6.1",
+ "iyes_progress",
  "regex",
  "serde",
  "serde_closure",
@@ -2099,6 +2102,42 @@ name = "itoa"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112c678d4050afce233f4f2852bb2eb519230b3cf12f33585275537d7e41578d"
+
+[[package]]
+name = "iyes_loopless"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e37cbe1fdc9aeed2d5ec064d3306ba4318723c20c5b0e4662d03c49fedcd491b"
+dependencies = [
+ "bevy_app",
+ "bevy_ecs",
+ "bevy_utils",
+]
+
+[[package]]
+name = "iyes_loopless"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2de41e79e600b6d8a49878c3a15c1ab0852c2d982dd638dfacd95d7eadab5193"
+dependencies = [
+ "bevy_app",
+ "bevy_core",
+ "bevy_ecs",
+ "bevy_utils",
+]
+
+[[package]]
+name = "iyes_progress"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46cae0743794e8b757a4c17be94b24d600edb0c3d409bc5a2e7993ccc98d8130"
+dependencies = [
+ "bevy_app",
+ "bevy_asset",
+ "bevy_ecs",
+ "bevy_utils",
+ "iyes_loopless 0.5.1",
+]
 
 [[package]]
 name = "jni"
