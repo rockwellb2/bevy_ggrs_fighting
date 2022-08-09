@@ -1,4 +1,4 @@
-use bevy::{render::render_resource::internal::bytemuck, reflect::FromReflect};
+use bevy::{reflect::FromReflect};
 use bevy::prelude::*;
 use bytemuck::{Pod, Zeroable};
 use ggrs::PlayerHandle;

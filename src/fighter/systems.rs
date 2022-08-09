@@ -1,15 +1,19 @@
 
 
+
+
 use super::{
     data::FighterData,
-    state::{CurrentState, Movement, StateFrame, StateMap, State, InputTransition},
+    state::{CurrentState, Movement, StateFrame, StateMap, State, InputTransition, HitboxData},
     Fighter,
 };
 use bevy::{
     ecs::reflect::ReflectComponent,
-    prelude::{Component, Entity, Query, Res, Transform, With},
+    prelude::{Component, Entity, Query, Res, Transform, With, Commands, SpatialBundle},
     reflect::{Reflect},
+    utils::default
 };
+use bevy_ggrs::Rollback;
 use ggrs::InputStatus;
 
 use crate::{
@@ -48,6 +52,8 @@ pub fn movement_system(
 
         if let Ok(_) = state_query.get(*state) {
             // //let input: u16 = inputs[0].0 .0;
+
+            //println!("Migration movement");
 
             // if input & LEFT != 0 {
             //     tf.translation.x -= data.walk_speed / FPS as f32;
@@ -95,27 +101,43 @@ pub fn movement_system(
 
 pub fn increment_frame_system(mut query: Query<&mut StateFrame, With<Player>>) {
     for mut frame in query.iter_mut() {
-        frame.0 = frame.0.checked_add(1).unwrap_or(0);
+        //println!("Printing increment frame");
+        frame.0 = frame.0.checked_add(1).unwrap_or(1);
     }
 }
 
 pub fn process_input_system(
-    mut query: Query<(&mut CurrentState, &StateMap, &InputBuffer), (With<Fighter>, With<Player>)>,
-    state_query: Query<&InputTransition, With<State>>
+    mut query: Query<(&mut CurrentState, &StateMap, &InputBuffer, &mut StateFrame), (With<Fighter>, With<Player>)>,
+    state_query: Query<(Option<&InputTransition>, &State)>
 ) {
-    for (mut current, map, buffer) in query.iter_mut() {
+    for (mut current, map, buffer, mut frame) in query.iter_mut() {
         //println!("Does this print?");
         
         let state: &Entity = map.get(&current.0).expect("State doesn't exist");
 
-        if let Ok(transitions) = state_query.get(*state) {
+        if let Ok((transitions, s)) = state_query.get(*state) {
             //println!("Always prints after the above");
-            for (command, u16) in transitions.0.iter() {
-                if command.compare(&buffer.0) {
-                    current.0 = *u16;
+            if let Some(transitions) = transitions {
+                for (command, u16) in transitions.0.iter() {
+                    if command.compare(&buffer.0) {
+                        current.0 = *u16;
+                        frame.0 = 1;
+                        return;
+                    }
                 }
             }
+
+            if let Some(duration) = s.duration {
+                if frame.0 > duration {
+                    // TODO: Add component that says which state it should return to
+                    current.0 = 0;
+                    frame.0 = 1;
+                }
+            }
+
+
         }
+
 
     }
 }
@@ -137,4 +159,54 @@ pub fn buffer_insert_system(
     for mut buffer in query.iter_mut() {
         buffer.0.push(inputs[0].0)
     }
+}
+
+
+pub fn something_system(
+    query: Query<With<Rollback>>
+) {
+    for _ in query.iter() {
+        println!("I don't even know what this is")
+    }
+}
+
+pub fn hitbox_component_system(
+    mut commands: Commands,
+    mut fighter_query: Query<
+        (
+            &CurrentState,
+            &StateMap,
+            &Transform,
+            &StateFrame,
+            &InputBuffer,
+        ),
+        With<Fighter>,
+    >,
+    state_query: Query<&State>,
+    hitbox_query: Query<&HitboxData>
+) {
+    for (current, map, tf, frame, _buffer) in fighter_query.iter_mut() {
+        let state = map.get(&current.0).expect("State doesn't exist.");
+
+        if let Ok(s) = state_query.get(*state) {
+            if let Some(hitboxes) = &s.hitboxes {
+                if let Some(set) = hitboxes.get(&frame.0) {
+                    for h in set {
+                        let hitbox = hitbox_query.get(*h).expect("Hitbox entity does not exist");
+
+                        let mut transform = tf.clone();
+                        transform.translation += hitbox.offset;
+
+                        commands
+                            .entity(*h)
+                            .insert_bundle(SpatialBundle {
+                                transform,
+                                ..default()
+                            });
+                    }
+                }
+            }
+        }
+    }
+
 }

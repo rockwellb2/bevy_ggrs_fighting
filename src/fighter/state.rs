@@ -77,8 +77,8 @@ impl StateModifier for InputTransition {}
 #[reflect(Component)]
 pub struct State {
     pub id: u16,
-    duration: Option<u16>,
-    hitboxes: Option<HashMap<u16, HashSet<Entity>>>,
+    pub duration: Option<u16>,
+    pub hitboxes: Option<HashMap<u16, HashSet<Entity>>>,
 }
 
 impl State {
@@ -133,7 +133,7 @@ pub struct HitboxData {
     #[serde(default)]
     id: u8,
     dimensions: Vec3,
-    offset: Vec3,
+    pub offset: Vec3,
     damage: u16,
     #[serde(alias = "startFrame")]
     pub start_frame: u16,

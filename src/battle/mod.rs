@@ -1,8 +1,8 @@
 use bevy::{
     core::Name,
     math::Vec2,
-    prelude::{default, Color, Commands, Entity, ResMut, OrthographicCameraBundle, Res, AssetServer, Handle, Assets},
-    sprite::{Sprite, SpriteBundle}
+    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, SpatialBundle, VisibilityBundle, Transform, Vec3},
+    sprite::{Sprite, SpriteBundle}, text::Text
 };
 use bevy_ggrs::{Rollback, RollbackIdProvider};
 use ggrs::{P2PSession, SyncTestSession};
@@ -76,14 +76,14 @@ pub fn load_fighters(
 
 pub fn spawn_fighters(
     mut commands: Commands, 
-    mut rip: ResMut<RollbackIdProvider>,
+    //mut rip: ResMut<RollbackIdProvider>,
     sync_test_session: Option<Res<SyncTestSession<GGRSConfig>>>,
 
     handle_access: Res<PlayerHandleAccess>,
-    mut state_vecs: ResMut<Assets<SerializedStateVec>>,
+    //mut state_vecs: ResMut<Assets<SerializedStateVec>>,
     mut data: ResMut<Assets<FighterData>>,
 
-    asset_server: Res<AssetServer>
+    //asset_server: Res<AssetServer>
 
 ) {
     let num_players = sync_test_session
@@ -96,8 +96,8 @@ pub fn spawn_fighters(
 
     // println!("{:?}", asset_server.get_load_state(handle_access.0.fighter_data.id));
 
-    let fighter1 = data.remove(handle_access.0.fighter_data.id).expect("FighterData asset does not exist");
-    let fighter2 = data.remove(handle_access.1.fighter_data.id).expect("FighterData asset does not exist");
+    let fighter1 = data.remove(&handle_access.0.fighter_data).expect("FighterData asset does not exist");
+    let fighter2 = data.remove(&handle_access.1.fighter_data).expect("FighterData asset does not exist");
 
 
 
@@ -120,20 +120,28 @@ pub fn spawn_fighters(
                 custom_size: Some(Vec2::new(1., 1.)),
                 ..default()
             },
+            visibility: Visibility::visible(),
+            //transform: Transform::from_translation(Vec3::new(0., 50., 0.)),
             ..default()
         })
+        //.insert_bundle(VisibilityBundle::default())
         .insert(Name::new("Player 1"))
         .insert(Fighter)
         .insert(fighter1)
         .insert(CurrentState(0))
         .insert(Player(1))
-        .insert(Rollback::new(rip.next_id()))
+        //.insert(Rollback::new(0))
+        //.insert(Text::default())
+        
         .insert(StateFrame(0))
         //.insert(InputBuffer(vec![FightInput::default(); BUFFER_SIZE]))
         .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
         .id();
 
-    let player2 = commands
+    
+
+    let player2 = 
+    commands
         .spawn_bundle(SpriteBundle {
             sprite: Sprite {
                 color: Color::RED,
@@ -147,16 +155,27 @@ pub fn spawn_fighters(
         .insert(fighter2)
         .insert(CurrentState(0))
         .insert(Player(2))
-        .insert(Rollback::new(rip.next_id()))
+        //.insert(Rollback::new(rip.next_id()))
         .insert(StateFrame(0))
         .id();
 
     commands.insert_resource(PlayerEntities(player1, player2));
 
 
-    let mut camera_bundle = OrthographicCameraBundle::new_2d();
-    camera_bundle.orthographic_projection.scale = 1. / 50.;
-    commands.spawn_bundle(camera_bundle);
+    // let mut camera_bundle = OrthographicCameraBundle::new_2d();
+    // camera_bundle.orthographic_projection.scale = 1. / 50.;
+    // commands.spawn_bundle(camera_bundle);
+
+    commands.spawn_bundle(Camera2dBundle {
+        projection: OrthographicProjection {
+            scale: 1. / 50.,
+            ..default()
+        },
+        ..default()
+    });
+
+    //commands.spawn_bundle(Camera2dBundle::default());
+    //println!("It gets here too!");
 
     // let mut load_states = |entity: Entity| {
     //     commands.entity(entity);

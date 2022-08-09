@@ -28,6 +28,17 @@
                             "window": 1
                         },
                         5
+                    ],
+                    [
+                        {
+                            "list": [
+                                {   
+                                    "with": "0b1"
+                                }
+                            ],
+                            "window": 1
+                        },
+                        100
                     ]
 
                 ]
@@ -63,6 +74,7 @@
     {
         "id": 100,
         "debug_name": "LP",
+        "duration": 10,
         "hitboxes": [
             {
                 "startFrame": 3,
