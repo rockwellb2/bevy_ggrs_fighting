@@ -10,12 +10,12 @@ use bevy::{
 use bevy_ggrs::{GGRSPlugin, Rollback, SessionType};
 use fighter::{
     state::{
-        CurrentState, HitboxData, InputTransition, Movement, SerializedStateVec, StateModifier,
-        Variables,
+        CurrentState, SerializedStateVec,
+        Variables, Active, Direction, Facing,
     },
     systems::{
         buffer_insert_system, hitbox_component_system, increment_frame_system, movement_system,
-        process_input_system, something_system, InputBuffer,
+        process_input_system, InputBuffer, hitbox_removal_system, adjust_facing_system,
     },
     FighterPlugin,
 };
@@ -24,13 +24,14 @@ use ggrs::{Config, PlayerType, SessionBuilder};
 use bevy_inspector_egui::WorldInspectorPlugin;
 
 use bevy_common_assets::json::JsonAssetPlugin;
-use iyes_loopless::prelude::{AppLooplessStateExt, ConditionSet, IntoConditionalSystem};
+use iyes_loopless::prelude::{AppLooplessStateExt, IntoConditionalSystem};
 use iyes_progress::ProgressPlugin;
+use bevy_prototype_lyon::prelude::*;
 
 use std::{
-    any::Any,
+
     env,
-    mem::{self, size_of},
+
 };
 
 use crate::{
@@ -38,13 +39,11 @@ use crate::{
     fighter::{
         data::FighterData,
         state::{
-            self, state_system, ReflectStateModifier, SerializedState, State as FightState,
-            StateFrame, StateMap,
+            SerializedState, State as FightState,
+            StateMap, Owner,
         },
-        systems::Active,
-        Fighter,
-    },
-    input::{Input as FightInput, LEFT},
+  
+    }
 };
 
 mod battle;
@@ -97,7 +96,8 @@ fn main() {
         .register_rollback_type::<Variables>()
         .register_rollback_type::<Active>()
         .register_rollback_type::<InputBuffer>()
-        .register_rollback_type::<FrameCount>()
+        .register_rollback_type::<Facing>()
+        //.register_rollback_type::<FrameCount>()
         .with_rollback_schedule(
             Schedule::default()
                 .with_stage(
@@ -123,24 +123,36 @@ fn main() {
                         .with_system(
                             movement_system
                                 .run_in_state(GameStates::Fight)
+                                .label("Movement")
                                 .after("Process"),
+                        )
+                        .with_system(
+                            adjust_facing_system
+                                .run_in_state(GameStates::Fight)
+                                .after("Movement"),
                         ),
                 )
                 .with_stage_after(
                     ROLLBACK_DEFAULT,
                     "Hitbox Stage",
                     SystemStage::parallel()
-                        //.with_system(state_system.run_in_state(GameStates::Fight))
-                        .with_system(hitbox_component_system.run_in_state(GameStates::Fight)), // .with_system(component_insert_system)
+                        .with_system(
+                            hitbox_component_system
+                                .run_in_state(GameStates::Fight)
+                                .label("InsertTransform")
+                        )
+                        .with_system(
+                            hitbox_removal_system
+                                .run_in_state(GameStates::Fight)
+                                .after("InsertTransform"))
+                        
+
                 ),
         )
         .build(&mut app);
 
     app.add_plugins(DefaultPlugins)
-        // .insert_resource(WindowDescriptor {
-        //     present_mode: PresentMode::Immediate,
-        //     ..default()
-        // })
+        .add_plugin(ShapePlugin)
         .add_plugin(JsonAssetPlugin::<SerializedStateVec>::new(&["sl.json"]))
         .add_plugin(JsonAssetPlugin::<FighterData>::new(&["json"]))
         // Game State Systems and Related Plugins
@@ -164,15 +176,15 @@ fn main() {
         .insert_resource(sess)
         .insert_resource(SessionType::SyncTestSession)
         .add_plugin(FighterPlugin)
-        .register_type::<Movement>()
-        .register_type::<InputTransition>()
+        // .register_type::<Movement>()
+        // .register_type::<InputTransition>()
         // These registers below are purely for inspector
         .register_type::<Player>()
-        .register_type::<StateMap>()
-        .register_type::<CurrentState>()
-        .register_type::<FightState>()
-        .register_type::<HitboxData>()
-        .register_type::<InputBuffer>()
+        // .register_type::<StateMap>()
+        // .register_type::<CurrentState>()
+        // .register_type::<FightState>()
+        // .register_type::<HitboxData>()
+        // .register_type::<InputBuffer>()
         //.insert_resource(FrameCount { frame: 0 })
         .insert_resource(Msaa { samples: 4 });
 
@@ -180,134 +192,18 @@ fn main() {
 }
 
 fn startup(world: &mut World) {
-    // let players = world.get_resource::<PlayerEntities>().unwrap();
-    // let player1 = world.entity(players.0).get::<FighterData>().unwrap();
-
-    //let path = format!("../assets/data/fighters/{}/states.sl.json", player1.name.to_lowercase());
-
-    println!("After migrating, does it get here?");
-
-    let deserialized: Vec<SerializedState> =
-        serde_json::from_str(include_str!("../assets/data/fighters/tahu/states.sl.json")).unwrap();
-    //println!("Deserialized file: {:?}", deserialized);
-    // let handle1: Handle<SerializedStateVec>;
-    // {
-    //     let access = &world.get_resource::<PlayerHandleAccess>().unwrap();
-    //     handle1 = access.0.state_list.clone();
-    // }
-    let mut state_lists = world
-        .get_resource_mut::<Assets<SerializedStateVec>>()
-        .expect("Can't find this SerializedStateVec");
-    //let access = world.remove_resource::<PlayerHandleAccess>().unwrap();
-    //let access = world.ge
-    //let deserialized: Vec<SerializedState> = state_lists.remove(access.0.state_list).take().unwrap().0;
-    //let deserialized = &state_lists.get(&access.0.state_list).unwrap().0;
-    // let deserialized = &state_lists.get(&handle1).unwrap().0;
-
-    let player1: Entity;
-    let player2: Entity;
-
-    {
+    world.resource_scope(|world, mut state_lists: Mut<Assets<SerializedStateVec>>| {
         let players = world.get_resource::<PlayerEntities>().unwrap();
-        player1 = players.get(1);
-        player2 = players.get(2);
-    }
+        let player1 = players.get(1);
+        let player2 = players.get(2);
 
-    println!("Deserialized file: {:?}", deserialized);
+        let access = world.get_resource::<PlayerHandleAccess>().unwrap().clone();
+        let deserialized = state_lists.remove(&access.0.state_list).unwrap().0;
+        let deserialized2 = deserialized.clone();
 
-    populate_entities_with_states(world, player1, deserialized);
-
-    /*
-    let mut state_map = StateMap::new();
-
-    for mut state in deserialized {
-        let name = state
-            .debug_name
-            .as_ref()
-            .unwrap_or(&"State".to_string())
-            .clone();
-        println!("Name: {}", name);
-        let entity = world
-            .spawn()
-            .insert(Name::new(name))
-            .insert_bundle(VisibilityBundle::default())
-            //.insert(Player(1))
-            //.insert(StateFrame(0))
-            .id();
-
-        {
-            world.entity_mut(player1).push_children(&[entity]);
-        }
-
-        state_map.add_state(state.id, entity);
-        let hbox_serialized = state.unsorted_hitboxes.take();
-        let mods_serialized = state.modifiers.take();
-
-        let mut state = FightState::from_serialized(state);
-
-        if let Some(hitboxes) = hbox_serialized {
-            let mut ordered: HashMap<u16, HashSet<Entity>> = HashMap::new();
-            for hitbox in hitboxes {
-                let start_frame = hitbox.start_frame;
-                let hitbox_entity = world.spawn().insert(hitbox).id();
-
-                if ordered.contains_key(&start_frame) {
-                    let set = ordered.get_mut(&start_frame).unwrap();
-                    set.insert(hitbox_entity);
-                } else {
-                    let mut set = HashSet::<Entity>::new();
-                    set.insert(hitbox_entity);
-                    ordered.insert(start_frame, set);
-                }
-            }
-
-            state.add_hitboxes(ordered);
-        }
-
-        if let Some(modifiers) = mods_serialized {
-            let type_registry = world.get_resource::<TypeRegistry>().unwrap().clone();
-            let type_registry = type_registry.read();
-
-            for modifier in modifiers {
-                let modifier = modifier.clone_value();
-                let registration = type_registry.get_with_name(modifier.type_name()).unwrap();
-
-                let reflect_component = registration.data::<ReflectComponent>().unwrap();
-                reflect_component.insert(world, entity, &**&modifier);
-            }
-        }
-
-        world.entity_mut(entity).insert(state);
-    }
-
-    println!("StateMap: {:?}", state_map);
-
-    // let players = world.get_resource::<PlayerEntities>().unwrap();
-    //let player1 = world.entity(players.0).get::<FighterData>().unwrap();
-
-    world.entity_mut(player1).insert(state_map);
-    */
-    // world.get::<CurrentState>(player1).expect("Entity does not have CurrentState component");
-    // world.get::<StateMap>(player1).expect("Entity does not have StateMap component");
-    // world.get::<Transform>(player1).expect("Entity does not have Transform component");
-    // world.get::<FighterData>(player1).expect("Entity does not have FighterData component");
-    // world.get::<InputBuffer>(player1).expect("Entity does not have InputBuffer component");
-    // world.get::<Fighter>(player1).expect("Entity does not have Fighter component");
-
-    // Get the boxed trait object from the deserialized FightState
-    // let modifier= deserialized.get(0).unwrap().modifiers.as_ref().unwrap().get(0).unwrap();
-    // let modifier: Box<dyn Reflect> = modifier.clone_value();
-
-    // let type_registry = world.get_resource::<TypeRegistry>().unwrap().clone();
-    // let type_registry = type_registry.read();
-
-    // let registration = type_registry.get_with_name(modifier.type_name()).unwrap();
-    // let reflect_component = registration.data::<ReflectComponent>().unwrap();
-
-    // let entity = world.spawn().id();
-    // reflect_component.add_component(world, entity,&**&modifier);
-
-    // world.entity_mut(entity).insert(Active);
+        populate_entities_with_states(world, player1, deserialized);
+        populate_entities_with_states(world, player2, deserialized2);
+    });
 }
 
 fn populate_entities_with_states(
@@ -344,9 +240,32 @@ fn populate_entities_with_states(
 
         if let Some(hitboxes) = hbox_serialized {
             let mut ordered: HashMap<u16, HashSet<Entity>> = HashMap::new();
+
             for hitbox in hitboxes {
+                let shape = shapes::Rectangle {
+                    extents: hitbox.dimensions.truncate(),
+                    origin: RectangleOrigin::Center,
+                };
+
+
+
                 let start_frame = hitbox.start_frame;
-                let hitbox_entity = world.spawn().insert(hitbox).id();
+                let hitbox_entity = 
+                    world
+                        .spawn()
+                        .insert(hitbox)
+                        .insert(Owner(player))
+                        .insert_bundle(GeometryBuilder::build_as(
+                            &shape,
+                            DrawMode::Fill(FillMode::color(Color::rgba(1., 0., 0., 0.8))),
+                            Transform::default()
+                        ))
+                        .insert_bundle(VisibilityBundle {
+                            visibility: Visibility { is_visible: false },
+                            computed: ComputedVisibility::default()
+                        })
+                        .id();
+                
 
                 if ordered.contains_key(&start_frame) {
                     let set = ordered.get_mut(&start_frame).unwrap();

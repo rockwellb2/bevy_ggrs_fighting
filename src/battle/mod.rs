@@ -1,18 +1,18 @@
 use bevy::{
     core::Name,
     math::Vec2,
-    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, SpatialBundle, VisibilityBundle, Transform, Vec3},
-    sprite::{Sprite, SpriteBundle}, text::Text
+    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3},
+    sprite::{Sprite, SpriteBundle}
 };
-use bevy_ggrs::{Rollback, RollbackIdProvider};
-use ggrs::{P2PSession, SyncTestSession};
+
+use ggrs::{SyncTestSession};
 
 use iyes_progress::prelude::AssetsLoading;
 
 
 use crate::{
-    fighter::{data::FighterData, state::{CurrentState, StateFrame, SerializedStateVec}, Fighter, systems::InputBuffer},
-    Player, GGRSConfig, input::{Input as FightInput, BUFFER_SIZE}, util::Buffer,
+    fighter::{data::FighterData, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, StateMap}, Fighter, systems::InputBuffer},
+    Player, GGRSConfig, input::{BUFFER_SIZE}, util::Buffer,
 };
 
 //#[derive(Default)]
@@ -121,7 +121,7 @@ pub fn spawn_fighters(
                 ..default()
             },
             visibility: Visibility::visible(),
-            //transform: Transform::from_translation(Vec3::new(0., 50., 0.)),
+            transform: Transform::from_translation(Vec3::new(-2., 0., 0.)),
             ..default()
         })
         //.insert_bundle(VisibilityBundle::default())
@@ -130,6 +130,7 @@ pub fn spawn_fighters(
         .insert(fighter1)
         .insert(CurrentState(0))
         .insert(Player(1))
+        .insert(Facing(Direction::Right))
         //.insert(Rollback::new(0))
         //.insert(Text::default())
         
@@ -148,6 +149,7 @@ pub fn spawn_fighters(
                 custom_size: Some(Vec2::new(1., 1.)),
                 ..default()
             },
+            transform: Transform::from_translation(Vec3::new(2., 0., 0.)),
             ..default()
         })
         .insert(Name::new("Player 2"))
@@ -155,8 +157,13 @@ pub fn spawn_fighters(
         .insert(fighter2)
         .insert(CurrentState(0))
         .insert(Player(2))
+        .insert(Facing(Direction::Left))
         //.insert(Rollback::new(rip.next_id()))
         .insert(StateFrame(0))
+
+        // DONT KEEP THIS
+        //.insert(StateMap { map: todo!() })
+        
         .id();
 
     commands.insert_resource(PlayerEntities(player1, player2));

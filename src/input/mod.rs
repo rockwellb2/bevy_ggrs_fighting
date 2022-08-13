@@ -1,7 +1,10 @@
+use std::default;
+
 use bevy::{reflect::FromReflect};
 use bevy::prelude::*;
 use bytemuck::{Pod, Zeroable};
 use ggrs::PlayerHandle;
+use packed_struct::prelude::{PrimitiveEnum_u8, PackedStruct};
 use serde::{Deserialize, Serialize, de};
 
 use crate::util::Buffer;
@@ -116,7 +119,7 @@ where
 
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, FromReflect, Reflect)]
+#[derive(Debug, Serialize, Deserialize, Default, FromReflect, Reflect, Clone)]
 pub struct CommandInput {
     list: Vec<MatchExpression>,
     window: u16
@@ -155,4 +158,59 @@ impl CommandInput {
 
         return true;
     }
+}
+
+#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default)]
+pub enum ButtonPress {
+    #[default]
+    None = 0,
+    Press = 1,
+    Hold = 2,
+    Release = 3,
+}
+
+#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default)]
+pub enum DirectionalInput {
+    #[default]
+    None = 0,
+    Positive = 1,
+    Negative = 2,
+}
+
+#[derive(PackedStruct, Default)]
+#[packed_struct(bit_numbering="msb0")]
+pub struct NewInput {
+    #[packed_field(bits="0..=1", ty= "enum")]
+    a: ButtonPress,
+    #[packed_field(bits="2..=3", ty= "enum")]
+    b: ButtonPress,
+    #[packed_field(bits="4..=5", ty= "enum")]
+    c: ButtonPress,
+    #[packed_field(bits="6..=7", ty= "enum")]
+    d: ButtonPress,
+    #[packed_field(bits="8..=9", ty= "enum")]
+    e: ButtonPress,
+    #[packed_field(bits="10..=11", ty= "enum")]
+    f: ButtonPress,
+    #[packed_field(bits="12..=13", ty= "enum")]
+    g: DirectionalInput,
+    #[packed_field(bits="14..=15", ty= "enum")]
+    h: DirectionalInput
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::size_of;
+
+    use packed_struct::PackedStruct;
+
+    use super::{NewInput, ButtonPress};
+
+    #[test]
+    fn something() {
+        let input = NewInput::default();
+        let packed = input.pack().unwrap();
+        
+    }
+
 }

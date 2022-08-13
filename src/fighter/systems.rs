@@ -4,12 +4,12 @@
 
 use super::{
     data::FighterData,
-    state::{CurrentState, Movement, StateFrame, StateMap, State, InputTransition, HitboxData},
+    state::{CurrentState, Movement, StateFrame, StateMap, State, InputTransition, HitboxData, Active, Owner, Direction, AdjustFacing, Facing},
     Fighter,
 };
 use bevy::{
     ecs::reflect::ReflectComponent,
-    prelude::{Component, Entity, Query, Res, Transform, With, Commands, SpatialBundle},
+    prelude::{Component, Entity, Query, Res, Transform, With, Commands, SpatialBundle, Visibility},
     reflect::{Reflect},
     utils::default
 };
@@ -17,12 +17,8 @@ use bevy_ggrs::Rollback;
 use ggrs::InputStatus;
 
 use crate::{
-    input::{Input as FightInput, LEFT, RIGHT}, Player, FPS, util::Buffer,
+    input::{Input as FightInput, LEFT, RIGHT}, Player, FPS, util::Buffer, battle::PlayerEntities,
 };
-
-// Component to attach to an entity when its state should actively query systems
-#[derive(Component, Default, Reflect)]
-pub struct Active;
 
 pub fn movement_system(
     //state_query: Query<&Parent, (With<Movement>)>,
@@ -179,13 +175,14 @@ pub fn hitbox_component_system(
             &Transform,
             &StateFrame,
             &InputBuffer,
+            &Facing
         ),
         With<Fighter>,
     >,
     state_query: Query<&State>,
-    hitbox_query: Query<&HitboxData>
+    hitbox_query: Query<(&HitboxData)>
 ) {
-    for (current, map, tf, frame, _buffer) in fighter_query.iter_mut() {
+    for (current, map, tf, frame, _buffer, facing) in fighter_query.iter_mut() {
         let state = map.get(&current.0).expect("State doesn't exist.");
 
         if let Ok(s) = state_query.get(*state) {
@@ -193,20 +190,83 @@ pub fn hitbox_component_system(
                 if let Some(set) = hitboxes.get(&frame.0) {
                     for h in set {
                         let hitbox = hitbox_query.get(*h).expect("Hitbox entity does not exist");
+                        let mut offset = hitbox.offset;
+                        offset.x *= facing.0.sign();
+                        //println!("Offset.x: {}", offset.x);
 
                         let mut transform = tf.clone();
-                        transform.translation += hitbox.offset;
+                        transform.translation += offset;
+
+                        //println!("Transform: {:?}", transform.translation);
 
                         commands
                             .entity(*h)
+                            .insert(Active)
                             .insert_bundle(SpatialBundle {
                                 transform,
                                 ..default()
                             });
+                            
                     }
                 }
             }
         }
     }
+
+}
+
+pub fn hitbox_removal_system(
+    mut commands: Commands,
+    mut query: Query<(Entity, &HitboxData, &Owner, &mut Visibility), With<Active>>,
+    fighter_query: Query<&StateFrame, With<Fighter>>
+) {
+    for (entity, data, owner, mut visible) in query.iter_mut() {
+        let frame = fighter_query.get(owner.0).expect("Owner doesn't exist");
+
+        if frame.0 > data.end_frame {
+            visible.is_visible = false;
+            commands.entity(entity).remove::<Active>();
+        }
+
+    }
+
+}
+
+
+pub fn adjust_facing_system(
+    players: Res<PlayerEntities>,
+    mut fighter_query: Query<(&CurrentState, &StateMap, &Transform, &mut Facing), With<Fighter>>,
+    state_query: Query<With<AdjustFacing>, With<State>>
+) {
+    let player1 = players.get(1);
+    let player2 = players.get(2);
+
+    if let Ok([
+        (current1, map1, tf1, mut facing1), 
+        (current2, map2, tf2, mut facing2)
+    ]) = fighter_query.get_many_mut([player1, player2]) 
+    {
+        let state1 = map1.get(&current1.0).unwrap();
+        let state2 = map2.get(&current2.0).unwrap();
+
+        if let Ok(_) = state_query.get(*state1) {
+            facing1.0 = if tf1.translation.x > tf2.translation.x {
+                Direction::Left
+            }
+            else {
+                Direction::Right
+            };
+        }
+
+        if let Ok(_) = state_query.get(*state2) {
+            facing2.0 = if tf1.translation.x > tf2.translation.x {
+                Direction::Right
+            }
+            else {
+                Direction::Left
+            }
+        }        
+    }
+
 
 }

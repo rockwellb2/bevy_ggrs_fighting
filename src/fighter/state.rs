@@ -1,7 +1,4 @@
-use std::any::Any;
 use std::fmt::Debug;
-use std::process::Output;
-use std::{borrow::Borrow, rc::Rc};
 
 use bevy::prelude::Entity;
 use bevy::reflect::{reflect_trait, FromReflect, TypeUuid};
@@ -12,6 +9,7 @@ use bevy::{
     reflect::{Reflect, ReflectDeserialize},
     utils::{HashMap, HashSet},
 };
+use bevy_inspector_egui::Inspectable;
 use serde::{Deserialize, Serialize, de};
 
 //use bevy_editor_pls::default_windows::inspector::InspectorWindow;
@@ -45,32 +43,50 @@ impl StateMap {
 
 #[typetag::serde]
 #[reflect_trait]
-pub trait StateModifier: Sync + Send + 'static + Debug + Reflect {}
+pub trait StateModifier: Sync + Send + 'static + Debug + Reflect {
+    fn dyn_clone(&self) -> Box<dyn StateModifier>;
+}
 
-#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component)]
+
+impl Clone for Box<dyn StateModifier> {
+    fn clone(&self) -> Self {
+        self.dyn_clone()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
 #[reflect(Component, Deserialize, StateModifier)]
 pub struct Movement;
 
 #[typetag::serde]
-impl StateModifier for Movement {}
+impl StateModifier for Movement {
+    fn dyn_clone(&self) -> Box<dyn StateModifier> {
+        Box::new(self.clone())
+    }
+}
 
-#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component)]
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
 #[reflect(Component, Deserialize, StateModifier)]
 pub struct InputTransition(pub Vec<(CommandInput, u16)>);
-    // #[serde(deserialize_with = "deserialize_bits")]
-    // bits: u16
-    /*
-    {
-                "InputTransition": {
-                    "bits": "0b0"
-                }
-            }
-    
-    */
-
 
 #[typetag::serde]
-impl StateModifier for InputTransition {}
+impl StateModifier for InputTransition {
+    fn dyn_clone(&self) -> Box<dyn StateModifier> {
+        Box::new(self.clone())
+    }
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
+#[reflect(Component, Deserialize, StateModifier)]
+pub struct AdjustFacing;
+
+#[typetag::serde]
+impl StateModifier for AdjustFacing {
+    fn dyn_clone(&self) -> Box<dyn StateModifier> {
+        Box::new(self.clone())
+    }
+}
 
 
 #[derive(Default, Debug, Component, Reflect)]
@@ -95,7 +111,7 @@ impl State {
     }
 }
 
-#[derive(Default, Serialize, Deserialize, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 pub struct SerializedState {
     pub id: u16,
     #[serde(default)]
@@ -123,7 +139,7 @@ impl SerializedState {
     }
 }
 
-#[derive(Serialize, Deserialize, TypeUuid)]
+#[derive(Serialize, Deserialize, TypeUuid, Clone)]
 #[uuid = "57ae9bea-139e-11ed-861d-0242ac120002"]
 pub struct SerializedStateVec(pub Vec<SerializedState>);
 
@@ -132,13 +148,13 @@ pub struct SerializedStateVec(pub Vec<SerializedState>);
 pub struct HitboxData {
     #[serde(default)]
     id: u8,
-    dimensions: Vec3,
+    pub dimensions: Vec3,
     pub offset: Vec3,
     damage: u16,
     #[serde(alias = "startFrame")]
     pub start_frame: u16,
     #[serde(alias = "endFrame")]
-    end_frame: u16,
+    pub end_frame: u16,
     #[serde(default)]
     rehit: Option<u16> // Number frames after hitting that hitbox can hit again
 }
@@ -169,9 +185,39 @@ impl Default for CurrentState {
         Self(1)
     }
 }
+
+#[derive(Default, Reflect, Component)]
+#[component(storage = "SparseSet")]
+pub struct Active;
+
+
 #[derive(Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct StateFrame(pub u16);
+
+#[derive(Component, Inspectable)]
+pub struct Owner(pub Entity);
+
+
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+pub enum Direction {
+    Left, 
+    #[default]
+    Right
+}
+
+impl Direction {
+    pub fn sign(&self) -> f32 {
+        match self {
+            Direction::Left => -1.,
+            Direction::Right => 1.,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[reflect(Component)]
+pub struct Facing(pub Direction);
 
 pub fn state_system(
     mut query: Query<(&mut CurrentState, &StateMap, &mut Transform, &InputBuffer), With<Fighter>>,
