@@ -8,10 +8,9 @@
                     [
                         {
                             "list": [
-                                {
-                                    "with": "0b1000000",
-                                    "without": "0b1100000000"
-                                }
+                                [
+                                    ["x", "Negative", false]
+                                ]
                             ],
                             "window": 1
                         }, 
@@ -20,10 +19,9 @@
                     [
                         {
                             "list": [
-                                {
-                                    "with": "0b10000000",
-                                    "without": "0b1100000000"
-                                }
+                                [
+                                    ["x", "Positive", false]
+                                ]
                             ],
                             "window": 1
                         },
@@ -32,9 +30,9 @@
                     [
                         {
                             "list": [
-                                {   
-                                    "with": "0b1"
-                                }
+                                [
+                                    ["lp", "Press"]
+                                ]
                             ],
                             "window": 1
                         },
@@ -55,22 +53,6 @@
         "modifiers": [
             {
                 "Movement": null
-            },
-            {
-                "InputTransition": [
-                    [
-                        {
-                            "list": [
-                                {
-                                    "with": "0b0",
-                                    "without": "0b1111111111"
-                                }
-                            ],
-                            "window": 1
-                        },
-                        0
-                    ]
-                ]
             }
         ]
     },

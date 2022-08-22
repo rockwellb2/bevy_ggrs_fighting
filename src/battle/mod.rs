@@ -5,6 +5,7 @@ use bevy::{
     sprite::{Sprite, SpriteBundle}
 };
 
+use bevy_ggrs::Rollback;
 use ggrs::{SyncTestSession};
 
 use iyes_progress::prelude::AssetsLoading;

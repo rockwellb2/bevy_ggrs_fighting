@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize, de};
 
 //use bevy_editor_pls::default_windows::inspector::InspectorWindow;
 
-use crate::input::CommandInput;
+use crate::input::NewCommandInput;
 
 use super::Fighter;
 use super::systems::InputBuffer;
@@ -67,7 +67,7 @@ impl StateModifier for Movement {
 
 #[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
 #[reflect(Component, Deserialize, StateModifier)]
-pub struct InputTransition(pub Vec<(CommandInput, u16)>);
+pub struct InputTransition(pub Vec<(NewCommandInput, u16)>);
 
 #[typetag::serde]
 impl StateModifier for InputTransition {
