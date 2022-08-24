@@ -1,7 +1,7 @@
 use bevy::{
     core::Name,
     math::Vec2,
-    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3},
+    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode},
     sprite::{Sprite, SpriteBundle}
 };
 
@@ -9,11 +9,12 @@ use bevy_ggrs::Rollback;
 use ggrs::{SyncTestSession};
 
 use iyes_progress::prelude::AssetsLoading;
+use leafwing_input_manager::{InputManagerBundle, prelude::{ActionState, InputMap}};
 
 
 use crate::{
     fighter::{data::FighterData, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, StateMap}, Fighter, systems::InputBuffer},
-    Player, GGRSConfig, input::{BUFFER_SIZE}, util::Buffer,
+    Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer,
 };
 
 //#[derive(Default)]
@@ -100,20 +101,6 @@ pub fn spawn_fighters(
     let fighter1 = data.remove(&handle_access.0.fighter_data).expect("FighterData asset does not exist");
     let fighter2 = data.remove(&handle_access.1.fighter_data).expect("FighterData asset does not exist");
 
-
-
-
-
-
-    // let fighter1: FighterData = serde_json::from_str(include_str!(
-    //     "../../assets/data/fighters/tahu/fighter_data.json"
-    // ))
-    // .unwrap();
-    // let fighter2: FighterData = serde_json::from_str(include_str!(
-    //     "../../assets/data/fighters/abe/fighter_data.json"
-    // ))
-    // .unwrap();
-
     let player1 = commands
         .spawn_bundle(SpriteBundle {
             sprite: Sprite {
@@ -125,19 +112,32 @@ pub fn spawn_fighters(
             transform: Transform::from_translation(Vec3::new(-2., 0., 0.)),
             ..default()
         })
-        //.insert_bundle(VisibilityBundle::default())
         .insert(Name::new("Player 1"))
         .insert(Fighter)
         .insert(fighter1)
         .insert(CurrentState(0))
         .insert(Player(1))
         .insert(Facing(Direction::Right))
-        //.insert(Rollback::new(0))
-        //.insert(Text::default())
-        
         .insert(StateFrame(0))
-        //.insert(InputBuffer(vec![FightInput::default(); BUFFER_SIZE]))
         .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
+
+        .insert_bundle(InputManagerBundle::<Action> {
+            action_state: ActionState::default(),
+            input_map: InputMap::new([
+                (KeyCode::U, Action::Lp),
+                (KeyCode::I, Action::Mp),
+                (KeyCode::O, Action::Hp),
+                (KeyCode::J, Action::Lk),
+                (KeyCode::K, Action::Mk),
+                (KeyCode::L, Action::Hk),
+
+                (KeyCode::A, Action::Left),
+                (KeyCode::D, Action::Right),
+                (KeyCode::W, Action::Up),
+                (KeyCode::S, Action::Down)
+            ])
+
+        })
         .id();
 
     
@@ -162,17 +162,9 @@ pub fn spawn_fighters(
         //.insert(Rollback::new(rip.next_id()))
         .insert(StateFrame(0))
 
-        // DONT KEEP THIS
-        //.insert(StateMap { map: todo!() })
-        
         .id();
 
     commands.insert_resource(PlayerEntities(player1, player2));
-
-
-    // let mut camera_bundle = OrthographicCameraBundle::new_2d();
-    // camera_bundle.orthographic_projection.scale = 1. / 50.;
-    // commands.spawn_bundle(camera_bundle);
 
     commands.spawn_bundle(Camera2dBundle {
         projection: OrthographicProjection {
@@ -182,14 +174,5 @@ pub fn spawn_fighters(
         ..default()
     });
 
-    //commands.spawn_bundle(Camera2dBundle::default());
-    //println!("It gets here too!");
 
-    // let mut load_states = |entity: Entity| {
-    //     commands.entity(entity);
-
-    // };
-
-    // load_states(player1);
-    // load_states(player2)
 }

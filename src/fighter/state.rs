@@ -95,6 +95,7 @@ pub struct State {
     pub id: u16,
     pub duration: Option<u16>,
     pub hitboxes: Option<HashMap<u16, HashSet<Entity>>>,
+    pub hurtboxes: Option<HashMap<u16, HashSet<Entity>>>
 }
 
 impl State {
@@ -103,11 +104,16 @@ impl State {
             id: serialized.id,
             duration: serialized.duration,
             hitboxes: None,
+            hurtboxes: None
         }
     }
 
     pub fn add_hitboxes(&mut self, hitboxes: HashMap<u16, HashSet<Entity>>) {
         self.hitboxes = Some(hitboxes);
+    }
+
+    pub fn add_hurtboxes(&mut self, hurtboxes: HashMap<u16, HashSet<Entity>>) {
+        self.hurtboxes = Some(hurtboxes);
     }
 }
 
@@ -120,28 +126,21 @@ pub struct SerializedState {
     duration: Option<u16>,
     #[serde(default, alias = "hitboxes")]
     pub unsorted_hitboxes: Option<Vec<HitboxData>>,
+    #[serde(default, alias = "hurtboxes")]
+    pub unsorted_hurtboxes: Option<Vec<HurtboxData>>,
     #[serde(default)]
     pub modifiers: Option<Vec<Box<dyn StateModifier>>>,
-
-    //something: Option<dyn Fn<(), Output = ()>>
-}
-
-impl SerializedState {
-    pub fn new(id: u16, damage: u8, script: Option<String>) -> Self {
-        Self {
-            id,
-            duration: None,
-            debug_name: None,
-            unsorted_hitboxes: None,
-            modifiers: None,
-            
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, TypeUuid, Clone)]
 #[uuid = "57ae9bea-139e-11ed-861d-0242ac120002"]
 pub struct SerializedStateVec(pub Vec<SerializedState>);
+
+pub trait HBox: Component {
+    fn get_id(&self) -> u8;
+
+    fn get_offset(&self) -> Vec3;
+}
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
 #[reflect(Component)]
@@ -159,19 +158,40 @@ pub struct HitboxData {
     rehit: Option<u16> // Number frames after hitting that hitbox can hit again
 }
 
-impl HitboxData {
-    fn new(id: u8, dimensions: Vec3, offset: Vec3, start_frame: u16, end_frame: u16, damage: u16) -> Self {
-        Self {
-            id, 
-            dimensions,
-            offset,
-            damage,
-            start_frame,
-            end_frame,
-            rehit: None
-        }
+impl HBox for HitboxData {
+    fn get_id(&self) -> u8 {
+        self.id
+    }
+
+    fn get_offset(&self) -> Vec3 {
+        self.offset
     }
 }
+
+#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
+#[reflect(Component)]
+pub struct HurtboxData {
+    #[serde(default)]
+    id: u8,
+    pub dimensions: Vec3,
+    #[serde(default)]
+    pub offset: Vec3,
+    #[serde(default, alias = "startFrame")]
+    pub start_frame: Option<u16>,
+    #[serde(default, alias = "endFrame")]
+    pub end_frame: Option<u16>,
+}
+
+impl HBox for HurtboxData {
+    fn get_id(&self) -> u8 {
+        self.id
+    }
+
+    fn get_offset(&self) -> Vec3 {
+        self.offset
+    }
+}
+
 
 #[derive(Component, Reflect, Default)]
 pub struct Variables(HashMap<String, u32>);
@@ -199,7 +219,7 @@ pub struct StateFrame(pub u16);
 pub struct Owner(pub Entity);
 
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable, Copy)]
 pub enum Direction {
     Left, 
     #[default]
@@ -219,13 +239,3 @@ impl Direction {
 #[reflect(Component)]
 pub struct Facing(pub Direction);
 
-pub fn state_system(
-    mut query: Query<(&mut CurrentState, &StateMap, &mut Transform, &InputBuffer), With<Fighter>>,
-    state_query: Query<&State>
-) {
-    for (current, map, tf, buffer) in query.iter_mut() {
-        //let state = map.get(&current.0).expect("State doesn't exist");
-        // println!("Current state: {}", current.0);
-        // println!("Most recent input: {}", buffer.0.last().unwrap().0)
-    }
-}

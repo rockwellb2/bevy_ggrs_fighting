@@ -19,9 +19,6 @@ bevy = {version = "0.8", features = ["serialize"]}
 bevy_ggrs = { git = "https://github.com/gschup/bevy_ggrs"}
 ggrs = { git = "https://github.com/gschup/ggrs", features=["sync-send"]}
 
-#bevy_mod_scripting = { git = "https://github.com/makspll/bevy_mod_scripting", rev = "c0eb34e", features = ["teal"] }
-#tealr = {git = "https://github.com/lenscas/tealr"}
-#tealr = { git = "https://github.com/lenscas/tealr", features = ["mlua_vendored","mlua_send"], branch="feature/document_global_instances" }
 
 bitflags = "1.3"
 ux = "0.1.4"
@@ -39,10 +36,10 @@ typetag = "0.2.0"
 bevy_common_assets = {version = "0.3.0", features = ["json"]}
 iyes_loopless = "0.7.0"
 iyes_progress = {version = "0.4.0", features = ["assets", "iyes_loopless"]}
-#iyes_progress = { git = "https://github.com/IyesGames/iyes_progress", rev = "4db0576", features = ["assets", "iyes_loopless"] }
 bevy_prototype_lyon = "0.6.0"
+leafwing-input-manager = "0.5.2"
 
-#bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls" }
+bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls" }
 bevy-inspector-egui = "0.12.1"
 #bevy_prototype_frametime_display_plugin = { git = "https://github.com/IceSentry/bevy_prototype_frametime_display_plugin" }
 

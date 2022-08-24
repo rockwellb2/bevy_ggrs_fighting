@@ -1,19 +1,22 @@
 use std::default;
 use std::ops::Deref;
 
-use bevy::{reflect::FromReflect};
 use bevy::prelude::*;
+use bevy::reflect::FromReflect;
 use bytemuck::{Pod, Zeroable};
 use ggrs::PlayerHandle;
-use packed_struct::prelude::{PrimitiveEnum_u8, PackedStruct};
-use packed_struct::types::ReservedZero;
+use leafwing_input_manager::prelude::ActionState;
+use leafwing_input_manager::Actionlike;
+use packed_struct::prelude::{PackedStruct, PrimitiveEnum_u8};
 use packed_struct::types::bits::Bits;
-use serde::{Deserialize, Serialize, de};
+use packed_struct::types::ReservedZero;
+use serde::{de, Deserialize, Serialize};
 
+use crate::fighter::systems::InputBuffer;
+use crate::fighter::Fighter;
 use crate::util::Buffer;
 
 pub const BUFFER_SIZE: usize = 10;
-
 
 pub const RAW_LP: u16 = 1 << 0;
 pub const RAW_MP: u16 = 1 << 1;
@@ -27,8 +30,6 @@ pub const RAW_RIGHT: u16 = 1 << 7;
 pub const RAW_UP: u16 = 1 << 8;
 pub const RAW_DOWN: u16 = 1 << 9;
 pub const RAW_EMPTY: u16 = 0;
-
-
 
 pub const LP_HELD: u32 = 128;
 pub const LP: u32 = 64;
@@ -70,7 +71,7 @@ pub const MAP: [(u16, u32, u32); 10] = [
     (RAW_LEFT, LEFT, LEFT_HELD),
     (RAW_RIGHT, RIGHT, RIGHT_HELD),
     (RAW_UP, UP, UP_HELD),
-    (RAW_DOWN, DOWN, DOWN_HELD)
+    (RAW_DOWN, DOWN, DOWN_HELD),
 ];
 
 // pub const THING: StateInput = StateInput::new(
@@ -90,101 +91,139 @@ pub const MAP: [(u16, u32, u32); 10] = [
 #[derive(Default, Debug, Copy, Clone, PartialEq, Pod, Zeroable, Reflect, FromReflect)]
 pub struct Input(pub u32);
 
-
+#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
+pub enum Action {
+    Lp,
+    Mp,
+    Hp,
+    Lk,
+    Mk,
+    Hk,
+    Left,
+    Right,
+    Up,
+    Down,
+}
 
 pub fn input(
     _handle: In<PlayerHandle>,
-    keyboard_input: Res<bevy::input::Input<KeyCode>>
-) -> Input 
-{
-    //let mut inp: u16 = 0;
+    //keyboard_input: Res<bevy::input::Input<KeyCode>>,
+    input_query: Query<(&ActionState<Action>, &InputBuffer), With<Fighter>>,
+) -> Input {
+    if let Ok((action_state, buffer)) = input_query.get_single() {
+        if let Some(previous) = buffer.0.get(0) {
+            let previous: StateInput = previous.into();
 
-    let button_check = |key_code: KeyCode| -> ButtonPress {
-        if keyboard_input.just_pressed(key_code) {
-            ButtonPress::Press
+            let button_check = |action: Action| -> ButtonPress {
+                if action_state.pressed(action) {
+                    match previous.get_button_from_action(action) {
+                        ButtonPress::Press | ButtonPress::Hold => ButtonPress::Hold,
+                        ButtonPress::None | ButtonPress::Release => ButtonPress::Press,
+                    }
+                } else {
+                    match previous.get_button_from_action(action) {
+                        ButtonPress::Press | ButtonPress::Hold => ButtonPress::Release,
+                        ButtonPress::None | ButtonPress::Release => ButtonPress::None,
+                    }
+                }
+            };
+
+            let directional_check = |pos: Action, neg: Action| -> (DirectionalInput, bool) {
+                if action_state.pressed(pos) {
+                    match (previous.get_directional_from_button(pos)) {
+                        (DirectionalInput::Positive, _) => (DirectionalInput::Positive, false),
+                        _ => (DirectionalInput::Positive, true),
+                    }
+                } else if action_state.pressed(neg) {
+                    match (previous.get_directional_from_button(pos)) {
+                        (DirectionalInput::Negative, _) => (DirectionalInput::Negative, false),
+                        _ => (DirectionalInput::Negative, true),
+                    }
+                } else {
+                    match previous.get_directional_from_button(pos) {
+                        (DirectionalInput::None, _) => (DirectionalInput::None, false),
+                        _ => (DirectionalInput::None, true),
+                    }
+                }
+            };
+
+            let lp = button_check(Action::Lp);
+            let mp = button_check(Action::Mp);
+            let hp = button_check(Action::Hp);
+            let lk = button_check(Action::Lk);
+            let mk = button_check(Action::Mk);
+            let hk = button_check(Action::Hk);
+
+            let (x, just_pressed_x) = directional_check(Action::Right, Action::Left);
+            let (y, just_pressed_y) = directional_check(Action::Up, Action::Down);
+
+            let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
+
+            Input(inp.into())
+        } else {
+            Input(StateInput::default().into())
         }
-    
-        else if keyboard_input.pressed(key_code) {
-            ButtonPress::Hold
-         }
-        
-        else if keyboard_input.just_released(key_code) {
-            ButtonPress::Release
-         }
-        
-        else {
-            ButtonPress::None
-         }
-    };
+    } else {
+        Input(StateInput::default().into())
+    }
 
-    let directional_check = |pos: KeyCode, neg: KeyCode| -> (DirectionalInput, bool) {
-        if keyboard_input.just_pressed(pos) {
-            (DirectionalInput::Positive, true)
-        }
-        else if keyboard_input.pressed(pos) {
-            (DirectionalInput::Positive, false)
-        }
-        else if keyboard_input.just_pressed(neg) {
-            (DirectionalInput::Negative, true)
-        }
-        else if keyboard_input.pressed(neg) {
-            (DirectionalInput::Negative, false)
-        }
-        else {
-            (DirectionalInput::None, false)
-        }
+    // if let Ok((action_state, buffer)) = input_query.get_single() {
+    //     if let Some(previous) = buffer.0.get(0) {
 
-    };
+    //     let button_check = |action: Action| -> ButtonPress {
+    //         if action_state.pressed(action) {
+    //             if
+    //         }
 
-    let lp = button_check(KeyCode::U);
-    let mp = button_check(KeyCode::I);
-    let hp = button_check(KeyCode::O);
-    let lk = button_check(KeyCode::J);
-    let mk = button_check(KeyCode::K);
-    let hk = button_check(KeyCode::L);
+    //     }
 
-    let (x, just_pressed_x)= directional_check(KeyCode::D, KeyCode::A);
-    let (y, just_pressed_y) = directional_check(KeyCode::W, KeyCode::S);
+    //         // if action_state.just_pressed(action) {
+    //         //     ButtonPress::Press
+    //         // } else if action_state.pressed(action) {
+    //         //     ButtonPress::Hold
+    //         // } else if action_state.just_released(action) {
+    //         //     ButtonPress::Release
+    //         // } else {
+    //         //     ButtonPress::None
+    //         // }
+    //     };
 
-    let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
-    Input(inp.into())
+    //     let directional_check = |pos: Action, neg: Action| -> (DirectionalInput, bool) {
+    //         if action_state.just_pressed(pos) {
+    //             (DirectionalInput::Positive, true)
+    //         } else if action_state.pressed(pos) {
+    //             (DirectionalInput::Positive, false)
+    //         } else if action_state.just_pressed(neg) {
+    //             (DirectionalInput::Negative, true)
+    //         } else if action_state.pressed(neg) {
+    //             (DirectionalInput::Negative, false)
+    //         } else {
+    //             (DirectionalInput::None, false)
+    //         }
+    //     };
 
-    // if keyboard_input.pressed(KeyCode::U) {
-    //     inp |= RAW_LP;
-    // }
-    // if keyboard_input.pressed(KeyCode::I) {
-    //     inp |= RAW_MP;
-    // }
-    // if keyboard_input.pressed(KeyCode::O) {
-    //     inp |= RAW_HP;
-    // }
-    // if keyboard_input.pressed(KeyCode::J) {
-    //     inp |= RAW_LK;
-    // }
-    // if keyboard_input.pressed(KeyCode::K) {
-    //     inp |= RAW_MK;
-    // }
-    // if keyboard_input.pressed(KeyCode::L) {
-    //     inp |= RAW_HK;
-    // }
+    //     let lp = button_check(Action::Lp);
+    //     let mp = button_check(Action::Mp);
+    //     let hp = button_check(Action::Hp);
+    //     let lk = button_check(Action::Lk);
+    //     let mk = button_check(Action::Mk);
+    //     let hk = button_check(Action::Hk);
 
+    //     let (x, just_pressed_x) = directional_check(Action::Right, Action::Left);
+    //     let (y, just_pressed_y) = directional_check(Action::Up, Action::Down);
 
-    // if keyboard_input.pressed(KeyCode::A) {
-    //     inp |= RAW_LEFT;
-    // }
-    // if keyboard_input.pressed(KeyCode::D) {
-    //     inp |= RAW_RIGHT;
-    // }
-    // if keyboard_input.pressed(KeyCode::W) {
-    //     inp |= RAW_UP;
-    // }
-    // if keyboard_input.pressed(KeyCode::S) {
-    //     inp |= RAW_DOWN;
-    // }
+    //     let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
 
-    // Input(inp)
+    //     if action_state.just_pressed(Action::Lp) && inp.lp != ButtonPress::Press {
+    //         println!("How the fuck does this happen?")
+    //     }
+
+    //     Input(inp.into())
+    // }
+    // else {
+    //     Input(StateInput::default().into())
+    // }
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Default, FromReflect, Reflect, Clone)]
 pub struct MatchExpression {
@@ -196,12 +235,12 @@ pub struct MatchExpression {
 }
 
 fn deserialize_bits<'de, D>(deserializer: D) -> Result<u16, D::Error>
-where 
+where
     D: de::Deserializer<'de>,
 {
     struct BitVisitor;
 
-    impl <'de> de::Visitor<'de> for BitVisitor {
+    impl<'de> de::Visitor<'de> for BitVisitor {
         type Value = u16;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -209,31 +248,26 @@ where
         }
 
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: de::Error, 
-        
+        where
+            E: de::Error,
         {
             let trimmed = v.trim().trim_start_matches("0b");
 
-
             return if let Ok(bits) = u16::from_str_radix(trimmed, 2) {
                 Ok(bits)
-            }
-
-            else {
+            } else {
                 Err(E::custom("error deserializing bits from string"))
-            }  
+            };
         }
     }
 
     deserializer.deserialize_any(BitVisitor)
-
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, FromReflect, Reflect, Clone)]
 pub struct CommandInput {
     list: Vec<MatchExpression>,
-    window: u16
+    window: u16,
 }
 
 // impl CommandInput {
@@ -244,7 +278,6 @@ pub struct CommandInput {
 //         let mut input_iter = input.into_iter();
 
 //         let mut index = 0;
-
 
 //         for command in &self.list {
 //             loop {
@@ -274,8 +307,8 @@ pub struct CommandInput {
 #[derive(Debug, Serialize, Deserialize, FromReflect, Reflect, Clone)]
 #[serde(untagged)]
 pub enum NewMatchExpression {
-    Button( String,  ButtonPress),
-    Directional( String,  DirectionalInput, bool)
+    Button(String, ButtonPress),
+    Directional(String, DirectionalInput, bool),
 }
 
 impl Default for NewMatchExpression {
@@ -284,13 +317,11 @@ impl Default for NewMatchExpression {
     }
 }
 
-
-
 #[derive(Debug, Serialize, Deserialize, Default, FromReflect, Reflect, Clone)]
 pub struct NewCommandInput {
     //#[serde(deserialize_with = "deserialize_command")]
     list: Vec<Vec<NewMatchExpression>>,
-    window: u16
+    window: u16,
 }
 
 impl NewCommandInput {
@@ -299,7 +330,6 @@ impl NewCommandInput {
         let mut index = 0;
 
         for command in &self.list {
-            
             loop {
                 index += 1;
                 if index > self.window {
@@ -316,11 +346,10 @@ impl NewCommandInput {
                         }
                     }
 
-                    if same { break; }
-                    
-                    
-                }
-                else {
+                    if same {
+                        break;
+                    }
+                } else {
                     return false;
                 }
             }
@@ -331,12 +360,12 @@ impl NewCommandInput {
 }
 
 fn deserialize_command<'de, D>(deserializer: D) -> Result<Vec<u32>, D::Error>
-where 
+where
     D: de::Deserializer<'de>,
 {
     struct CommandVisitor;
 
-    impl <'de> de::Visitor<'de> for CommandVisitor {
+    impl<'de> de::Visitor<'de> for CommandVisitor {
         type Value = Vec<u32>;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -345,7 +374,7 @@ where
 
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
         where
-            A: de::SeqAccess<'de>, 
+            A: de::SeqAccess<'de>,
         {
             let mut out_vec: Vec<u32> = Vec::new();
 
@@ -357,9 +386,7 @@ where
         }
     }
 
-
-   deserializer.deserialize_any(CommandVisitor)
-
+    deserializer.deserialize_any(CommandVisitor)
 }
 
 #[cfg(test)]
@@ -376,13 +403,12 @@ mod input_tests {
             ],
             "window": 1
         }"#;
-        
+
         let result: NewCommandInput = serde_json::from_str(string).unwrap();
         //let input: StateInput = result.list.get(0).unwrap().to_owned().into();
 
         // println!("{:?}", input);
     }
-
 }
 
 #[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -401,7 +427,7 @@ impl ButtonPress {
             1 => ButtonPress::Press,
             2 => ButtonPress::Hold,
             3 => ButtonPress::Release,
-            _ => panic!("Unknown value")
+            _ => panic!("Unknown value"),
         }
     }
 
@@ -430,7 +456,7 @@ impl DirectionalInput {
             0 => DirectionalInput::None,
             1 => DirectionalInput::Positive,
             2 => DirectionalInput::Negative,
-            _ => panic!("Unknown value")
+            _ => panic!("Unknown value"),
         }
     }
 }
@@ -441,43 +467,42 @@ impl From<u32> for DirectionalInput {
     }
 }
 
-
 #[derive(PackedStruct, Default, PartialEq, Debug, Serialize, Deserialize)]
-#[packed_struct(bit_numbering="msb0")]
+#[packed_struct(bit_numbering = "msb0")]
 pub struct StateInput {
     #[serde(default)]
-    #[packed_field(bits="0..=1", ty= "enum")]
+    #[packed_field(bits = "0..=1", ty = "enum")]
     pub lp: ButtonPress,
     #[serde(default)]
-    #[packed_field(bits="2..=3", ty= "enum")]
+    #[packed_field(bits = "2..=3", ty = "enum")]
     pub mp: ButtonPress,
     #[serde(default)]
-    #[packed_field(bits="4..=5", ty= "enum")]
+    #[packed_field(bits = "4..=5", ty = "enum")]
     pub hp: ButtonPress,
     #[serde(default)]
-    #[packed_field(bits="6..=7", ty= "enum")]
+    #[packed_field(bits = "6..=7", ty = "enum")]
     pub lk: ButtonPress,
     #[serde(default)]
-    #[packed_field(bits="8..=9", ty= "enum")]
+    #[packed_field(bits = "8..=9", ty = "enum")]
     pub mk: ButtonPress,
     #[serde(default)]
-    #[packed_field(bits="10..=11", ty= "enum")]
+    #[packed_field(bits = "10..=11", ty = "enum")]
     pub hk: ButtonPress,
     #[serde(default)]
-    #[packed_field(bits="12..=13", ty= "enum")]
+    #[packed_field(bits = "12..=13", ty = "enum")]
     pub x: DirectionalInput,
     #[serde(default)]
-    #[packed_field(bits="14")]
+    #[packed_field(bits = "14")]
     pub just_pressed_x: bool,
     #[serde(default)]
-    #[packed_field(bits="15..=16", ty= "enum")]
+    #[packed_field(bits = "15..=16", ty = "enum")]
     pub y: DirectionalInput,
     #[serde(default)]
-    #[packed_field(bits="17")]
+    #[packed_field(bits = "17")]
     pub just_pressed_y: bool,
     #[serde(default)]
-    #[packed_field(bits="18..=31")]
-    _reserved: ReservedZero<Bits::<14>>
+    #[packed_field(bits = "18..=31")]
+    _reserved: ReservedZero<Bits<14>>,
 }
 
 impl StateInput {
@@ -486,15 +511,48 @@ impl StateInput {
         mp: ButtonPress,
         hp: ButtonPress,
         lk: ButtonPress,
-        mk: ButtonPress, 
+        mk: ButtonPress,
         hk: ButtonPress,
         x: DirectionalInput,
         just_pressed_x: bool,
         y: DirectionalInput,
-        just_pressed_y: bool
-    ) -> StateInput 
-    {
-        StateInput { lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y, _reserved: ReservedZero::default() }
+        just_pressed_y: bool,
+    ) -> StateInput {
+        StateInput {
+            lp,
+            mp,
+            hp,
+            lk,
+            mk,
+            hk,
+            x,
+            just_pressed_x,
+            y,
+            just_pressed_y,
+            _reserved: ReservedZero::default(),
+        }
+    }
+
+    pub fn get_button_from_action(&self, action: Action) -> ButtonPress {
+        match action {
+            Action::Lp => self.lp,
+            Action::Mp => self.mp,
+            Action::Hp => self.hp,
+            Action::Lk => self.lk,
+            Action::Mk => self.mk,
+            Action::Hk => self.hk,
+            _ => panic!(),
+        }
+    }
+
+    pub fn get_directional_from_button(&self, action: Action) -> (DirectionalInput, bool) {
+        match action {
+            Action::Left => (self.x, self.just_pressed_x),
+            Action::Right => (self.x, self.just_pressed_x),
+            Action::Up => (self.y, self.just_pressed_y),
+            Action::Down => (self.y, self.just_pressed_y),
+            _ => panic!(),
+        }
     }
 
     pub fn compare_command(&self, command: NewMatchExpression) -> bool {
@@ -507,27 +565,31 @@ impl StateInput {
                     "lk" => self.lk,
                     "mk" => self.mk,
                     "hk" => self.hk,
-                    _ => panic!()
+                    _ => panic!(),
                 };
 
-                i == button 
+                i == button
             }
             NewMatchExpression::Directional(name, direction, just_pressed) => {
                 let i = match name.as_str() {
                     "x" => (self.x, self.just_pressed_x),
                     "y" => (self.y, self.just_pressed_y),
-                    _ => panic!()
+                    _ => panic!(),
                 };
 
                 i.0 == direction && (i.1 == just_pressed)
-            },
+            }
         }
     }
 
     pub fn lp(just_pressed: bool) -> Self {
-        let lp = if just_pressed { ButtonPress::Press } else { ButtonPress::Hold };
+        let lp = if just_pressed {
+            ButtonPress::Press
+        } else {
+            ButtonPress::Hold
+        };
 
-        StateInput { 
+        StateInput {
             lp,
             ..Default::default()
         }
@@ -538,9 +600,13 @@ impl StateInput {
     }
 
     pub fn mp(just_pressed: bool) -> Self {
-        let mp = if just_pressed { ButtonPress::Press } else { ButtonPress::Hold };
+        let mp = if just_pressed {
+            ButtonPress::Press
+        } else {
+            ButtonPress::Hold
+        };
 
-        StateInput { 
+        StateInput {
             mp,
             ..Default::default()
         }
@@ -549,11 +615,15 @@ impl StateInput {
     pub fn mp_bits(just_pressed: bool) -> u32 {
         Self::mp(just_pressed).into()
     }
-    
-    pub fn hp(just_pressed: bool) -> Self {
-        let hp = if just_pressed { ButtonPress::Press } else { ButtonPress::Hold };
 
-        StateInput { 
+    pub fn hp(just_pressed: bool) -> Self {
+        let hp = if just_pressed {
+            ButtonPress::Press
+        } else {
+            ButtonPress::Hold
+        };
+
+        StateInput {
             hp,
             ..Default::default()
         }
@@ -564,9 +634,13 @@ impl StateInput {
     }
 
     pub fn lk(just_pressed: bool) -> Self {
-        let lk = if just_pressed { ButtonPress::Press } else { ButtonPress::Hold };
+        let lk = if just_pressed {
+            ButtonPress::Press
+        } else {
+            ButtonPress::Hold
+        };
 
-        StateInput { 
+        StateInput {
             lk,
             ..Default::default()
         }
@@ -577,9 +651,13 @@ impl StateInput {
     }
 
     pub fn mk(just_pressed: bool) -> Self {
-        let mk = if just_pressed { ButtonPress::Press } else { ButtonPress::Hold };
+        let mk = if just_pressed {
+            ButtonPress::Press
+        } else {
+            ButtonPress::Hold
+        };
 
-        StateInput { 
+        StateInput {
             mk,
             ..Default::default()
         }
@@ -588,11 +666,15 @@ impl StateInput {
     pub fn mk_bits(just_pressed: bool) -> u32 {
         Self::mk(just_pressed).into()
     }
-    
-    pub fn hk(just_pressed: bool) -> Self {
-        let hk = if just_pressed { ButtonPress::Press } else { ButtonPress::Hold };
 
-        StateInput { 
+    pub fn hk(just_pressed: bool) -> Self {
+        let hk = if just_pressed {
+            ButtonPress::Press
+        } else {
+            ButtonPress::Hold
+        };
+
+        StateInput {
             hk,
             ..Default::default()
         }
@@ -601,13 +683,12 @@ impl StateInput {
     pub fn hk_bits(just_pressed: bool) -> u32 {
         Self::hk(just_pressed).into()
     }
-    
 
     pub fn left(just_pressed: bool) -> Self {
-        StateInput { 
-            x: DirectionalInput::Negative, 
+        StateInput {
+            x: DirectionalInput::Negative,
             just_pressed_x: just_pressed,
-            ..Default::default() 
+            ..Default::default()
         }
     }
 
@@ -616,10 +697,10 @@ impl StateInput {
     }
 
     pub fn right(just_pressed: bool) -> Self {
-        StateInput { 
-            x: DirectionalInput::Positive, 
+        StateInput {
+            x: DirectionalInput::Positive,
             just_pressed_x: just_pressed,
-            ..Default::default() 
+            ..Default::default()
         }
     }
 
@@ -628,10 +709,10 @@ impl StateInput {
     }
 
     pub fn up(just_pressed: bool) -> Self {
-        StateInput { 
-            y: DirectionalInput::Positive, 
+        StateInput {
+            y: DirectionalInput::Positive,
             just_pressed_y: just_pressed,
-            ..Default::default() 
+            ..Default::default()
         }
     }
 
@@ -640,10 +721,10 @@ impl StateInput {
     }
 
     pub fn down(just_pressed: bool) -> Self {
-        StateInput { 
-            y: DirectionalInput::Negative, 
+        StateInput {
+            y: DirectionalInput::Negative,
             just_pressed_y: just_pressed,
-            ..Default::default() 
+            ..Default::default()
         }
     }
 
@@ -683,14 +764,13 @@ mod tests {
 
     use packed_struct::PackedStruct;
 
-    use super::{StateInput, ButtonPress};
+    use super::{ButtonPress, StateInput};
 
     #[test]
     fn something() {
         let input = StateInput {
             x: crate::input::DirectionalInput::None,
             ..Default::default()
-
         };
 
         // println!("Input: {}", input);
@@ -703,14 +783,11 @@ mod tests {
         assert_eq!(input, unpacked);
 
         println!("Size of StateInput is {}", size_of::<StateInput>());
-        
     }
 
     #[test]
     fn something_else() {
         println!("{}", StateInput::down_bits(false));
         println!("{}", StateInput::down_bits(true))
-
     }
-
 }

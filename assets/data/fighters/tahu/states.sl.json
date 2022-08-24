@@ -9,18 +9,11 @@
                         {
                             "list": [
                                 [
-                                    ["x", "Negative", false]
-                                ]
-                            ],
-                            "window": 1
-                        }, 
-                        5
-                    ],
-                    [
-                        {
-                            "list": [
-                                [
-                                    ["x", "Positive", false]
+                                    [
+                                        "x",
+                                        "Negative",
+                                        false
+                                    ]
                                 ]
                             ],
                             "window": 1
@@ -31,28 +24,111 @@
                         {
                             "list": [
                                 [
-                                    ["lp", "Press"]
+                                    [
+                                        "x",
+                                        "Negative",
+                                        true
+                                    ]
+                                ]
+                            ],
+                            "window": 1
+                        },
+                        5
+                    ],
+                    [
+                        {
+                            "list": [
+                                [
+                                    [
+                                        "x",
+                                        "Positive",
+                                        false
+                                    ]
+                                ]
+                            ],
+                            "window": 1
+                        },
+                        5
+                    ],
+                    [
+                        {
+                            "list": [
+                                [
+                                    [
+                                        "x",
+                                        "Positive",
+                                        true
+                                    ]
+                                ]
+                            ],
+                            "window": 1
+                        },
+                        5
+                    ],
+                    [
+                        {
+                            "list": [
+                                [
+                                    [
+                                        "lp",
+                                        "Press"
+                                    ]
                                 ]
                             ],
                             "window": 1
                         },
                         100
                     ]
-
                 ]
             },
             {
                 "AdjustFacing": null
             }
+        ],
+        "hurtboxes": [
+            {
+                "dimensions": [
+                    1,
+                    2,
+                    1
+                ]
+            }
         ]
     },
-
     {
         "id": 5,
         "debug_name": "Walk",
         "modifiers": [
             {
                 "Movement": null
+            },
+            {
+                "InputTransition": [
+                    [
+                        {
+                            "list": [
+                                [
+                                    [
+                                        "x",
+                                        "None",
+                                        false
+                                    ]
+                                ]
+                            ],
+                            "window": 1
+                        },
+                        0
+                    ]
+                ]
+            }
+        ],
+        "hurtboxes": [
+            {
+                "dimensions": [
+                    1,
+                    1,
+                    1
+                ]
             }
         ]
     },
@@ -65,10 +141,26 @@
                 "startFrame": 3,
                 "endFrame": 6,
                 "damage": 30,
-                "dimensions": [1, 1, 1],
-                "offset": [1, 0, 0]
+                "dimensions": [
+                    1,
+                    1,
+                    1
+                ],
+                "offset": [
+                    1,
+                    0,
+                    0
+                ]
+            }
+        ],
+        "hurtboxes": [
+            {
+                "dimensions": [
+                    1,
+                    1,
+                    1
+                ]
             }
         ]
-
     }
 ]

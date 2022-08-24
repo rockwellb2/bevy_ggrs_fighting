@@ -7,26 +7,30 @@ use bevy::{
     utils::{HashMap, HashSet},
     window::PresentMode,
 };
+use bevy_editor_pls::EditorPlugin;
 use bevy_ggrs::{GGRSPlugin, Rollback, SessionType};
 use fighter::{
     state::{
         CurrentState, SerializedStateVec,
-        Variables, Active, Direction, Facing,
+        Variables, Active, Direction, Facing, HitboxData, HurtboxData,
     },
     systems::{
         buffer_insert_system, hitbox_component_system, increment_frame_system, movement_system,
-        process_input_system, InputBuffer, hitbox_removal_system, adjust_facing_system,
+        process_input_system, InputBuffer, hitbox_removal_system, adjust_facing_system, hurtbox_component_system, hurtbox_removal_system, hbox_position_system,
     },
     FighterPlugin,
 };
+use game::{INPUT_BUFFER, PROCESS, MOVEMENT, ADD_HURTBOX, ADD_HITBOX, REMOVE_HITBOX, REMOVE_HURTBOX, UPDATE_HIT_POS, UPDATE_HURT_POS};
 use ggrs::{Config, PlayerType, SessionBuilder};
 //use bevy_editor_pls::prelude::*;
 use bevy_inspector_egui::WorldInspectorPlugin;
 
 use bevy_common_assets::json::JsonAssetPlugin;
+use input::Action;
 use iyes_loopless::prelude::{AppLooplessStateExt, IntoConditionalSystem};
 use iyes_progress::ProgressPlugin;
 use bevy_prototype_lyon::prelude::*;
+use leafwing_input_manager::prelude::InputManagerPlugin;
 
 use std::{
 
@@ -50,12 +54,13 @@ mod battle;
 mod fighter;
 mod input;
 mod util;
+mod game;
 
 const FPS: usize = 60;
 const ROLLBACK_DEFAULT: &str = "rollback_default";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum GameStates {
+pub enum GameState {
     Menu,
     LoadingFight,
     Fight,
@@ -105,31 +110,31 @@ fn main() {
                     SystemStage::parallel()
                         .with_system(
                             buffer_insert_system
-                                .run_in_state(GameStates::Fight)
-                                .label("InputBuffer"),
+                                .run_in_state(GameState::Fight)
+                                .label(INPUT_BUFFER),
                         )
                         .with_system(
                             increment_frame_system
-                                .run_in_state(GameStates::Fight)
-                                .before("Process")
-                                .after("InputBuffer"),
+                                .run_in_state(GameState::Fight)
+                                .before(PROCESS)
+                                .after(INPUT_BUFFER),
                         )
                         .with_system(
                             process_input_system
-                                .run_in_state(GameStates::Fight)
-                                .label("Process")
-                                .after("InputBuffer"),
+                                .run_in_state(GameState::Fight)
+                                .label(PROCESS)
+                                .after(INPUT_BUFFER),
                         )
                         .with_system(
                             movement_system
-                                .run_in_state(GameStates::Fight)
-                                .label("Movement")
-                                .after("Process"),
+                                .run_in_state(GameState::Fight)
+                                .label(MOVEMENT)
+                                .after(PROCESS),
                         )
                         .with_system(
                             adjust_facing_system
-                                .run_in_state(GameStates::Fight)
-                                .after("Movement"),
+                                .run_in_state(GameState::Fight)
+                                .after(MOVEMENT),
                         ),
                 )
                 .with_stage_after(
@@ -138,13 +143,39 @@ fn main() {
                     SystemStage::parallel()
                         .with_system(
                             hitbox_component_system
-                                .run_in_state(GameStates::Fight)
-                                .label("InsertTransform")
+                                .run_in_state(GameState::Fight)
+                                .label(ADD_HITBOX)
+                        )
+                        .with_system(
+                            hurtbox_component_system
+                                .run_in_state(GameState::Fight)
+                                .after(ADD_HITBOX)
+                                .label(ADD_HURTBOX)
                         )
                         .with_system(
                             hitbox_removal_system
-                                .run_in_state(GameStates::Fight)
-                                .after("InsertTransform"))
+                                .run_in_state(GameState::Fight)
+                                .label(REMOVE_HITBOX)
+                                .after(ADD_HURTBOX)
+                        )
+                        .with_system(
+                            hurtbox_removal_system
+                                .run_in_state(GameState::Fight)
+                                .label(REMOVE_HURTBOX)
+                                .after(REMOVE_HITBOX)
+                        )
+                        .with_system(
+                            hbox_position_system::<HitboxData>
+                                .run_in_state(GameState::Fight)
+                                .label(UPDATE_HIT_POS)
+                                .after(REMOVE_HURTBOX)
+                        )
+                        .with_system(
+                            hbox_position_system::<HurtboxData>
+                                .run_in_state(GameState::Fight)
+                                .label(UPDATE_HURT_POS)
+                                .after(UPDATE_HIT_POS)
+                        )
                         
 
                 )
@@ -164,36 +195,26 @@ fn main() {
         .add_plugin(JsonAssetPlugin::<SerializedStateVec>::new(&["sl.json"]))
         .add_plugin(JsonAssetPlugin::<FighterData>::new(&["json"]))
         // Game State Systems and Related Plugins
-        .add_loopless_state(GameStates::LoadingFight)
+        .add_loopless_state(GameState::LoadingFight)
         .add_plugin(
-            ProgressPlugin::new(GameStates::LoadingFight)
-                .continue_to(GameStates::Fight)
+            ProgressPlugin::new(GameState::LoadingFight)
+                .continue_to(GameState::Fight)
                 .track_assets(),
         )
-        .add_enter_system(GameStates::LoadingFight, load_fighters)
-        .add_exit_system(GameStates::LoadingFight, spawn_fighters)
-        .add_enter_system(GameStates::Fight, startup.exclusive_system())
-        //.add_startup_system(startup.exclusive_system().after("Spawn"))
-        //.add_startup_system(spawn_fighters.exclusive_system().label("Spawn"))
-        //.add_system(increment_frame_system.run_in_state(GameStates::Fight))
-        //.add_system(something_system.run_in_state(GameStates::Fight))
-        // .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        .add_enter_system(GameState::LoadingFight, load_fighters)
+        .add_exit_system(GameState::LoadingFight, spawn_fighters)
+        .add_enter_system(GameState::Fight, startup.exclusive_system())
+
+        .add_plugin(InputManagerPlugin::<Action>::default())
+
+        //.add_plugin(FrameTimeDiagnosticsPlugin::default())
         // .add_plugin(LogDiagnosticsPlugin::default())
-        //.add_plugin(EditorPlugin)
-        .add_plugin(WorldInspectorPlugin::new())
+        .add_plugin(EditorPlugin)
+        //.add_plugin(WorldInspectorPlugin::new())
         .insert_resource(sess)
         .insert_resource(SessionType::SyncTestSession)
         .add_plugin(FighterPlugin)
-        // .register_type::<Movement>()
-        // .register_type::<InputTransition>()
-        // These registers below are purely for inspector
         .register_type::<Player>()
-        // .register_type::<StateMap>()
-        // .register_type::<CurrentState>()
-        // .register_type::<FightState>()
-        // .register_type::<HitboxData>()
-        // .register_type::<InputBuffer>()
-        //.insert_resource(FrameCount { frame: 0 })
         .insert_resource(Msaa { samples: 4 });
 
     app.run();
@@ -230,10 +251,8 @@ fn populate_entities_with_states(
         println!("Name: {}", name);
         let entity = world
             .spawn()
-            .insert(Name::new(name))
+            .insert(Name::new(name.clone()))
             .insert_bundle(VisibilityBundle::default())
-            //.insert(Player(1))
-            //.insert(StateFrame(0))
             .id();
 
         {
@@ -242,10 +261,12 @@ fn populate_entities_with_states(
 
         state_map.add_state(state.id, entity);
         let hbox_serialized = state.unsorted_hitboxes.take();
+        let hurtbox_serialized = state.unsorted_hurtboxes.take();
         let mods_serialized = state.modifiers.take();
 
         let mut state = FightState::from_serialized(state);
 
+        // HITBOXES
         if let Some(hitboxes) = hbox_serialized {
             let mut ordered: HashMap<u16, HashSet<Entity>> = HashMap::new();
 
@@ -262,6 +283,7 @@ fn populate_entities_with_states(
                     world
                         .spawn()
                         .insert(hitbox)
+                        .insert(Name::new(format!("Hitbox {}", &name)))
                         .insert(Owner(player))
                         .insert_bundle(GeometryBuilder::build_as(
                             &shape,
@@ -284,8 +306,52 @@ fn populate_entities_with_states(
                     ordered.insert(start_frame, set);
                 }
             }
-
+            println!("Hitboxes: {:?}", ordered);
             state.add_hitboxes(ordered);
+        }
+
+        // HURTBOXES
+        if let Some(hurtboxes) = hurtbox_serialized {
+            let mut ordered_hurt: HashMap<u16, HashSet<Entity>> = HashMap::new();
+
+            for hurtbox in hurtboxes {
+                let shape = shapes::Rectangle {
+                    extents: hurtbox.dimensions.truncate(),
+                    origin: RectangleOrigin::Center,
+                };
+
+
+
+                let start_frame = hurtbox.start_frame.unwrap_or_default();
+                let hurtbox_entity = 
+                    world
+                        .spawn()
+                        .insert(hurtbox)
+                        .insert(Name::new(format!("Hurtbox {}", &name)))
+                        .insert(Owner(player))
+                        .insert_bundle(GeometryBuilder::build_as(
+                            &shape,
+                            DrawMode::Fill(FillMode::color(Color::rgba(1., 1., 0., 0.8))),
+                            Transform::default()
+                        ))
+                        .insert_bundle(VisibilityBundle {
+                            visibility: Visibility { is_visible: false },
+                            computed: ComputedVisibility::default()
+                        })
+                        .id();
+                
+
+                if ordered_hurt.contains_key(&start_frame) {
+                    let set = ordered_hurt.get_mut(&start_frame).unwrap();
+                    set.insert(hurtbox_entity);
+                } else {
+                    let mut set = HashSet::<Entity>::new();
+                    set.insert(hurtbox_entity);
+                    ordered_hurt.insert(start_frame, set);
+                }
+            }
+
+            state.add_hurtboxes(ordered_hurt);
         }
 
         if let Some(modifiers) = mods_serialized {
@@ -309,14 +375,6 @@ fn populate_entities_with_states(
     world.entity_mut(player).insert(state_map);
 }
 
-// pub fn component_insert_system(
-//     query: Query<(Entity, &Player), (With<Active>, With<Movement>)>,
-//     frame_count: Res<FrameCount>
-// ) {
-//     for _ in query.iter() {
-//         println!("Second stage: {}", frame_count.frame)
-//     }
-// }
 
 pub fn increase_frame_system(mut frame_count: ResMut<FrameCount>) {
     frame_count.frame += 1;

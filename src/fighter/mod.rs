@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::{HashMap, HashSet}};
 use bevy_inspector_egui::RegisterInspectable;
 
 
@@ -24,9 +24,8 @@ impl Plugin for FighterPlugin {
             .register_type::<AdjustFacing>()
             .register_type::<Facing>()
             // Inspectable
-            .register_inspectable::<Owner>()
-            .register_inspectable::<Direction>()
-            //.register_inspectable::<FightState>
+            // .register_inspectable::<Owner>()
+            // .register_inspectable::<Direction>()
 
             // These registers below are purely for the inspector
             .register_type::<CurrentState>()
@@ -37,5 +36,7 @@ impl Plugin for FighterPlugin {
             .register_type::<StateMap>()
             .register_type::<Direction>()
             .register_type::<FighterData>();
+
+            //.register_type::<HashMap<u16, HashSet<Entity>>>();
     }
 }
