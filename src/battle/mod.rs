@@ -1,8 +1,8 @@
 use bevy::{
     core::Name,
     math::Vec2,
-    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode},
-    sprite::{Sprite, SpriteBundle}
+    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component},
+    sprite::{Sprite, SpriteBundle}, ui::{Style, UiImage, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}
 };
 
 use bevy_ggrs::Rollback;
@@ -13,7 +13,7 @@ use leafwing_input_manager::{InputManagerBundle, prelude::{ActionState, InputMap
 
 
 use crate::{
-    fighter::{data::FighterData, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, StateMap}, Fighter, systems::InputBuffer},
+    fighter::{data::FighterData, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, StateMap, Health}, Fighter, systems::InputBuffer},
     Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer,
 };
 
@@ -93,11 +93,6 @@ pub fn spawn_fighters(
         .expect("Couldn't find Session");
 
 
-    // println!("FighterData Assets: {:?}", data);
-    // println!("Access: {:?}", handle_access);
-
-    // println!("{:?}", asset_server.get_load_state(handle_access.0.fighter_data.id));
-
     let fighter1 = data.remove(&handle_access.0.fighter_data).expect("FighterData asset does not exist");
     let fighter2 = data.remove(&handle_access.1.fighter_data).expect("FighterData asset does not exist");
 
@@ -120,6 +115,7 @@ pub fn spawn_fighters(
         .insert(Facing(Direction::Right))
         .insert(StateFrame(0))
         .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
+        .insert(Health(500))
 
         .insert_bundle(InputManagerBundle::<Action> {
             action_state: ActionState::default(),
@@ -161,6 +157,8 @@ pub fn spawn_fighters(
         .insert(Facing(Direction::Left))
         //.insert(Rollback::new(rip.next_id()))
         .insert(StateFrame(0))
+        .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
+        .insert(Health(500))
 
         .id();
 
@@ -174,5 +172,145 @@ pub fn spawn_fighters(
         ..default()
     });
 
+
+}
+
+#[derive(Component)]
+pub struct Lifebar {
+    full: u16,
+    pub current: u16,
+}
+
+impl Lifebar {
+    pub fn new(full: u16) -> Self {
+        Lifebar {
+            full,
+            current: full
+        }
+    }
+
+    pub fn health_percent(&self) -> f32 {
+        (self.current as f32 / self.full as f32) * 100.
+    }
+}
+
+pub fn create_battle_ui(
+    mut commands: Commands,
+
+) {
+    commands.spawn_bundle(
+        NodeBundle {
+            style: Style {
+                size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            color: Color::NONE.into(),
+            ..default()
+        })
+        .insert(Name::new("UI Parent"))
+        .with_children(|parent| {
+            // Player 1
+            parent.spawn_bundle(
+                NodeBundle {
+                    style: Style {
+                        flex_direction: bevy::ui::FlexDirection::ColumnReverse,
+                        size: Size::new(Val::Percent(45.), Val::Percent(20.)),
+                        align_self: AlignSelf::FlexEnd,
+                        display: Display::Flex,
+                        ..default()
+                    },
+                    color: Color::NONE.into(),
+                    ..default()
+                }
+            )
+            .insert(Name::new("Player 1 UI"))
+            .with_children(|parent| {
+                parent.spawn_bundle(
+                    NodeBundle {
+                        style: Style {
+                            flex_direction: FlexDirection::RowReverse,
+                            size: Size::new(Val::Percent(85.), Val::Percent(20.)),
+                            position: UiRect {
+                                top: Val::Percent(30.),
+                                ..default()
+                            },
+                            align_self: AlignSelf::FlexEnd,
+                            ..default()
+                        },
+                        color: Color::BLACK.into(),
+                        ..default()
+                    }
+                )
+                .insert(Name::new("Player 1 Lifebar"))
+                .with_children(|parent| {
+                    parent.spawn_bundle(
+                        NodeBundle {
+                            style: Style {
+                                size: Size::new(Val::Percent(100.), Val::Percent(100.)),
+                                align_self: AlignSelf::FlexEnd,
+                                ..default()
+                            },
+                            color: Color::GREEN.into(),
+                            ..default()
+                        }
+                    )
+                    .insert(Player(1))
+                    .insert(Lifebar::new(500))
+                    .insert(Name::new("Player 1 Lifebar Fill"));
+                });
+            });
+
+            // Player 2
+            parent.spawn_bundle(
+                NodeBundle {
+                    style: Style {
+                        flex_direction: bevy::ui::FlexDirection::ColumnReverse,
+                        size: Size::new(Val::Percent(45.), Val::Percent(20.)),
+                        align_self: AlignSelf::FlexEnd,
+                        display: Display::Flex,
+                        ..default()
+                    },
+                    color: Color::NONE.into(),
+                    ..default()
+                }
+            )
+            .insert(Name::new("Player 2 UI"))
+            .with_children(|parent| {
+                parent.spawn_bundle(
+                    NodeBundle {
+                        style: Style {
+                            flex_direction: FlexDirection::Row,
+                            size: Size::new(Val::Percent(85.), Val::Percent(20.)),
+                            position: UiRect {
+                                top: Val::Percent(30.),
+                                ..default()
+                            },
+                            align_self: AlignSelf::FlexStart,
+                            ..default()
+                        },
+                        color: Color::BLACK.into(),
+                        ..default()
+                    }
+                )
+                .insert(Name::new("Player 2 Lifebar"))
+                .with_children(|parent| {
+                    parent.spawn_bundle(
+                        NodeBundle {
+                            style: Style {
+                                size: Size::new(Val::Percent(100.), Val::Percent(100.)),
+                                align_self: AlignSelf::FlexEnd,
+                                ..default()
+                            },
+                            color: Color::GREEN.into(),
+                            ..default()
+                        }
+                    )
+                    .insert(Player(2))
+                    .insert(Lifebar::new(500))
+                    .insert(Name::new("Player 2 Lifebar Fill"));
+                });
+            });
+        });
 
 }

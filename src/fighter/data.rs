@@ -1,7 +1,11 @@
+use bevy::prelude::Entity;
 use bevy::reflect::TypeUuid;
 use bevy::{prelude::Component, reflect::Reflect};
 use bevy::ecs::reflect::ReflectComponent;
+use parry3d::shape::Cuboid;
 use serde::{Deserialize, Serialize};
+
+use super::state::{HitboxData, HurtboxData};
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, Component, Reflect, TypeUuid)]
 #[reflect(Component)]
@@ -10,3 +14,28 @@ pub struct FighterData {
     pub name: String,
     pub walk_speed: f32
 }
+
+#[derive(Component)]
+pub struct Collider {
+    pub shape: Cuboid
+}
+
+
+pub struct CollisionData {
+    pub attacker_box: HitboxData,
+    pub attacker: Entity,
+    pub recipient_box: HurtboxData,
+    pub recipient: Entity,
+}
+
+impl CollisionData {
+    pub fn get_attacker_id(&self) -> u8 {
+        self.attacker_box.id
+    }
+
+    pub fn get_recipient(&self) -> Entity {
+        self.recipient
+    }
+}
+
+pub struct HitEvent(pub CollisionData);

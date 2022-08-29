@@ -1,4 +1,4 @@
-use battle::{load_fighters, spawn_fighters};
+use battle::{load_fighters, spawn_fighters, create_battle_ui};
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     ecs::reflect::ReflectComponent,
@@ -16,11 +16,11 @@ use fighter::{
     },
     systems::{
         buffer_insert_system, hitbox_component_system, increment_frame_system, movement_system,
-        process_input_system, InputBuffer, hitbox_removal_system, adjust_facing_system, hurtbox_component_system, hurtbox_removal_system, hbox_position_system,
+        process_input_system, InputBuffer, hitbox_removal_system, adjust_facing_system, hurtbox_component_system, hurtbox_removal_system, hbox_position_system, collision_system, hit_event_system, ui_lifebar_system,
     },
     FighterPlugin,
 };
-use game::{INPUT_BUFFER, PROCESS, MOVEMENT, ADD_HURTBOX, ADD_HITBOX, REMOVE_HITBOX, REMOVE_HURTBOX, UPDATE_HIT_POS, UPDATE_HURT_POS};
+use game::{INPUT_BUFFER, PROCESS, MOVEMENT, ADD_HURTBOX, ADD_HITBOX, REMOVE_HITBOX, REMOVE_HURTBOX, UPDATE_HIT_POS, UPDATE_HURT_POS, COLLISION, HIT_EVENT};
 use ggrs::{Config, PlayerType, SessionBuilder};
 //use bevy_editor_pls::prelude::*;
 use bevy_inspector_egui::WorldInspectorPlugin;
@@ -31,6 +31,8 @@ use iyes_loopless::prelude::{AppLooplessStateExt, IntoConditionalSystem};
 use iyes_progress::ProgressPlugin;
 use bevy_prototype_lyon::prelude::*;
 use leafwing_input_manager::prelude::InputManagerPlugin;
+use nalgebra::{Vector, Vector3};
+use parry3d::{shape::Cuboid, math::Real};
 
 use std::{
 
@@ -41,7 +43,7 @@ use std::{
 use crate::{
     battle::{PlayerEntities, PlayerHandleAccess},
     fighter::{
-        data::FighterData,
+        data::{FighterData, Collider},
         state::{
             SerializedState, State as FightState,
             StateMap, Owner,
@@ -176,17 +178,29 @@ fn main() {
                                 .label(UPDATE_HURT_POS)
                                 .after(UPDATE_HIT_POS)
                         )
-                        
-
                 )
-                // .with_stage_after(
-                //     "Hitbox Stage",
-                //     "Collision Stage",
-                //     SystemStage::parallel()
-                //         .with_system(
+                .with_stage_after(
+                    "Hitbox Stage",
+                    "Collision Stage",
+                    SystemStage::parallel()
+                        .with_system(
+                            collision_system
+                                .run_in_state(GameState::Fight)
+                                .label(COLLISION)
+                        )
+                        .with_system(
+                            hit_event_system
+                                .run_in_state(GameState::Fight)
+                                .label(HIT_EVENT)
+                                .after(COLLISION)
+                        )
+                        // .with_system(
+                        //     ui_lifebar_system
+                        //         .run_in_state(GameState::Fight)
+                        //         .after(HIT_EVENT)
 
-                //         )
-                //     )
+                        // )
+                    )
         )
         .build(&mut app);
 
@@ -202,8 +216,11 @@ fn main() {
                 .track_assets(),
         )
         .add_enter_system(GameState::LoadingFight, load_fighters)
+        .add_enter_system(GameState::LoadingFight, create_battle_ui)
         .add_exit_system(GameState::LoadingFight, spawn_fighters)
         .add_enter_system(GameState::Fight, startup.exclusive_system())
+
+        .add_system(ui_lifebar_system.run_in_state(GameState::Fight))
 
         .add_plugin(InputManagerPlugin::<Action>::default())
 
@@ -276,6 +293,8 @@ fn populate_entities_with_states(
                     origin: RectangleOrigin::Center,
                 };
 
+                let cuboid = Cuboid::new((hitbox.dimensions / 2.).into());
+
 
 
                 let start_frame = hitbox.start_frame;
@@ -283,6 +302,9 @@ fn populate_entities_with_states(
                     world
                         .spawn()
                         .insert(hitbox)
+                        .insert(Collider {
+                            shape: cuboid
+                        })
                         .insert(Name::new(format!("Hitbox {}", &name)))
                         .insert(Owner(player))
                         .insert_bundle(GeometryBuilder::build_as(
@@ -320,13 +342,16 @@ fn populate_entities_with_states(
                     origin: RectangleOrigin::Center,
                 };
 
-
+                let cuboid = Cuboid::new((hurtbox.dimensions / 2.).into());
 
                 let start_frame = hurtbox.start_frame.unwrap_or_default();
                 let hurtbox_entity = 
                     world
                         .spawn()
                         .insert(hurtbox)
+                        .insert(Collider {
+                            shape: cuboid
+                        })
                         .insert(Name::new(format!("Hurtbox {}", &name)))
                         .insert(Owner(player))
                         .insert_bundle(GeometryBuilder::build_as(

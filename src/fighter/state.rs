@@ -2,12 +2,12 @@ use std::fmt::Debug;
 
 use bevy::prelude::Entity;
 use bevy::reflect::{reflect_trait, FromReflect, TypeUuid};
+use bevy::utils::hashbrown::{HashMap, HashSet};
 use bevy::{
     ecs::reflect::ReflectComponent,
     math::Vec3,
     prelude::{Component, Query, Transform, With},
     reflect::{Reflect, ReflectDeserialize},
-    utils::{HashMap, HashSet},
 };
 use bevy_inspector_egui::Inspectable;
 use serde::{Deserialize, Serialize, de};
@@ -146,10 +146,10 @@ pub trait HBox: Component {
 #[reflect(Component)]
 pub struct HitboxData {
     #[serde(default)]
-    id: u8,
+    pub id: u8,
     pub dimensions: Vec3,
     pub offset: Vec3,
-    damage: u16,
+    pub damage: u16,
     #[serde(alias = "startFrame")]
     pub start_frame: u16,
     #[serde(alias = "endFrame")]
@@ -208,14 +208,15 @@ impl Default for CurrentState {
 
 #[derive(Default, Reflect, Component)]
 #[component(storage = "SparseSet")]
-pub struct Active;
+pub struct Active(pub HashSet<Entity>);
+// Ignored Entities
 
 
 #[derive(Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct StateFrame(pub u16);
 
-#[derive(Component, Inspectable)]
+#[derive(Component, Inspectable, PartialEq)]
 pub struct Owner(pub Entity);
 
 
@@ -238,4 +239,8 @@ impl Direction {
 #[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
 #[reflect(Component)]
 pub struct Facing(pub Direction);
+
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[reflect(Component)]
+pub struct Health(pub u16);
 

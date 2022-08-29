@@ -8,3 +8,7 @@ pub const REMOVE_HITBOX: &str = "remove_hitbox";
 pub const REMOVE_HURTBOX: &str = "remove_hurtbox";
 pub const UPDATE_HIT_POS: &str = "update_hit_pos";
 pub const UPDATE_HURT_POS: &str = "update_hurt_pos";
+pub const COLLISION: &str = "collision";
+pub const HIT_EVENT: &str = "hit_event";
+
+
