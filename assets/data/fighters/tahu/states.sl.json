@@ -2,133 +2,100 @@
     {
         "id": 0,
         "debug_name": "Idle",
+        "transitions": [
+            5,
+            100
+        ],
         "modifiers": [
-            {
-                "InputTransition": [
-                    [
-                        {
-                            "list": [
-                                [
-                                    [
-                                        "x",
-                                        "Negative",
-                                        false
-                                    ]
-                                ]
-                            ],
-                            "window": 1
-                        },
-                        5
-                    ],
-                    [
-                        {
-                            "list": [
-                                [
-                                    [
-                                        "x",
-                                        "Negative",
-                                        true
-                                    ]
-                                ]
-                            ],
-                            "window": 1
-                        },
-                        5
-                    ],
-                    [
-                        {
-                            "list": [
-                                [
-                                    [
-                                        "x",
-                                        "Positive",
-                                        false
-                                    ]
-                                ]
-                            ],
-                            "window": 1
-                        },
-                        5
-                    ],
-                    [
-                        {
-                            "list": [
-                                [
-                                    [
-                                        "x",
-                                        "Positive",
-                                        true
-                                    ]
-                                ]
-                            ],
-                            "window": 1
-                        },
-                        5
-                    ],
-                    [
-                        {
-                            "list": [
-                                [
-                                    [
-                                        "lp",
-                                        "Press"
-                                    ]
-                                ]
-                            ],
-                            "window": 1
-                        },
-                        100
-                    ]
-                ]
-            },
             {
                 "AdjustFacing": null
             }
         ],
         "hurtboxes": [
             {
-                "dimensions": [
-                    1,
-                    2,
-                    1
-                ]
+                "dimensions": [1, 2, 1]
             }
+        ],
+        "trigger1": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["x", "None", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            },
+            { "in": 5 }
+        ],
+        "trigger2": [
+            { "in": 100 },
+            { "endDuration": null }
         ]
     },
     {
         "id": 5,
         "debug_name": "Walk",
+        "transitions": [
+            0
+        ],
         "modifiers": [
             {
                 "Movement": null
-            },
-            {
-                "InputTransition": [
-                    [
-                        {
-                            "list": [
-                                [
-                                    [
-                                        "x",
-                                        "None",
-                                        false
-                                    ]
-                                ]
-                            ],
-                            "window": 1
-                        },
-                        0
-                    ]
-                ]
             }
         ],
         "hurtboxes": [
             {
-                "dimensions": [
-                    1,
-                    1,
-                    1
-                ]
+                "dimensions": [1, 1, 1]
+            }
+        ],
+        "trigger1": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["x", "Positive", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ],
+        "trigger2": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["x", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ],
+        "trigger3": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["x", "Positive", true]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ],
+        "trigger4": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["x", "Negative", true]
+                        ]
+                    ],
+                    "window": 1
+                }
             }
         ]
     },
@@ -141,25 +108,25 @@
                 "startFrame": 3,
                 "endFrame": 6,
                 "damage": 30,
-                "dimensions": [
-                    1,
-                    1,
-                    1
-                ],
-                "offset": [
-                    1,
-                    0,
-                    0
-                ]
+                "dimensions": [1, 1, 1],
+                "offset": [1, 0, 0]
             }
         ],
         "hurtboxes": [
             {
-                "dimensions": [
-                    1,
-                    1,
-                    1
-                ]
+                "dimensions": [1, 1, 1]
+            }
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"]
+                        ]
+                    ],
+                    "window": 1
+                }
             }
         ]
     }

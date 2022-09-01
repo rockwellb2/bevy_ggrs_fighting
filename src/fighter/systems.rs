@@ -2,7 +2,7 @@ use super::{
     data::{FighterData, Collider, CollisionData, HitEvent},
     state::{
         Active, AdjustFacing, CurrentState, Direction, Facing, HitboxData, HurtboxData,
-        InputTransition, Movement, Owner, State, StateFrame, StateMap, HBox, Health,
+        InputTransition, Movement, Owner, State, StateFrame, StateMap, HBox, Health, Conditions,
     },
     Fighter,
 };
@@ -111,60 +111,172 @@ pub fn increment_frame_system(mut query: Query<&mut StateFrame, (With<Player>, W
 pub fn process_input_system(
     mut commands: Commands,
     mut query: Query<
-        (&mut CurrentState, &StateMap, &InputBuffer, &mut StateFrame),
+        (&mut CurrentState, &StateMap, &InputBuffer, &mut StateFrame, &Player),
         (With<Fighter>, With<Player>),
     >,
-    state_query: Query<(Option<&InputTransition>, &State)>,
+    //state_query: Query<(Option<&InputTransition>, &State)>,
+    state_query: Query<&State>,
 
     mut hurtbox_query: Query<(Entity, &HurtboxData, &mut Visibility)>
 ) {
-    for (mut current, map, buffer, mut frame) in query.iter_mut() {
+    'fighter: for (mut current, map, buffer, mut frame, player) in query.iter_mut() {
         //println!("Does this print?");
 
         let state: &Entity = map.get(&current.0).expect("State doesn't exist");
 
-        if let Ok((transitions, s)) = state_query.get(*state) {
-            if let Some(transitions) = transitions {
-                for (command, to_state) in transitions.0.iter() {
-                    if command.compare(&buffer.0) {
-                        if let Some(hurtboxes) = &s.hurtboxes {
-                            if let Some(set) = hurtboxes.get(&0) {
-                                for hurtbox in set {
-                                    if let Ok((entity, data, mut visibility)) = hurtbox_query.get_mut(*hurtbox) {
-                                        visibility.is_visible = false;
-                                        commands.entity(entity).remove::<Active>();
+        //if let Ok((transitions, s)) = state_query.get(*state) {
+        if let Ok(s) = state_query.get(*state) {
+            // if let Some(transitions) = transitions {
+            //     for (command, to_state) in transitions.0.iter() {
+            //         if command.compare(&buffer.0) {
+            //             if let Some(hurtboxes) = &s.hurtboxes {
+            //                 if let Some(set) = hurtboxes.get(&0) {
+            //                     for hurtbox in set {
+            //                         if let Ok((entity, data, mut visibility)) = hurtbox_query.get_mut(*hurtbox) {
+            //                             visibility.is_visible = false;
+            //                             commands.entity(entity).remove::<Active>();
+            //                         }
+            //                     }
+            //                 }
+            //             }
+
+
+            //             current.0 = *to_state;
+            //             frame.0 = 1;
+            //             return;
+            //         }
+            //     }
+            // }
+
+
+            // if current.0 == 5 {
+            //     println!("WALKaSKDJJIDIJ")
+            // }
+
+            'transitions: for transition in s.transitions.iter() {
+                if let Ok(to_state) = state_query.get(*transition) {
+
+                    // if let Some(previous) = buffer.0.get(0) {
+                    //     if *previous == 1536 && player.0 == 1 && to_state.id == 5 {
+                    //         println!("")
+                    //     }
+                    // }
+
+                
+
+
+                    if let Some(all) = &to_state.triggers.0 {
+                        let mut meets_conditions = true;
+                        'all: for condition in all.iter() {
+                            match condition {
+                                Conditions::In(n) => {
+                                    if n != &current.0 {
+                                        meets_conditions = false;
+                                        break 'all;
                                     }
-                                }
+                                },
+                                Conditions::NotIn(n) => {
+                                    if n == &current.0 {
+                                        meets_conditions = false;
+                                        break 'all;
+                                    }
+                                },
+                                Conditions::Command(command) => {
+                                    if !command.compare(&buffer.0) {
+                                        meets_conditions = false;
+                                        break 'all;
+                                    }
+                                },
+                                Conditions::EndDuration => {
+                                    if frame.0 <= s.duration.expect("State doesn't have duration") {
+                                        meets_conditions = false;
+                                        break 'all;
+                                    }
+                                },
                             }
                         }
 
+                        if !meets_conditions {
+                            // if current.0 == 5 && to_state.id == 0 {
+                            //     println!("State {} does not meet condition to transition to {}", current.0, to_state.id);
+                            // }
+                            continue 'transitions
+                        }
+                    }
 
-                        current.0 = *to_state;
+                    let mut others = true;
+
+                    if current.0 == 100 {
+                        print!("")
+                    }
+
+                    'set: for con_set in to_state.triggers.1.iter() {
+                        let mut met = true;
+                        others = false;
+                        'conditions: for conditions in con_set.iter() {
+                            match conditions {
+                                Conditions::In(n) => {
+                                    if n != &current.0 {
+                                        met = false;
+                                        break 'conditions;
+                                    }
+                                },
+                                Conditions::NotIn(n) => {
+                                    if n == &current.0 {
+                                        met = false;
+                                        break 'conditions;
+                                    }
+                                },
+                                Conditions::Command(command) => {
+                                    if !command.compare(&buffer.0) {
+                                        met = false;
+                                        break 'conditions;
+                                    }
+                                },
+
+                                Conditions::EndDuration => {
+                                    if frame.0 <= s.duration.expect("State doesn't have duration") {
+                                        met = false;
+                                        break 'conditions;
+                                    }
+                                },
+                            }
+                        }
+                        if met {
+                            current.0 = to_state.id;
+                            frame.0 = 1;
+                            break 'transitions;
+                        }
+                    }
+                
+                    if others {
+                        current.0 = to_state.id;
                         frame.0 = 1;
-                        return;
+                        break 'transitions;
                     }
+                
                 }
             }
 
-            if let Some(duration) = s.duration {
-                if frame.0 > duration {
-                    if let Some(hurtboxes) = &s.hurtboxes {
-                        if let Some(set) = hurtboxes.get(&0) {
-                            for hurtbox in set {
-                                if let Ok((entity, data, mut visibility)) = hurtbox_query.get_mut(*hurtbox) {
-                                    visibility.is_visible = false;
-                                    commands.entity(entity).remove::<Active>();
-                                }
-                            }
-                        }
-                    }
+            // if let Some(duration) = s.duration {
+            //     if frame.0 > duration {
+            //         if let Some(hurtboxes) = &s.hurtboxes {
+            //             if let Some(set) = hurtboxes.get(&0) {
+            //                 for hurtbox in set {
+            //                     if let Ok((entity, data, mut visibility)) = hurtbox_query.get_mut(*hurtbox) {
+            //                         visibility.is_visible = false;
+            //                         commands.entity(entity).remove::<Active>();
+            //                     }
+            //                 }
+            //             }
+            //         }
 
 
-                    // TODO: Add component that says which state it should return to
-                    current.0 = 0;
-                    frame.0 = 1;
-                }
-            }
+            //         // TODO: Add component that says which state it should return to
+            //         current.0 = 0;
+            //         frame.0 = 1;
+            //     }
+            // }
         }
     }
 }

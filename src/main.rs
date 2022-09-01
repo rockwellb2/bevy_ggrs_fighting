@@ -258,6 +258,7 @@ fn populate_entities_with_states(
     deserialized: Vec<SerializedState>,
 ) {
     let mut state_map = StateMap::new();
+    let mut transition_list: Vec<(Entity, Vec<u16>)> = Vec::new();
 
     for mut state in deserialized {
         let name = state
@@ -280,8 +281,14 @@ fn populate_entities_with_states(
         let hbox_serialized = state.unsorted_hitboxes.take();
         let hurtbox_serialized = state.unsorted_hurtboxes.take();
         let mods_serialized = state.modifiers.take();
+        let transitions_serialized = state.transitions.clone();
+
+        transition_list.push((entity, transitions_serialized));
 
         let mut state = FightState::from_serialized(state);
+
+        println!("State {}: {:?}", name, state.triggers);
+
 
         // HITBOXES
         if let Some(hitboxes) = hbox_serialized {
@@ -396,6 +403,16 @@ fn populate_entities_with_states(
     }
 
     println!("StateMap: {:?}", state_map);
+
+    for (s, transitions) in transition_list {
+        let mut target = world.get_mut::<FightState>(s).unwrap();
+        println!("State {} Transitions: {:?}", target.id, transitions);
+        for t in transitions {
+            target.transitions.insert(*state_map.get(&t).unwrap());
+        }
+        
+        // println!("State {} Transitions: {:?}", target.id, target.transitions);
+    }
 
     world.entity_mut(player).insert(state_map);
 }

@@ -142,7 +142,7 @@ pub fn input(
                 } else {
                     match previous.get_directional_from_button(pos) {
                         (DirectionalInput::None, _) => (DirectionalInput::None, false),
-                        _ => (DirectionalInput::None, true),
+                        _ => (DirectionalInput::None, false),
                     }
                 }
             };
@@ -158,6 +158,10 @@ pub fn input(
             let (y, just_pressed_y) = directional_check(Action::Up, Action::Down);
 
             let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
+
+            if inp.x == DirectionalInput::None && inp.just_pressed_x == false {
+                //println!("Something");
+            }
 
             Input(inp.into())
         } else {

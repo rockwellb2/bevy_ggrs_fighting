@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 use bevy::prelude::Entity;
 use bevy::reflect::{reflect_trait, FromReflect, TypeUuid};
@@ -10,11 +11,13 @@ use bevy::{
     reflect::{Reflect, ReflectDeserialize},
 };
 use bevy_inspector_egui::Inspectable;
-use serde::{Deserialize, Serialize, de};
+use serde::de::Visitor;
+use serde::{Deserialize, Serialize, de, Deserializer};
+use serde_json::from_value;
 
 //use bevy_editor_pls::default_windows::inspector::InspectorWindow;
 
-use crate::input::NewCommandInput;
+use crate::input::{NewCommandInput, NewMatchExpression};
 
 use super::Fighter;
 use super::systems::InputBuffer;
@@ -95,7 +98,10 @@ pub struct State {
     pub id: u16,
     pub duration: Option<u16>,
     pub hitboxes: Option<HashMap<u16, HashSet<Entity>>>,
-    pub hurtboxes: Option<HashMap<u16, HashSet<Entity>>>
+    pub hurtboxes: Option<HashMap<u16, HashSet<Entity>>>,
+    pub transitions: HashSet<Entity>,
+    //pub triggers: Vec<NewCommandInput>,
+    pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>)
 }
 
 impl State {
@@ -104,7 +110,9 @@ impl State {
             id: serialized.id,
             duration: serialized.duration,
             hitboxes: None,
-            hurtboxes: None
+            hurtboxes: None,
+            transitions: HashSet::new(),
+            triggers: serialized.triggers
         }
     }
 
@@ -116,21 +124,113 @@ impl State {
         self.hurtboxes = Some(hurtboxes);
     }
 }
+#[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect)]
+#[serde(rename_all = "camelCase")]
+pub enum Conditions {
+    // used for the current state
+    In(u16),
+    NotIn(u16),
+    Command(NewCommandInput),
+    // when current state is at the end of its duration
+    EndDuration,
+}
 
-#[derive(Default, Serialize, Deserialize, Debug, Clone)]
+#[derive(Default, Serialize, Debug, Clone)]
 pub struct SerializedState {
     pub id: u16,
-    #[serde(default)]
+    //#[serde(default)]
     pub debug_name: Option<String>,
-    #[serde(default)]
+    //#[serde(default)]
     duration: Option<u16>,
-    #[serde(default, alias = "hitboxes")]
+    //#[serde(default, alias = "hitboxes")]
     pub unsorted_hitboxes: Option<Vec<HitboxData>>,
-    #[serde(default, alias = "hurtboxes")]
+    //#[serde(default, alias = "hurtboxes")]
     pub unsorted_hurtboxes: Option<Vec<HurtboxData>>,
-    #[serde(default)]
+    //#[serde(default)]
     pub modifiers: Option<Vec<Box<dyn StateModifier>>>,
+    //#[serde(default = "SerializedState::transition_default")]
+    pub transitions: Vec<u16>,
+    //#[serde(default)]
+    //pub triggers: Vec<NewCommandInput>,
+    pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>)
 }
+
+// impl SerializedState {
+//     fn transition_default() -> Vec<u16> {
+//         vec![0]
+//     }
+// }
+
+impl<'de> Deserialize<'de> for SerializedState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let json: serde_json::value::Value = serde_json::value::Value::deserialize(deserializer)?;
+        let object = json.as_object().expect("Not an object");
+
+        let mut id: u16 = 0;
+        let mut debug_name: Option<String> = None;
+        let mut duration: Option<u16> = None;
+        let mut unsorted_hitboxes: Option<Vec<HitboxData>> = None;
+        let mut unsorted_hurtboxes: Option<Vec<HurtboxData>> = None;
+        let mut modifiers: Option<Vec<Box<dyn StateModifier>>> = None;
+        let mut transitions: Vec<u16> = vec![0];
+        //let mut triggers: Vec<NewCommandInput> = Vec::new();
+        let mut triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>) = (None, Vec::new());
+
+        for (key, value) in object.into_iter() {
+            let key = key.as_str();
+
+            if key == "id" {
+                id = value.as_u64().expect("u64") as u16;
+            }
+            else if key == "debug_name" {
+                debug_name = Some(value.as_str().expect("str").to_string());
+            }
+            else if key == "duration" {
+                duration = Some(value.as_u64().expect("u64") as u16);
+            }
+            else if key == "hitboxes" {
+                unsorted_hitboxes = Some(from_value(value.clone()).expect("Can't convert array to Vec<HitboxData>"));
+            }
+            else if key == "hurtboxes" {
+                unsorted_hurtboxes = Some(from_value(value.clone()).expect("Can't convert array to Vec<HurtboxData>"));
+            }
+
+            else if key == "modifiers" {
+                modifiers = Some(from_value(value.clone()).expect("Can't convert array to Vec<Box<dyn StateModifier>>"));
+            }
+
+            else if key == "transitions" {
+                transitions = from_value(value.clone()).expect("Can't convert array to Vec<u16>");
+            }
+
+            else if key == "allTriggers" {
+                triggers.0 = Some(from_value(value.clone()).expect("Can't convert array to Vec<Conditions>"));
+            }
+
+            else if key.contains("trigger") {
+                triggers.1.push(from_value(value.clone()).expect("Can't convert array to Vec<Conditions>"))
+            }
+        }
+
+        println!("Triggers: {:?}", triggers.0);
+
+        Ok(SerializedState {
+            id,
+            debug_name,
+            duration,
+            unsorted_hitboxes,
+            unsorted_hurtboxes,
+            modifiers,
+            transitions,
+            triggers,
+        })
+
+    }
+}
+
 
 #[derive(Serialize, Deserialize, TypeUuid, Clone)]
 #[uuid = "57ae9bea-139e-11ed-861d-0242ac120002"]
