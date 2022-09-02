@@ -16,11 +16,11 @@ use fighter::{
     },
     systems::{
         buffer_insert_system, hitbox_component_system, increment_frame_system, movement_system,
-        process_input_system, InputBuffer, hitbox_removal_system, adjust_facing_system, hurtbox_component_system, hurtbox_removal_system, hbox_position_system, collision_system, hit_event_system, ui_lifebar_system,
+        process_input_system, InputBuffer, hitbox_removal_system, adjust_facing_system, hurtbox_component_system, hurtbox_removal_system, hbox_position_system, collision_system, hit_event_system, ui_lifebar_system, hitstun_system, transition_system,
     },
     FighterPlugin,
 };
-use game::{INPUT_BUFFER, PROCESS, MOVEMENT, ADD_HURTBOX, ADD_HITBOX, REMOVE_HITBOX, REMOVE_HURTBOX, UPDATE_HIT_POS, UPDATE_HURT_POS, COLLISION, HIT_EVENT};
+use game::{INPUT_BUFFER, PROCESS, MOVEMENT, ADD_HURTBOX, ADD_HITBOX, REMOVE_HITBOX, REMOVE_HURTBOX, UPDATE_HIT_POS, UPDATE_HURT_POS, COLLISION, HIT_EVENT, HITSTUN, FRAME_INCREMENT, TRANSITION};
 use ggrs::{Config, PlayerType, SessionBuilder};
 //use bevy_editor_pls::prelude::*;
 use bevy_inspector_egui::WorldInspectorPlugin;
@@ -116,22 +116,34 @@ fn main() {
                                 .label(INPUT_BUFFER),
                         )
                         .with_system(
+                            hitstun_system
+                                .run_in_state(GameState::Fight)
+                                .label(HITSTUN)
+                                .after(INPUT_BUFFER)
+                        )
+                        .with_system(
                             increment_frame_system
                                 .run_in_state(GameState::Fight)
-                                .before(PROCESS)
-                                .after(INPUT_BUFFER),
+                                .label(FRAME_INCREMENT)
+                                .after(HITSTUN),
                         )
                         .with_system(
                             process_input_system
                                 .run_in_state(GameState::Fight)
                                 .label(PROCESS)
-                                .after(INPUT_BUFFER),
+                                .after(FRAME_INCREMENT),
+                        )
+                        .with_system(
+                            transition_system
+                                .run_in_state(GameState::Fight)
+                                .label(TRANSITION)
+                                .after(PROCESS)
                         )
                         .with_system(
                             movement_system
                                 .run_in_state(GameState::Fight)
                                 .label(MOVEMENT)
-                                .after(PROCESS),
+                                .after(TRANSITION),
                         )
                         .with_system(
                             adjust_facing_system
@@ -410,8 +422,6 @@ fn populate_entities_with_states(
         for t in transitions {
             target.transitions.insert(*state_map.get(&t).unwrap());
         }
-        
-        // println!("State {} Transitions: {:?}", target.id, target.transitions);
     }
 
     world.entity_mut(player).insert(state_map);

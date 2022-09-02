@@ -1,5 +1,8 @@
 pub const INPUT_BUFFER: &str = "input_buffer";
+pub const HITSTUN: &str = "hitstun";
+pub const FRAME_INCREMENT: &str = "frame_increment";
 pub const PROCESS: &str = "process";
+pub const TRANSITION: &str = "transition";
 pub const MOVEMENT: &str = "movement";
 
 pub const ADD_HITBOX: &str = "insert_transform";

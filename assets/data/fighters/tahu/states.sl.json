@@ -3,6 +3,7 @@
         "id": 0,
         "debug_name": "Idle",
         "transitions": [
+            1,
             5,
             100
         ],
@@ -32,6 +33,56 @@
         "trigger2": [
             { "in": 100 },
             { "endDuration": null }
+        ],
+        "trigger4": [
+            { "in": 101 },
+            { "endDuration": null }
+        ],
+        "trigger3": [
+            { "in": 1},
+            { 
+                "command": {
+                    "list": [
+                        [
+                            ["y", "None", false]
+                        ]
+                    ],
+                    "window": 1
+
+                }
+            }
+        ]
+    },
+    {
+        "id": 1,
+        "debug_name": "Crouch",
+        "transitions": [
+            0,
+            101 
+        ],
+        "hurtboxes": [
+            {
+                "dimensions": [1, 1, 1]
+            }
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["y", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ],
+        "trigger1": [
+            { "in": 101 },
+            { "endDuration": null }
+        ],
+        "trigger2": [
+            { "in": 0 }
         ]
     },
     {
@@ -102,12 +153,14 @@
     {
         "id": 100,
         "debug_name": "LP",
-        "duration": 10,
+        "duration": 15,
         "hitboxes": [
             {
                 "startFrame": 3,
                 "endFrame": 6,
                 "damage": 30,
+                "hitstun": 18,
+                "blockstun": 10,
                 "dimensions": [1, 1, 1],
                 "offset": [1, 0, 0]
             }
@@ -129,5 +182,31 @@
                 }
             }
         ]
+    },
+    {
+        "id": 101,
+        "debug_name": "2LP",
+        "transitions": [
+            0,
+            1
+        ],
+        "duration": 13,
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"],
+                            ["y", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+    },
+    {
+        "id": 3000,
+        "debug_name": "Hitstun"
     }
 ]

@@ -4,11 +4,12 @@ use bevy_inspector_egui::RegisterInspectable;
 
 
 
-use self::{data::{FighterData, HitEvent}, state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Movement, InputTransition, Owner, AdjustFacing, Facing, Health}, systems::InputBuffer};
+use self::{data::{FighterData, HitEvent}, state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Movement, InputTransition, Owner, AdjustFacing, Facing, Health}, systems::InputBuffer, event::TransitionEvent};
 
 pub(crate) mod state;
 pub(crate) mod systems;
 pub(crate) mod data;
+pub(crate) mod event;
 
 #[derive(Component)]
 pub struct Fighter;
@@ -20,6 +21,7 @@ impl Plugin for FighterPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_event::<HitEvent>()
+            .add_event::<TransitionEvent>()
             .register_type::<Movement>()
             .register_type::<InputTransition>()
             .register_type::<AdjustFacing>()

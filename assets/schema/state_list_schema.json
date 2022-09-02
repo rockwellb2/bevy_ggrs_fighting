@@ -4,7 +4,5 @@
     "type": "array",
     "items": {
         "$ref": "state_schema.json"
-    }
-
-    
+    } 
 }

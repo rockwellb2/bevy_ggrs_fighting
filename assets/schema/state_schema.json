@@ -24,6 +24,10 @@
                 "$ref": "hitbox_schema.json"
             }
         },
+        "hurtboxes": {
+            "description": "A list of the hurtboxes that are active during the state",
+            "type": "array"
+        },
         "modifiers": {
             "description": "A list of modifiers to be applied to the state that change its function",
             "type": "array",
@@ -91,6 +95,14 @@
                         ]
                     }
                 ]
+            }
+        },
+        "transitions": {
+            "description": "A list of the ids that this state can transition to",
+            "type": "array",
+            "items": {
+                "type": "integer",
+                "minimum": 0
             }
         }
     },

@@ -1,20 +1,18 @@
 use super::{
     data::{FighterData, Collider, CollisionData, HitEvent},
     state::{
-        Active, AdjustFacing, CurrentState, Direction, Facing, HitboxData, HurtboxData,
-        InputTransition, Movement, Owner, State, StateFrame, StateMap, HBox, Health, Conditions,
+        Active, AdjustFacing, CurrentState, Direction, Facing, HitboxData, HurtboxData, Movement, Owner, State, StateFrame, StateMap, HBox, Health, Conditions, InHitstun,
     },
-    Fighter,
+    Fighter, event::TransitionEvent,
 };
 use bevy::{
-    ecs::{reflect::ReflectComponent, entity::EntityMap},
+    ecs::{reflect::ReflectComponent, },
     prelude::{
-        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader,
+        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without,
     },
     reflect::Reflect,
-    utils::{default, HashMap, hashbrown::HashSet}, render::view::visibility, ui::{Style, Val},
+    utils::{default, HashMap, hashbrown::HashSet}, ui::{Style, Val},
 };
-use bevy_ggrs::Rollback;
 use ggrs::InputStatus;
 use nalgebra::{Isometry3, Vector3};
 use parry3d::{query::intersection_test, shape::Cuboid};
@@ -22,9 +20,8 @@ use parry3d::{query::intersection_test, shape::Cuboid};
 use crate::{
     battle::{PlayerEntities, Lifebar},
     input::{
-        ButtonPress, DirectionalInput, Input as FightInput, StateInput, DOWN, DOWN_HELD, LEFT,
-        LEFT_HELD, MAP, RAW_DOWN, RAW_LEFT, RAW_LP, RAW_RIGHT, RAW_UP, RIGHT, RIGHT_HELD, UP,
-        UP_HELD,
+        Input as FightInput, LEFT,
+        LEFT_HELD, RIGHT, RIGHT_HELD,
     },
     util::Buffer,
     Player, FPS,
@@ -35,22 +32,21 @@ pub fn movement_system(
     //mut fighter_query: Query<(&mut Transform, &FighterData), With<Fighter>>,
     mut fighter_query: Query<
         (
-            &mut CurrentState,
+            &CurrentState,
             &StateMap,
             &mut Transform,
             &FighterData,
             &InputBuffer,
         ),
-        With<Fighter>,
+        (With<Fighter>, Without<InHitstun>)
     >,
     state_query: Query<With<Movement>>,
     //inputs: Res<Vec<(FightInput, InputStatus)>>,
     //mut commands: Commands,
     //frame_count: Res<FrameCount>
 ) {
-    //println!("How often does this print?");
 
-    for (mut current, map, mut tf, data, buffer) in fighter_query.iter_mut() {
+    for (current, map, mut tf, data, buffer) in fighter_query.iter_mut() {
         //println!("Is this called every frame?");
         let state = map.get(&current.0).expect("State doesn't exist.");
         //let another = state_query.get(*state);
@@ -59,13 +55,7 @@ pub fn movement_system(
             let input: &Buffer<u32> = &buffer.0;
 
             if let Some(last) = input.last() {
-                let last_unref = *last;
-                let unpacked: StateInput = last_unref.into();
-
-                // if unpacked.x == DirectionalInput::None {
-                //     current.0 = 0;
-                //     return;
-                // }
+                //let last_unref = *last;
 
                 if *last & LEFT == LEFT || *last & LEFT_HELD == LEFT_HELD {
                     tf.translation.x -= data.walk_speed / FPS as f32;
@@ -75,94 +65,50 @@ pub fn movement_system(
             }
         }
     }
-
-    // for fighter in state_query.iter() {
-    //     if let Ok((mut tf, data)) = fighter_query.get_mut(fighter.0) {
-    //         let input: u16 = inputs[0].0.0;
-    //         //println!("{:?}", input);
-
-    //         if input & LEFT != 0 {
-    //             tf.translation.x -= data.walk_speed / FPS as f32;
-    //         }
-    //         else if input & RIGHT != 0 {
-    //             tf.translation.x += data.walk_speed / FPS as f32;
-    //         }
-    //     }
-    // }
-
-    // for (e, _p) in query.iter() {
-    //     println!("First stage: {}", frame_count.frame);
-    //     commands.entity(e).insert(Active);
-
-    //     for (mut tf, data) in fighter_query.iter_mut() {
-    //         //tf.translation.x -= data.walk_speed;
-
-    //     }
-    // }
 }
 
 pub fn increment_frame_system(mut query: Query<&mut StateFrame, (With<Player>, With<Fighter>)>) {
     for mut frame in query.iter_mut() {
-        //println!("Printing increment frame");
         frame.0 = frame.0.checked_add(1).unwrap_or(1);
     }
 }
 
-pub fn process_input_system(
+pub fn hitstun_system(
     mut commands: Commands,
-    mut query: Query<
-        (&mut CurrentState, &StateMap, &InputBuffer, &mut StateFrame, &Player),
+    mut query: Query<(Entity, &mut CurrentState, &mut StateFrame, &InHitstun), With<Fighter>>
+) {
+    for (fighter, mut current, mut frame, hitstun) in query.iter_mut() {
+        if frame.0 > hitstun.0 {
+            frame.0 = 1;
+            current.0 = 0;
+            commands
+                .entity(fighter)
+                .remove::<InHitstun>();
+        }
+    }
+}
+
+pub fn process_input_system(
+    //mut commands: Commands,
+    query: Query<
+        (Entity, &CurrentState, &StateMap, &InputBuffer, &StateFrame, &Player),
         (With<Fighter>, With<Player>),
     >,
     //state_query: Query<(Option<&InputTransition>, &State)>,
     state_query: Query<&State>,
 
-    mut hurtbox_query: Query<(Entity, &HurtboxData, &mut Visibility)>
+    //mut hurtbox_query: Query<(Entity, &HurtboxData, &mut Visibility)>,
+
+    mut trans_writer: EventWriter<TransitionEvent>
 ) {
-    'fighter: for (mut current, map, buffer, mut frame, player) in query.iter_mut() {
-        //println!("Does this print?");
+    'fighter: for (fighter, current, map, buffer, frame, _player) in query.iter() {
 
         let state: &Entity = map.get(&current.0).expect("State doesn't exist");
 
-        //if let Ok((transitions, s)) = state_query.get(*state) {
+
         if let Ok(s) = state_query.get(*state) {
-            // if let Some(transitions) = transitions {
-            //     for (command, to_state) in transitions.0.iter() {
-            //         if command.compare(&buffer.0) {
-            //             if let Some(hurtboxes) = &s.hurtboxes {
-            //                 if let Some(set) = hurtboxes.get(&0) {
-            //                     for hurtbox in set {
-            //                         if let Ok((entity, data, mut visibility)) = hurtbox_query.get_mut(*hurtbox) {
-            //                             visibility.is_visible = false;
-            //                             commands.entity(entity).remove::<Active>();
-            //                         }
-            //                     }
-            //                 }
-            //             }
-
-
-            //             current.0 = *to_state;
-            //             frame.0 = 1;
-            //             return;
-            //         }
-            //     }
-            // }
-
-
-            // if current.0 == 5 {
-            //     println!("WALKaSKDJJIDIJ")
-            // }
-
             'transitions: for transition in s.transitions.iter() {
                 if let Ok(to_state) = state_query.get(*transition) {
-
-                    // if let Some(previous) = buffer.0.get(0) {
-                    //     if *previous == 1536 && player.0 == 1 && to_state.id == 5 {
-                    //         println!("")
-                    //     }
-                    // }
-
-                
 
 
                     if let Some(all) = &to_state.triggers.0 {
@@ -193,22 +139,32 @@ pub fn process_input_system(
                                         break 'all;
                                     }
                                 },
+                                Conditions::Frame(start_frame, end_frame) => {
+                                    if let Some(start) = start_frame {
+                                        if frame.0 < *start {
+                                            meets_conditions = false;
+                                            break 'all;
+                                        }
+                                    }
+
+                                    if let Some(end) = end_frame {
+                                        if frame.0 > *end {
+                                            meets_conditions = false;
+                                            break 'all;
+                                        }
+                                    }
+
+                                    
+                                }
                             }
                         }
 
                         if !meets_conditions {
-                            // if current.0 == 5 && to_state.id == 0 {
-                            //     println!("State {} does not meet condition to transition to {}", current.0, to_state.id);
-                            // }
                             continue 'transitions
                         }
                     }
 
                     let mut others = true;
-
-                    if current.0 == 100 {
-                        print!("")
-                    }
 
                     'set: for con_set in to_state.triggers.1.iter() {
                         let mut met = true;
@@ -240,43 +196,70 @@ pub fn process_input_system(
                                         break 'conditions;
                                     }
                                 },
+                                Conditions::Frame(start_frame, end_frame) => {
+                                    if let Some(start) = start_frame {
+                                        if frame.0 < *start {
+                                            met = false;
+                                            break 'conditions;
+                                        }
+                                    }
+
+                                    if let Some(end) = end_frame {
+                                        if frame.0 > *end {
+                                            met = false;
+                                            break 'conditions;
+                                        }
+                                    }
+
+                                    
+                                }
                             }
                         }
                         if met {
-                            current.0 = to_state.id;
-                            frame.0 = 1;
+                            trans_writer.send(TransitionEvent::new(fighter, to_state.id));
                             break 'transitions;
                         }
                     }
                 
                     if others {
-                        current.0 = to_state.id;
-                        frame.0 = 1;
+                        trans_writer.send(TransitionEvent::new(fighter, to_state.id));
                         break 'transitions;
                     }
                 
                 }
             }
+        }
+    }
+}
 
-            // if let Some(duration) = s.duration {
-            //     if frame.0 > duration {
-            //         if let Some(hurtboxes) = &s.hurtboxes {
-            //             if let Some(set) = hurtboxes.get(&0) {
-            //                 for hurtbox in set {
-            //                     if let Ok((entity, data, mut visibility)) = hurtbox_query.get_mut(*hurtbox) {
-            //                         visibility.is_visible = false;
-            //                         commands.entity(entity).remove::<Active>();
-            //                     }
-            //                 }
-            //             }
-            //         }
+pub fn transition_system(
+    mut commands: Commands,
+    mut trans_reader: EventReader<TransitionEvent>,
+    mut fighter_query: Query<(&mut CurrentState, &StateMap, &mut StateFrame), With<Fighter>>,
+    state_query: Query<&State>,
+    mut hurtbox_query: Query<&mut Visibility>
+) {
+    for event in trans_reader.iter() {
+        if let Ok((mut current, map, mut frame)) = fighter_query.get_mut(event.fighter) {
+            let entity = map.get(&current.0).expect("State doesn't exist");
 
-
-            //         // TODO: Add component that says which state it should return to
-            //         current.0 = 0;
-            //         frame.0 = 1;
-            //     }
-            // }
+            if let Ok(state) = state_query.get(*entity) {
+                if let Some(hurt_map) = &state.hurtboxes {
+                    if let Some(hurtboxes) = hurt_map.get(&0) {
+                        for hurt in hurtboxes {
+                            commands.entity(*hurt)
+                                .remove::<Active>();
+                            
+                            if let Ok(mut visibility) = hurtbox_query.get_mut(*hurt) {
+                                visibility.is_visible = false;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            current.0 = event.to_id;
+            frame.0 = 1;
         }
     }
 }
@@ -284,11 +267,6 @@ pub fn process_input_system(
 #[derive(Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct InputBuffer(pub Buffer<u32>);
-//pub struct InputBuffer(pub Buffer<FightInput>);
-
-// #[derive(Default, Component, Reflect)]
-// #[reflect(Component)]
-// pub struct InputBuffer(pub Vec<FightInput>);
 
 pub fn buffer_insert_system(
     //mut query: Query<&mut InputBuffer, With<Player>>,
@@ -315,7 +293,7 @@ pub fn hitbox_component_system(
             &InputBuffer,
             &Facing,
         ),
-        With<Fighter>,
+        (With<Fighter>, Without<InHitstun>)
     >,
     state_query: Query<&State>,
     hitbox_query: Query<&HitboxData>,
@@ -443,8 +421,6 @@ pub fn hurtbox_removal_system(
                 commands.entity(entity).remove::<Active>();
             }
         }
-        
-        
     }
 }
 
@@ -503,7 +479,7 @@ pub fn hbox_position_system<T: HBox>(
 }
 
 pub fn collision_system(
-    mut hitbox_query: Query<(Entity, &Owner, &mut Active), (With<HitboxData>)>,
+    mut hitbox_query: Query<(Entity, &Owner, &mut Active), With<HitboxData>>,
     hurtbox_query: Query<(Entity, &Owner), (With<HurtboxData>, With<Active>)>,
 
     hit_query: Query<(&HitboxData, &Collider, &Transform)>,
@@ -579,13 +555,20 @@ pub fn collision_system(
 }
 
 pub fn hit_event_system(
+    mut commands: Commands,
     mut hit_reader: EventReader<HitEvent>,
-    mut fighter_query: Query<&mut Health, With<Fighter>>,
+    mut fighter_query: Query<(Entity, &mut Health, &mut StateFrame, &mut CurrentState), With<Fighter>>,
     mut hitbox_query: Query<(&mut Active, &HitboxData, &Owner)>
 ) {
     for hit_event in hit_reader.iter() {
-        if let Ok(mut health) = fighter_query.get_mut(hit_event.0.recipient) {
+        if let Ok((fighter, mut health, mut frame, mut current)) = fighter_query.get_mut(hit_event.0.recipient) {
             health.0 = health.0.saturating_sub(hit_event.0.attacker_box.damage);
+            commands
+                .entity(fighter)
+                .insert(InHitstun(hit_event.0.attacker_box.hitstun));
+
+            frame.0 = 1;
+            current.0 = 3000;
         }
 
         for (mut active, _data, owner) in hitbox_query.iter_mut() {

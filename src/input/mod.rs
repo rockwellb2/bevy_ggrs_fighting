@@ -1,6 +1,3 @@
-use std::default;
-use std::ops::Deref;
-
 use bevy::prelude::*;
 use bevy::reflect::FromReflect;
 use bytemuck::{Pod, Zeroable};
@@ -159,8 +156,9 @@ pub fn input(
 
             let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
 
-            if inp.x == DirectionalInput::None && inp.just_pressed_x == false {
-                //println!("Something");
+            if inp.hk == ButtonPress::Hold {
+                println!("LP: {:?}, previous: {:?}", inp.lp, previous.lp);
+
             }
 
             Input(inp.into())

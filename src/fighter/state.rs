@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-use std::marker::PhantomData;
 
 use bevy::prelude::Entity;
 use bevy::reflect::{reflect_trait, FromReflect, TypeUuid};
@@ -100,7 +99,6 @@ pub struct State {
     pub hitboxes: Option<HashMap<u16, HashSet<Entity>>>,
     pub hurtboxes: Option<HashMap<u16, HashSet<Entity>>>,
     pub transitions: HashSet<Entity>,
-    //pub triggers: Vec<NewCommandInput>,
     pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>)
 }
 
@@ -133,6 +131,8 @@ pub enum Conditions {
     Command(NewCommandInput),
     // when current state is at the end of its duration
     EndDuration,
+    // current frame of the stat
+    Frame(Option<u16>, Option<u16>)
 }
 
 #[derive(Default, Serialize, Debug, Clone)]
@@ -155,11 +155,6 @@ pub struct SerializedState {
     pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>)
 }
 
-// impl SerializedState {
-//     fn transition_default() -> Vec<u16> {
-//         vec![0]
-//     }
-// }
 
 impl<'de> Deserialize<'de> for SerializedState {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -176,7 +171,6 @@ impl<'de> Deserialize<'de> for SerializedState {
         let mut unsorted_hurtboxes: Option<Vec<HurtboxData>> = None;
         let mut modifiers: Option<Vec<Box<dyn StateModifier>>> = None;
         let mut transitions: Vec<u16> = vec![0];
-        //let mut triggers: Vec<NewCommandInput> = Vec::new();
         let mut triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>) = (None, Vec::new());
 
         for (key, value) in object.into_iter() {
@@ -206,7 +200,7 @@ impl<'de> Deserialize<'de> for SerializedState {
                 transitions = from_value(value.clone()).expect("Can't convert array to Vec<u16>");
             }
 
-            else if key == "allTriggers" {
+            else if key == "triggerAll" {
                 triggers.0 = Some(from_value(value.clone()).expect("Can't convert array to Vec<Conditions>"));
             }
 
@@ -250,6 +244,8 @@ pub struct HitboxData {
     pub dimensions: Vec3,
     pub offset: Vec3,
     pub damage: u16,
+    pub hitstun: u16,
+    pub blockstun: u16,
     #[serde(alias = "startFrame")]
     pub start_frame: u16,
     #[serde(alias = "endFrame")]
@@ -343,4 +339,8 @@ pub struct Facing(pub Direction);
 #[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
 #[reflect(Component)]
 pub struct Health(pub u16);
+
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[reflect(Component)]
+pub struct InHitstun(pub u16);
 
