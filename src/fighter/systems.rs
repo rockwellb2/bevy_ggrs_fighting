@@ -101,14 +101,23 @@ pub fn process_input_system(
 
     mut trans_writer: EventWriter<TransitionEvent>
 ) {
-    'fighter: for (fighter, current, map, buffer, frame, _player) in query.iter() {
+    'fighter: for (fighter, current, map, buffer, frame, player) in query.iter() {
 
         let state: &Entity = map.get(&current.0).expect("State doesn't exist");
 
+        // if player.0 == 1 {
+        //     println!("State: {}", current.0);
+        // }
 
         if let Ok(s) = state_query.get(*state) {
             'transitions: for transition in s.transitions.iter() {
                 if let Ok(to_state) = state_query.get(*transition) {
+
+                    if s.id == 0 && to_state.id == 1 && player.0 == 1 {
+                        print!("");
+                    }
+
+
 
 
                     if let Some(all) = &to_state.triggers.0 {
@@ -235,12 +244,12 @@ pub fn process_input_system(
 pub fn transition_system(
     mut commands: Commands,
     mut trans_reader: EventReader<TransitionEvent>,
-    mut fighter_query: Query<(&mut CurrentState, &StateMap, &mut StateFrame), With<Fighter>>,
+    mut fighter_query: Query<(&mut CurrentState, &StateMap, &mut StateFrame, &InputBuffer), With<Fighter>>,
     state_query: Query<&State>,
     mut hurtbox_query: Query<&mut Visibility>
 ) {
     for event in trans_reader.iter() {
-        if let Ok((mut current, map, mut frame)) = fighter_query.get_mut(event.fighter) {
+        if let Ok((mut current, map, mut frame, buffer)) = fighter_query.get_mut(event.fighter) {
             let entity = map.get(&current.0).expect("State doesn't exist");
 
             if let Ok(state) = state_query.get(*entity) {
@@ -257,11 +266,20 @@ pub fn transition_system(
                     }
                 }
             }
+
+            if current.0 == 0 && event.to_id == 1 {
+                println!("Frame {}: {:?}", frame.0, buffer.0);
+                print!("Something")
+            }
+
+            println!("Transition {} to {}", current.0, event.to_id);
             
             current.0 = event.to_id;
             frame.0 = 1;
         }
     }
+
+    trans_reader.clear()
 }
 
 #[derive(Default, Component, Reflect)]
@@ -274,12 +292,12 @@ pub fn buffer_insert_system(
     inputs: Res<Vec<(FightInput, InputStatus)>>,
 ) {
 
-    for (mut buffer, player) in query.iter_mut() {
-        if player.0 != 1 {
-            return
-        }
-        buffer.0.push(inputs[0].0 .0)
-    }
+    // for (mut buffer, player) in query.iter_mut() {
+    //     if player.0 != 1 {
+    //         return
+    //     }
+    //     buffer.0.push(inputs[0].0 .0)
+    // }
 }
 
 pub fn hitbox_component_system(

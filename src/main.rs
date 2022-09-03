@@ -85,7 +85,8 @@ fn main() {
 
     let mut app = App::new();
 
-    let mut sess_build = SessionBuilder::<GGRSConfig>::new().with_num_players(2);
+    let mut sess_build = SessionBuilder::<GGRSConfig>::new()
+        .with_num_players(2);
 
     sess_build = sess_build
         .add_player(PlayerType::Local, 1)

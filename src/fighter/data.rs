@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use bevy::prelude::Entity;
 use bevy::reflect::TypeUuid;
 use bevy::{prelude::Component, reflect::Reflect};
@@ -39,3 +41,4 @@ impl CollisionData {
 }
 
 pub struct HitEvent(pub CollisionData);
+

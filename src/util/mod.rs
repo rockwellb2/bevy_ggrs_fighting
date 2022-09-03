@@ -6,9 +6,9 @@ use bevy::reflect::Reflect;
 
 pub(crate) mod scripting;
 
-#[derive(Reflect, Default)]
+#[derive(Reflect, Default, Debug)]
 pub struct Buffer<T: Reflect + FromReflect> {
-    vec: Vec<T>,
+    pub vec: Vec<T>,
     head: usize, 
     tail: usize,
     capacity: usize,

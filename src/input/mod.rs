@@ -103,128 +103,166 @@ pub enum Action {
 }
 
 pub fn input(
-    _handle: In<PlayerHandle>,
+    handle: In<PlayerHandle>,
+    mut input_query: Query<(&ActionState<Action>, &mut InputBuffer)>,
+    mut local: Local<(StateInput, StateInput)>
+
+
+
     //keyboard_input: Res<bevy::input::Input<KeyCode>>,
-    input_query: Query<(&ActionState<Action>, &InputBuffer), With<Fighter>>,
-) -> Input {
-    if let Ok((action_state, buffer)) = input_query.get_single() {
-        if let Some(previous) = buffer.0.get(0) {
-            let previous: StateInput = previous.into();
+    // mut input_params: ParamSet<(
+    //     Query<(&ActionState<Action>, &InputBuffer), With<Fighter>>,
+    //     Query<&mut InputBuffer, With<ActionState<Action>>>
+    // )>,
+) -> Input 
+{
+    if handle.0 == 1 {
+        return Input(StateInput::default().into());
+    }
+    // let output = 
+    //  if let Ok((action_state, buffer)) = input_params.p0().get_single() {
+    //     if let Some(previous) = buffer.0.get(0) {
+    //         let previous: StateInput = previous.into();
 
-            let button_check = |action: Action| -> ButtonPress {
-                if action_state.pressed(action) {
-                    match previous.get_button_from_action(action) {
-                        ButtonPress::Press | ButtonPress::Hold => ButtonPress::Hold,
-                        ButtonPress::None | ButtonPress::Release => ButtonPress::Press,
-                    }
-                } else {
-                    match previous.get_button_from_action(action) {
-                        ButtonPress::Press | ButtonPress::Hold => ButtonPress::Release,
-                        ButtonPress::None | ButtonPress::Release => ButtonPress::None,
-                    }
+    //         let button_check = |action: Action| -> ButtonPress {
+    //             if action_state.pressed(action) {
+    //                 match previous.get_button_from_action(action) {
+    //                     ButtonPress::Press | ButtonPress::Hold => ButtonPress::Hold,
+    //                     ButtonPress::None | ButtonPress::Release => ButtonPress::Press,
+    //                 }
+    //             } else {
+    //                 match previous.get_button_from_action(action) {
+    //                     ButtonPress::Press | ButtonPress::Hold => ButtonPress::Release,
+    //                     ButtonPress::None | ButtonPress::Release => ButtonPress::None,
+    //                 }
+    //             }
+    //         };
+
+    //         let directional_check = |pos: Action, neg: Action| -> (DirectionalInput, bool) {
+    //             if action_state.pressed(pos) {
+    //                 match (previous.get_directional_from_button(pos)) {
+    //                     (DirectionalInput::Positive, _) => (DirectionalInput::Positive, false),
+    //                     _ => (DirectionalInput::Positive, true),
+    //                 }
+    //             } else if action_state.pressed(neg) {
+    //                 match (previous.get_directional_from_button(pos)) {
+    //                     (DirectionalInput::Negative, _) => (DirectionalInput::Negative, false),
+    //                     _ => (DirectionalInput::Negative, true),
+    //                 }
+    //             } else {
+    //                 match previous.get_directional_from_button(pos) {
+    //                     (DirectionalInput::None, _) => (DirectionalInput::None, false),
+    //                     _ => (DirectionalInput::None, false),
+    //                 }
+    //             }
+    //         };
+
+    //         let lp = button_check(Action::Lp);
+    //         let mp = button_check(Action::Mp);
+    //         let hp = button_check(Action::Hp);
+    //         let lk = button_check(Action::Lk);
+    //         let mk = button_check(Action::Mk);
+    //         let hk = button_check(Action::Hk);
+
+    //         let (x, just_pressed_x) = directional_check(Action::Right, Action::Left);
+    //         let (y, just_pressed_y) = directional_check(Action::Up, Action::Down);
+
+    //         let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
+
+    //         if inp.hk.is_held() {
+    //             println!("LP | This frame: {:?}, Prev frame: {:?}", inp.lp, previous.lp);
+    //         }
+
+            
+    //         Input(inp.into())
+    //     } else {
+    //         Input(StateInput::default().into())
+    //     }
+    // } else {
+    //     Input(StateInput::default().into())
+    // };
+
+    // if let Ok(mut buffer) = input_params.p1().get_single_mut() {
+    //     println!("Does this??????");
+    //     buffer.0.push(output.0);
+    // }
+
+    // output
+
+    if let Ok((action_state, mut buffer)) = input_query.get_single_mut() {
+        let previous = &local.0;
+
+        let button_check = |action: Action| -> ButtonPress {
+            let prev = previous.get_button_from_action(action);
+            let check = action_state.pressed(action);
+
+            if check {
+                if prev == ButtonPress::Press || prev == ButtonPress::Hold {
+                    ButtonPress::Hold
                 }
-            };
-
-            let directional_check = |pos: Action, neg: Action| -> (DirectionalInput, bool) {
-                if action_state.pressed(pos) {
-                    match (previous.get_directional_from_button(pos)) {
-                        (DirectionalInput::Positive, _) => (DirectionalInput::Positive, false),
-                        _ => (DirectionalInput::Positive, true),
-                    }
-                } else if action_state.pressed(neg) {
-                    match (previous.get_directional_from_button(pos)) {
-                        (DirectionalInput::Negative, _) => (DirectionalInput::Negative, false),
-                        _ => (DirectionalInput::Negative, true),
-                    }
-                } else {
-                    match previous.get_directional_from_button(pos) {
-                        (DirectionalInput::None, _) => (DirectionalInput::None, false),
-                        _ => (DirectionalInput::None, false),
-                    }
+                else {
+                    ButtonPress::Press
                 }
-            };
+            }
+            else {
+                if prev == ButtonPress::None || prev == ButtonPress::Release {
+                    ButtonPress::None
+                }
+                else {
+                    ButtonPress::Release
+                }
+            }
+        };
 
-            let lp = button_check(Action::Lp);
-            let mp = button_check(Action::Mp);
-            let hp = button_check(Action::Hp);
-            let lk = button_check(Action::Lk);
-            let mk = button_check(Action::Mk);
-            let hk = button_check(Action::Hk);
+        let directional_check = |pos: Action, neg: Action| -> (DirectionalInput, bool) {
+            let prev = previous.get_directional_from_button(pos);
+            let check_pos = action_state.pressed(pos);
+            let check_neg = action_state.pressed(neg);
 
-            let (x, just_pressed_x) = directional_check(Action::Right, Action::Left);
-            let (y, just_pressed_y) = directional_check(Action::Up, Action::Down);
-
-            let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
-
-            if inp.hk == ButtonPress::Hold {
-                println!("LP: {:?}, previous: {:?}", inp.lp, previous.lp);
-
+            if check_pos {
+                match prev {
+                    (DirectionalInput::Positive, _) => (DirectionalInput::Positive, false),
+                    _ => (DirectionalInput::Positive, true)
+                }
+            }
+            else if check_neg {
+                match prev {
+                    (DirectionalInput::Negative, _) => (DirectionalInput::Negative, false),
+                    _ => (DirectionalInput::Negative, true)
+                }
+            }
+            else {
+                (DirectionalInput::None, false)
             }
 
-            Input(inp.into())
-        } else {
-            Input(StateInput::default().into())
+
+        };
+
+        let lp = button_check(Action::Lp);
+        let mp = button_check(Action::Mp);
+        let hp = button_check(Action::Hp);
+        let lk = button_check(Action::Lk);
+        let mk = button_check(Action::Mk);
+        let hk = button_check(Action::Hk);
+
+        let (x, just_pressed_x) = directional_check(Action::Right, Action::Left);
+        let (y, just_pressed_y) = directional_check(Action::Up, Action::Down);
+
+        let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
+
+        if inp.hk.is_held() {
+            println!("Y-axis: {:?}, Just pressed: {}", inp.y, inp.just_pressed_y);
         }
-    } else {
+
+        local.0 = inp.clone();
+
+        let inp: u32 = inp.into();
+        buffer.0.push(inp);
+        Input(inp)
+    }
+    else {
         Input(StateInput::default().into())
     }
-
-    // if let Ok((action_state, buffer)) = input_query.get_single() {
-    //     if let Some(previous) = buffer.0.get(0) {
-
-    //     let button_check = |action: Action| -> ButtonPress {
-    //         if action_state.pressed(action) {
-    //             if
-    //         }
-
-    //     }
-
-    //         // if action_state.just_pressed(action) {
-    //         //     ButtonPress::Press
-    //         // } else if action_state.pressed(action) {
-    //         //     ButtonPress::Hold
-    //         // } else if action_state.just_released(action) {
-    //         //     ButtonPress::Release
-    //         // } else {
-    //         //     ButtonPress::None
-    //         // }
-    //     };
-
-    //     let directional_check = |pos: Action, neg: Action| -> (DirectionalInput, bool) {
-    //         if action_state.just_pressed(pos) {
-    //             (DirectionalInput::Positive, true)
-    //         } else if action_state.pressed(pos) {
-    //             (DirectionalInput::Positive, false)
-    //         } else if action_state.just_pressed(neg) {
-    //             (DirectionalInput::Negative, true)
-    //         } else if action_state.pressed(neg) {
-    //             (DirectionalInput::Negative, false)
-    //         } else {
-    //             (DirectionalInput::None, false)
-    //         }
-    //     };
-
-    //     let lp = button_check(Action::Lp);
-    //     let mp = button_check(Action::Mp);
-    //     let hp = button_check(Action::Hp);
-    //     let lk = button_check(Action::Lk);
-    //     let mk = button_check(Action::Mk);
-    //     let hk = button_check(Action::Hk);
-
-    //     let (x, just_pressed_x) = directional_check(Action::Right, Action::Left);
-    //     let (y, just_pressed_y) = directional_check(Action::Up, Action::Down);
-
-    //     let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
-
-    //     if action_state.just_pressed(Action::Lp) && inp.lp != ButtonPress::Press {
-    //         println!("How the fuck does this happen?")
-    //     }
-
-    //     Input(inp.into())
-    // }
-    // else {
-    //     Input(StateInput::default().into())
-    // }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, FromReflect, Reflect, Clone)]
@@ -469,7 +507,7 @@ impl From<u32> for DirectionalInput {
     }
 }
 
-#[derive(PackedStruct, Default, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(PackedStruct, Default, PartialEq, Debug, Serialize, Deserialize, Clone)]
 #[packed_struct(bit_numbering = "msb0")]
 pub struct StateInput {
     #[serde(default)]
