@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use bevy::{
     core::Name,
     math::Vec2,
@@ -114,7 +116,7 @@ pub fn spawn_fighters(
         .insert(Player(1))
         .insert(Facing(Direction::Right))
         .insert(StateFrame(0))
-        .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
+        .insert(InputBuffer(VecDeque::with_capacity(BUFFER_SIZE)))
         .insert(Health(500))
 
         .insert_bundle(InputManagerBundle::<Action> {
@@ -157,7 +159,7 @@ pub fn spawn_fighters(
         .insert(Facing(Direction::Left))
         //.insert(Rollback::new(rip.next_id()))
         .insert(StateFrame(0))
-        .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
+        .insert(InputBuffer(VecDeque::with_capacity(BUFFER_SIZE)))
         .insert(Health(500))
 
         .id();

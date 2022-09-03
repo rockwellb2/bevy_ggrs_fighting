@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use bevy::prelude::*;
 use bevy::reflect::FromReflect;
 use bytemuck::{Pod, Zeroable};
@@ -257,7 +259,8 @@ pub fn input(
         local.0 = inp.clone();
 
         let inp: u32 = inp.into();
-        buffer.0.push(inp);
+        buffer.0.pop_back();
+        buffer.0.push_front(inp);
         Input(inp)
     }
     else {
@@ -359,14 +362,13 @@ impl Default for NewMatchExpression {
 
 #[derive(Debug, Serialize, Deserialize, Default, FromReflect, Reflect, Clone)]
 pub struct NewCommandInput {
-    //#[serde(deserialize_with = "deserialize_command")]
     list: Vec<Vec<NewMatchExpression>>,
     window: u16,
 }
 
 impl NewCommandInput {
-    pub fn compare(&self, input: &Buffer<u32>) -> bool {
-        let mut input_iter = input.into_iter();
+    pub fn compare(&self, input: &VecDeque<u32>) -> bool {
+        let mut input_iter = input.iter();
         let mut index = 0;
 
         for command in &self.list {

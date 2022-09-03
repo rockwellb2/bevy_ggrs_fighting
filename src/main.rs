@@ -103,7 +103,7 @@ fn main() {
         .register_rollback_type::<CurrentState>()
         .register_rollback_type::<Variables>()
         .register_rollback_type::<Active>()
-        .register_rollback_type::<InputBuffer>()
+        //.register_rollback_type::<InputBuffer>()
         .register_rollback_type::<Facing>()
         //.register_rollback_type::<FrameCount>()
         .with_rollback_schedule(

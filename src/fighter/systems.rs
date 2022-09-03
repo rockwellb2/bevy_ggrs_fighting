@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use super::{
     data::{FighterData, Collider, CollisionData, HitEvent},
     state::{
@@ -52,9 +54,9 @@ pub fn movement_system(
         //let another = state_query.get(*state);
 
         if let Ok(_) = state_query.get(*state) {
-            let input: &Buffer<u32> = &buffer.0;
+            let input: &VecDeque<u32> = &buffer.0;
 
-            if let Some(last) = input.last() {
+            if let Some(last) = input.front() {
                 //let last_unref = *last;
 
                 if *last & LEFT == LEFT || *last & LEFT_HELD == LEFT_HELD {
@@ -282,9 +284,8 @@ pub fn transition_system(
     trans_reader.clear()
 }
 
-#[derive(Default, Component, Reflect)]
-#[reflect(Component)]
-pub struct InputBuffer(pub Buffer<u32>);
+#[derive(Default, Component)]
+pub struct InputBuffer(pub VecDeque<u32>);
 
 pub fn buffer_insert_system(
     //mut query: Query<&mut InputBuffer, With<Player>>,

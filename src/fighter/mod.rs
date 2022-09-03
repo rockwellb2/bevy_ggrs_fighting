@@ -36,7 +36,7 @@ impl Plugin for FighterPlugin {
             .register_type::<StateFrame>()
             .register_type::<FightState>()
             .register_type::<HitboxData>()
-            .register_type::<InputBuffer>()
+            //.register_type::<InputBuffer>()
             .register_type::<StateMap>()
             .register_type::<Direction>()
             .register_type::<FighterData>();
