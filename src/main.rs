@@ -315,12 +315,11 @@ fn populate_entities_with_states(
                 .as_ref()
                 .unwrap_or(&"State".to_string())
                 .clone();
-            println!("Name: {}", name);
             let entity = world
                 .spawn()
                 .insert(Name::new(name.clone()))
                 .insert_bundle(VisibilityBundle::default())
-                //.insert(Rollback::new(rip.next_id()))
+                .insert(Rollback::new(rip.next_id()))
                 .id();
 
             {
@@ -336,8 +335,6 @@ fn populate_entities_with_states(
             transition_list.push((entity, transitions_serialized));
 
             let mut state = FightState::from_serialized(state);
-
-            println!("State {}: {:?}", name, state.triggers);
 
             // HITBOXES
             if let Some(hitboxes) = hbox_serialized {
@@ -355,7 +352,7 @@ fn populate_entities_with_states(
                     let hitbox_entity = world
                         .spawn()
                         .insert(hitbox)
-                        //.insert(Rollback::new(rip.next_id()))
+                        .insert(Rollback::new(rip.next_id()))
                         .insert(Collider { shape: cuboid })
                         .insert(Name::new(format!("Hitbox {}", &name)))
                         .insert(Owner(player))
@@ -379,7 +376,6 @@ fn populate_entities_with_states(
                         ordered.insert(start_frame, set);
                     }
                 }
-                println!("Hitboxes: {:?}", ordered);
                 state.add_hitboxes(ordered);
             }
 
@@ -399,7 +395,7 @@ fn populate_entities_with_states(
                     let hurtbox_entity = world
                         .spawn()
                         .insert(hurtbox)
-                        //.insert(Rollback::new(rip.next_id()))
+                        .insert(Rollback::new(rip.next_id()))
                         .insert(Collider { shape: cuboid })
                         .insert(Name::new(format!("Hurtbox {}", &name)))
                         .insert(Owner(player))
@@ -444,20 +440,15 @@ fn populate_entities_with_states(
             world.entity_mut(entity).insert(state);
         }
 
-        println!("StateMap: {:?}", state_map);
-
         for (s, transitions) in transition_list {
             let mut target = world.get_mut::<FightState>(s).unwrap();
-            println!("State {} Transitions: {:?}", target.id, transitions);
             for t in transitions {
                 target.transitions.push(*state_map.get(&t).unwrap());
             }
         }
 
         world.entity_mut(player)
-            .insert(state_map)
-            .insert(Rollback::new(rip.next_id()))
-            ;
+            .insert(state_map);
 
     });
 }

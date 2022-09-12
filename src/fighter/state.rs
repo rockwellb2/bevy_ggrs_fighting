@@ -199,8 +199,6 @@ impl<'de> Deserialize<'de> for SerializedState {
             }
         }
 
-        println!("Triggers: {:?}", triggers.0);
-
         Ok(SerializedState {
             id,
             debug_name,

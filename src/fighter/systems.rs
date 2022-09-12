@@ -50,16 +50,13 @@ pub fn movement_system(
 ) {
 
     for (current, map, mut tf, data, buffer) in fighter_query.iter_mut() {
-        //println!("Is this called every frame?");
+
         let state = map.get(&current.0).expect("State doesn't exist.");
-        //let another = state_query.get(*state);
 
         if let Ok(_) = state_query.get(*state) {
             let input: &Buffer = &buffer.0;
 
             if let Some(last) = input.get(0) {
-                //let last_unref = *last;
-
                 if *last & LEFT == LEFT || *last & LEFT_HELD == LEFT_HELD {
                     tf.translation.x -= data.walk_speed / FPS as f32;
                 } else if *last & RIGHT == RIGHT || *last & RIGHT_HELD == RIGHT_HELD {
@@ -97,31 +94,16 @@ pub fn process_input_system(
         (Entity, &CurrentState, &StateMap, &InputBuffer, &StateFrame, &Player),
         (With<Fighter>, With<Player>),
     >,
-    //state_query: Query<(Option<&InputTransition>, &State)>,
     state_query: Query<&State>,
-
-    //mut hurtbox_query: Query<(Entity, &HurtboxData, &mut Visibility)>,
-
     mut trans_writer: EventWriter<TransitionEvent>
 ) {
     'fighter: for (fighter, current, map, buffer, frame, player) in query.iter() {
 
         let state: &Entity = map.get(&current.0).expect("State doesn't exist");
 
-        // if player.0 == 1 {
-        //     println!("State: {}", current.0);
-        // }
-
         if let Ok(s) = state_query.get(*state) {
             'transitions: for transition in s.transitions.iter() {
                 if let Ok(to_state) = state_query.get(*transition) {
-
-                    if s.id == 0 && to_state.id == 1 && player.0 == 1 {
-                        print!("");
-                    }
-
-
-
 
                     if let Some(all) = &to_state.triggers.0 {
                         let mut meets_conditions = true;
@@ -269,11 +251,6 @@ pub fn transition_system(
                         }
                     }
                 }
-            }
-
-            if current.0 == 0 && event.to_id == 1 {
-                //println!("Frame {}: {:?}", frame.0, buffer.0);
-                //print!("Something")
             }
 
             println!("Transition {} to {}", current.0, event.to_id);
@@ -553,8 +530,6 @@ pub fn collision_system(
                             recipient_box: hurt_data, 
                             recipient: hurt_owner.0 
                         });
-
-                        println!("Collide!!!!!") 
                     }
                 }
 

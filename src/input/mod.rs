@@ -10,7 +10,6 @@ use packed_struct::types::ReservedZero;
 use serde::{de, Deserialize, Serialize};
 
 use crate::fighter::systems::InputBuffer;
-use crate::fighter::Fighter;
 use crate::util::Buffer;
 
 pub const BUFFER_SIZE: usize = 10;
@@ -59,75 +58,6 @@ pub fn input(
     if handle.0 == 1 {
         return Input(StateInput::default().into());
     }
-    // let output = 
-    //  if let Ok((action_state, buffer)) = input_params.p0().get_single() {
-    //     if let Some(previous) = buffer.0.get(0) {
-    //         let previous: StateInput = previous.into();
-
-    //         let button_check = |action: Action| -> ButtonPress {
-    //             if action_state.pressed(action) {
-    //                 match previous.get_button_from_action(action) {
-    //                     ButtonPress::Press | ButtonPress::Hold => ButtonPress::Hold,
-    //                     ButtonPress::None | ButtonPress::Release => ButtonPress::Press,
-    //                 }
-    //             } else {
-    //                 match previous.get_button_from_action(action) {
-    //                     ButtonPress::Press | ButtonPress::Hold => ButtonPress::Release,
-    //                     ButtonPress::None | ButtonPress::Release => ButtonPress::None,
-    //                 }
-    //             }
-    //         };
-
-    //         let directional_check = |pos: Action, neg: Action| -> (DirectionalInput, bool) {
-    //             if action_state.pressed(pos) {
-    //                 match (previous.get_directional_from_button(pos)) {
-    //                     (DirectionalInput::Positive, _) => (DirectionalInput::Positive, false),
-    //                     _ => (DirectionalInput::Positive, true),
-    //                 }
-    //             } else if action_state.pressed(neg) {
-    //                 match (previous.get_directional_from_button(pos)) {
-    //                     (DirectionalInput::Negative, _) => (DirectionalInput::Negative, false),
-    //                     _ => (DirectionalInput::Negative, true),
-    //                 }
-    //             } else {
-    //                 match previous.get_directional_from_button(pos) {
-    //                     (DirectionalInput::None, _) => (DirectionalInput::None, false),
-    //                     _ => (DirectionalInput::None, false),
-    //                 }
-    //             }
-    //         };
-
-    //         let lp = button_check(Action::Lp);
-    //         let mp = button_check(Action::Mp);
-    //         let hp = button_check(Action::Hp);
-    //         let lk = button_check(Action::Lk);
-    //         let mk = button_check(Action::Mk);
-    //         let hk = button_check(Action::Hk);
-
-    //         let (x, just_pressed_x) = directional_check(Action::Right, Action::Left);
-    //         let (y, just_pressed_y) = directional_check(Action::Up, Action::Down);
-
-    //         let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
-
-    //         if inp.hk.is_held() {
-    //             println!("LP | This frame: {:?}, Prev frame: {:?}", inp.lp, previous.lp);
-    //         }
-
-            
-    //         Input(inp.into())
-    //     } else {
-    //         Input(StateInput::default().into())
-    //     }
-    // } else {
-    //     Input(StateInput::default().into())
-    // };
-
-    // if let Ok(mut buffer) = input_params.p1().get_single_mut() {
-    //     println!("Does this??????");
-    //     buffer.0.push(output.0);
-    // }
-
-    // output
 
     if let Ok((action_state, mut buffer)) = input_query.get_single_mut() {
         let previous = &local.0;
@@ -190,18 +120,10 @@ pub fn input(
 
         let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
 
-        if inp.hk.is_held() {
-            println!("Y-axis: {:?}, Just pressed: {}", inp.y, inp.just_pressed_y);
-        }
-
         local.0 = inp.clone();
 
         let inp: u32 = inp.into();
         buffer.0.insert(inp);
-        // buffer.0.pop_back();
-        // buffer.0.push_front(inp);
-
-
         Input(inp)
     }
     else {
@@ -286,14 +208,8 @@ impl NewCommandInput {
                     return false;
                 }
 
-                //println!("Peek at next value: {:?}", input_iter.peek());
-
                 if let Some(next) = input_iter.next() {
                     let next: StateInput = next.into();
-
-                    if next.lp == ButtonPress::Press {
-                        print!("");
-                    }
 
                     let mut command_iter = command.iter();
                     let mut same = true;
@@ -365,9 +281,6 @@ mod input_tests {
         }"#;
 
         let result: NewCommandInput = serde_json::from_str(string).unwrap();
-        //let input: StateInput = result.list.get(0).unwrap().to_owned().into();
-
-        // println!("{:?}", input);
     }
 }
 
@@ -718,34 +631,4 @@ impl From<[u8; 4]> for StateInput {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::mem::size_of;
 
-    use bevy::reflect::Typed;
-    use packed_struct::PackedStruct;
-    use serde::Serialize;
-
-    use super::{ButtonPress, StateInput};
-
-    #[test]
-    fn something() {
-        let input = StateInput {
-            x: crate::input::DirectionalInput::None,
-            ..Default::default()
-        };
-
-        // println!("Input: {}", input);
-        // println!("Bits: {}", u32::from(input));
-
-        let packed = input.pack().unwrap();
-        let bytes = u32::from_le_bytes(packed);
-        let unpacked: StateInput = bytes.into();
-
-        assert_eq!(input, unpacked);
-
-        println!("Size of StateInput is {}", size_of::<StateInput>());
-    }
-
- 
-}
