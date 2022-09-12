@@ -7,8 +7,8 @@ use bevy::{
     sprite::{Sprite, SpriteBundle}, ui::{Style, UiImage, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}
 };
 
-use bevy_ggrs::Rollback;
-use ggrs::{SyncTestSession};
+use bevy_ggrs::{Rollback, RollbackIdProvider};
+use ggrs::{SyncTestSession, P2PSession};
 
 use iyes_progress::prelude::AssetsLoading;
 use leafwing_input_manager::{InputManagerBundle, prelude::{ActionState, InputMap}};
@@ -80,8 +80,9 @@ pub fn load_fighters(
 
 pub fn spawn_fighters(
     mut commands: Commands, 
-    //mut rip: ResMut<RollbackIdProvider>,
+    mut rip: ResMut<RollbackIdProvider>,
     sync_test_session: Option<Res<SyncTestSession<GGRSConfig>>>,
+    p2p_session: Option<Res<P2PSession<GGRSConfig>>>,
 
     handle_access: Res<PlayerHandleAccess>,
     //mut state_vecs: ResMut<Assets<SerializedStateVec>>,
@@ -90,11 +91,6 @@ pub fn spawn_fighters(
     //asset_server: Res<AssetServer>
 
 ) {
-    let num_players = sync_test_session
-        .map(|s| s.num_players())
-        .expect("Couldn't find Session");
-
-
     let fighter1 = data.remove(&handle_access.0.fighter_data).expect("FighterData asset does not exist");
     let fighter2 = data.remove(&handle_access.1.fighter_data).expect("FighterData asset does not exist");
 
@@ -116,7 +112,7 @@ pub fn spawn_fighters(
         .insert(Player(1))
         .insert(Facing(Direction::Right))
         .insert(StateFrame(0))
-        .insert(InputBuffer(VecDeque::with_capacity(BUFFER_SIZE)))
+        .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
         .insert(Health(500))
 
         .insert_bundle(InputManagerBundle::<Action> {
@@ -157,10 +153,10 @@ pub fn spawn_fighters(
         .insert(CurrentState(0))
         .insert(Player(2))
         .insert(Facing(Direction::Left))
-        //.insert(Rollback::new(rip.next_id()))
         .insert(StateFrame(0))
-        .insert(InputBuffer(VecDeque::with_capacity(BUFFER_SIZE)))
+        .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
         .insert(Health(500))
+        
 
         .id();
 
@@ -173,6 +169,8 @@ pub fn spawn_fighters(
         },
         ..default()
     });
+
+    
 
 
 }

@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::{VecDeque, hash_map::DefaultHasher}, hash::{Hash, Hasher}};
 
 use super::{
     data::{FighterData, Collider, CollisionData, HitEvent},
@@ -12,12 +12,13 @@ use bevy::{
     prelude::{
         Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without,
     },
-    reflect::Reflect,
+    reflect::{Reflect, Typed, List, FromReflect, list_apply, array_hash, utility::GenericTypeInfoCell, ListInfo, TypeInfo, ReflectRef },
     utils::{default, HashMap, hashbrown::HashSet}, ui::{Style, Val},
 };
 use ggrs::InputStatus;
 use nalgebra::{Isometry3, Vector3};
 use parry3d::{query::intersection_test, shape::Cuboid};
+use regex::internal::Input;
 
 use crate::{
     battle::{PlayerEntities, Lifebar},
@@ -54,9 +55,9 @@ pub fn movement_system(
         //let another = state_query.get(*state);
 
         if let Ok(_) = state_query.get(*state) {
-            let input: &VecDeque<u32> = &buffer.0;
+            let input: &Buffer = &buffer.0;
 
-            if let Some(last) = input.front() {
+            if let Some(last) = input.get(0) {
                 //let last_unref = *last;
 
                 if *last & LEFT == LEFT || *last & LEFT_HELD == LEFT_HELD {
@@ -125,12 +126,18 @@ pub fn process_input_system(
                     if let Some(all) = &to_state.triggers.0 {
                         let mut meets_conditions = true;
                         'all: for condition in all.iter() {
+                            
                             match condition {
                                 Conditions::In(n) => {
-                                    if n != &current.0 {
+                                    if !n.contains(&current.0) {
                                         meets_conditions = false;
                                         break 'all;
                                     }
+
+                                    // if n != &current.0 {
+                                    //     meets_conditions = false;
+                                    //     break 'all;
+                                    // }
                                 },
                                 Conditions::NotIn(n) => {
                                     if n == &current.0 {
@@ -183,7 +190,7 @@ pub fn process_input_system(
                         'conditions: for conditions in con_set.iter() {
                             match conditions {
                                 Conditions::In(n) => {
-                                    if n != &current.0 {
+                                    if !n.contains(&current.0) {
                                         met = false;
                                         break 'conditions;
                                     }
@@ -270,8 +277,8 @@ pub fn transition_system(
             }
 
             if current.0 == 0 && event.to_id == 1 {
-                println!("Frame {}: {:?}", frame.0, buffer.0);
-                print!("Something")
+                //println!("Frame {}: {:?}", frame.0, buffer.0);
+                //print!("Something")
             }
 
             println!("Transition {} to {}", current.0, event.to_id);
@@ -284,8 +291,10 @@ pub fn transition_system(
     trans_reader.clear()
 }
 
-#[derive(Default, Component)]
-pub struct InputBuffer(pub VecDeque<u32>);
+#[derive(Default, Component, Reflect)]
+#[reflect(Component)]
+pub struct InputBuffer(pub Buffer);
+
 
 pub fn buffer_insert_system(
     //mut query: Query<&mut InputBuffer, With<Player>>,
@@ -444,12 +453,16 @@ pub fn hurtbox_removal_system(
 }
 
 pub fn adjust_facing_system(
+    mut commands: Commands,
+
+
     players: Res<PlayerEntities>,
     mut fighter_query: Query<(&CurrentState, &StateMap, &Transform, &mut Facing), With<Fighter>>,
     state_query: Query<With<AdjustFacing>, With<State>>,
 ) {
     let player1 = players.get(1);
     let player2 = players.get(2);
+
 
     if let Ok([(current1, map1, tf1, mut facing1), (current2, map2, tf2, mut facing2)]) =
         fighter_query.get_many_mut([player1, player2])

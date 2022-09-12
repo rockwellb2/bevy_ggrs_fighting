@@ -5,7 +5,8 @@
         "transitions": [
             1,
             5,
-            100
+            100,
+            141
         ],
         "modifiers": [
             {
@@ -28,18 +29,14 @@
                     "window": 1
                 }
             },
-            { "in": 5 }
+            { "in": [5] }
         ],
         "trigger2": [
-            { "in": 100 },
-            { "endDuration": null }
-        ],
-        "trigger4": [
-            { "in": 101 },
+            { "in": [100, 101, 141] },
             { "endDuration": null }
         ],
         "trigger3": [
-            { "in": 1},
+            { "in": [1]},
             { 
                 "command": {
                     "list": [
@@ -78,18 +75,20 @@
             }
         ],
         "trigger1": [
-            { "in": 101 },
+            { "in": [101] },
             { "endDuration": null }
         ],
         "trigger2": [
-            { "in": 0 }
+            { "in": [0, 5] }
         ]
     },
     {
         "id": 5,
         "debug_name": "Walk",
         "transitions": [
-            0
+            1,
+            0,
+            141
         ],
         "modifiers": [
             {
@@ -187,8 +186,8 @@
         "id": 101,
         "debug_name": "2LP",
         "transitions": [
-            0,
-            1
+            1,
+            0
         ],
         "duration": 13,
         "triggerAll": [
@@ -208,5 +207,29 @@
     {
         "id": 3000,
         "debug_name": "Hitstun"
+    },
+    {
+        "id": 141,
+        "debug_name": "Light Fireball",
+        "duration": 60,
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"]
+                        ],
+                        [
+                            ["x", "Positive", true]
+                        ],
+                        [
+                            ["y", "Negative", false]
+                        ]
+                    ],
+                    "window": 12
+
+                }
+            }
+        ]
     }
 ]

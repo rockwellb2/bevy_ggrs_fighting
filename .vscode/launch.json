@@ -6,8 +6,20 @@
     "configurations": [
         {
             "type": "lldb",
+            "request": "custom",
+            "name": "Custom launch",
+            "targetCreateCommands": [
+                "target create ${workspaceFolder}/<your program>"
+            ],
+            "processCreateCommands": [
+                "settings set target.run-args value1 value2 value3",
+                "process launch"
+            ]
+        },
+        {
+            "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'bevy_ggrs_fighting'",
+            "name": "Run executable 'bevy_ggrs_fighting' with synctest args",
             "cargo": {
                 "args": [
                     "build",
@@ -19,7 +31,59 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": [
+                "--num-players", "2",
+                "--check-distance", "5"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "CARGO_MANIFEST_DIR": "${workspaceFolder}", 
+            },
+
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "(Player 1) Debug executable 'bevy_ggrs_fighting' with p2p args",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=bevy_ggrs_fighting",
+                    "--package=bevy_ggrs_fighting"
+                ],
+                "filter": {
+                    "name": "bevy_ggrs_fighting",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--local-port", "7000",
+                "--players", "localhost", "127.0.0.1:7001"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "CARGO_MANIFEST_DIR": "${workspaceFolder}", 
+            },
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "(Player 2) Debug executable 'bevy_ggrs_fighting' with p2p args",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=bevy_ggrs_fighting",
+                    "--package=bevy_ggrs_fighting"
+                ],
+                "filter": {
+                    "name": "bevy_ggrs_fighting",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--local-port", "7001",
+                "--players", "127.0.0.1:7000", "localhost"
+            ],
             "cwd": "${workspaceFolder}",
             "env": {
                 "CARGO_MANIFEST_DIR": "${workspaceFolder}", 

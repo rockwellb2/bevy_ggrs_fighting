@@ -1,211 +1,143 @@
 
 use std::ops::Index;
 
-use bevy::reflect::FromReflect;
+use bevy::prelude::{Component, ReflectComponent};
 use bevy::reflect::Reflect;
+
+use crate::input::BUFFER_SIZE;
 
 pub(crate) mod scripting;
 
-#[derive(Reflect, Default, Debug)]
-pub struct Buffer<T: Reflect + FromReflect> {
-    pub vec: Vec<T>,
+
+
+
+#[derive(Reflect, Default, Debug, Component)]
+#[reflect(Component)]
+pub struct Buffer {
+    pub vec: Vec<u32>,
     head: usize, 
+}
+
+impl Buffer {
+    pub fn with_capacity(capacity: usize) -> Buffer {
+        Self {
+            vec: vec![0; capacity],
+            head: 0,
+        }
+    }
+
+    pub fn get(&self, index: usize) -> Option<&u32> {
+        let raw = self.head + index;
+        let new_index = if raw > (self.vec.len() - 1) {
+            0
+        }
+        else {
+            raw
+        };
+        self.vec.get(new_index)
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut u32> {
+        let raw = self.head + index;
+        let new_index = if raw > (self.vec.len() - 1) {
+            0
+        }
+        else {
+            raw
+        };
+        self.vec.get_mut(new_index)
+    }
+
+    pub fn insert(&mut self, value: u32) {
+        self.head = self.head.checked_sub(1).unwrap_or(self.vec.len() - 1);
+        if let Some(head) = self.get_mut(0) {
+            *head = value;
+        }
+        else {
+            panic!()
+        }
+    }
+
+    pub fn iter(&self) -> BufferIter {
+        let ring = self.vec.as_slice();
+        let head = self.head;
+        let tail = self.head.checked_sub(1).unwrap_or(self.vec.len() - 1);
+
+        BufferIter::new(ring, tail, head)
+    }
+}
+
+
+
+pub struct BufferIter<'a> {
+    ring: &'a[u32],
     tail: usize,
-    capacity: usize,
-}
-
-impl<T: Reflect + FromReflect + Default> Buffer<T> {
-    pub fn with_capacity(capacity: usize) -> Buffer<T> {
-        let vec = Vec::with_capacity(capacity);
-        let head = 0;
-        let tail = capacity - 1;
-
-        Self {
-            vec,
-            head,
-            tail,
-            capacity,
-        }
-    }
-
-    pub fn from_vec(vec: Vec<T>) -> Buffer<T> {
-        let head = 0;
-        let tail = vec.len() - 1;
-        let capacity = vec.capacity();
-
-        Self {
-            vec,
-            head,
-            tail,
-            capacity
-        }
-    }
-
-    pub fn push(&mut self, value: T) {
-        if self.capacity != self.vec.len() {
-            self.vec.push(value);
-            self.tail += 1;
-        }
-        else {
-            if let Some(elem) = self.vec.get_mut(self.head) {
-                *elem = value;
-
-                if self.head < self.capacity - 1 {
-                    self.head += 1;
-                }
-                else {
-                    self.head = 0;
-                }
-
-                if self.tail < self.capacity - 1 {
-                    self.tail += 1;
-                }
-                else {
-                    self.tail = 0;
-                }
-            }
-        }
-        
-
-    }
-
-    pub fn last(&self) -> Option<&T> {
-        self.vec.get(self.tail)
-    }
-
-    pub fn get(&self, index: usize) -> Option<&T> {
-        let baseline = self.head + index;
-        if let Some(overflow) = baseline.checked_sub(self.capacity) {
-            self.vec.get(overflow)
-        }
-        else {
-            self.vec.get(baseline)
-        }
-    }
-
-
-
-}
-
-impl<T: Reflect + FromReflect + Default> Index<usize> for Buffer<T> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        let baseline = self.head + index;
-        if let Some(overflow) = baseline.checked_sub(self.capacity) {
-            &self.vec[overflow]
-        }
-        else {
-            &self.vec[baseline]
-        }
-    }
-}
-
-pub struct BufferIter<'a, T: Reflect + FromReflect + Default> {
-    buffer: &'a Buffer<T>,
-    index: usize,
+    head: usize,
     check: bool
 }
 
-impl<'a, T: Reflect + FromReflect + Default> IntoIterator for &'a Buffer<T> {
-    type Item = &'a T;
-    type IntoIter = BufferIter<'a, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-       BufferIter {
-        buffer: self,
-        index: self.tail,
-        check: false
-       }
+impl<'a> BufferIter<'a> {
+    pub fn new(ring: &'a[u32], tail: usize, head: usize) -> Self {
+        Self { ring, tail, head, check: false }
     }
 }
 
-
-
-impl<'a, T: Reflect + FromReflect + Default> Iterator for BufferIter<'a, T> {
-    type Item = &'a T;
+impl<'a> Iterator for BufferIter<'a> {
+    type Item = &'a u32;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.check {
             return None
         }
-        
-        let n = self.buffer.get(self.index);
-        if self.index == self.buffer.head {
+        if self.tail == self.head  {
             self.check = true;
         }
-        else if self.index == 0 {
-            self.index = self.buffer.capacity - 1;
+
+        let head = self.head;
+        self.head = if self.head + 1 <= self.ring.len() - 1 {
+            self.head + 1
         }
         else {
-            self.index -= 1;
-        }
+           0
+        };
 
-        return n
-
+        self.ring.get(head)
     }
 }
 
+
+
 #[cfg(test)]
-pub mod tests {
+mod tests {
+    use crate::input::BUFFER_SIZE;
+
     use super::Buffer;
 
     #[test]
-    pub fn index_check() {
-        let vector: Vec<i32> = vec![1, 2, 3];
-        let buffer = Buffer::from_vec(vector);
+    fn thing() {
+        let mut buf = Buffer::with_capacity(BUFFER_SIZE);
 
-        assert_eq!(buffer[0], 1);
-        assert_eq!(buffer[2], 3);
+        for n in 1..100 {
+            println!("{}", n);
+            buf.insert(n);
+        }
+        println!("");
+        for n in 0..10 {
+            if n == 92 {
+                print!("");
+            }
+            print!("{:?}, ", buf.get(n).unwrap())
+        }
+        println!("");
 
-    }
-
-    #[test]
-    fn push_test() {
-        let vector: Vec<i32> = vec![4, 3, 6, 7, 10];
-        let mut buffer = Buffer::from_vec(vector);
-        buffer.push(1);
-        assert_eq!(buffer[0], 3);
-    }
-
-    #[test]
-    fn with_capacity_test() {
-        let mut buffer: Buffer<i32> = Buffer::with_capacity(10);
-        buffer.push(5);
-
-        assert_eq!(buffer[0], 5);
-
-        for n in 0..9 {
-            println!("N is equal to {}", n);
-            buffer.push(n);
-            println!("Vec: {:?}", buffer.vec);
+        for x in buf.iter() {
+            println!("Iterator: {}", x)
         }
 
-
-
-        assert_eq!(buffer[9], 8);
-        buffer.push(11);
-        println!("Vec: {:?}", buffer.vec);
-
-        assert_eq!(buffer[0], 0);
-        buffer.push(-3);
-        assert_eq!(buffer[9], -3);
-        assert_eq!(buffer[0], 1);
+        println!("Compare to: {:?}", buf);
 
     }
 
-    #[test]
-    fn iter_test() {
-        let buffer = Buffer::from_vec(vec![0, 1, 2]);
-        let iter = &mut buffer.into_iter();
-
-       assert_eq!(Some(&2), iter.next());
-       assert_eq!(Some(&1), iter.next());
-       assert_eq!(Some(&0), iter.next());
-       assert_eq!(None, iter.next());
-
-
-       
-    }
-
+   
+    
 }

@@ -15,7 +15,7 @@ opt-level = 3
 
 [dependencies]
 structopt = "0.3"
-bevy = {version = "0.8", features = ["serialize"]}
+bevy = {version = "0.8", features = ["serialize", "trace"]}
 bevy_ggrs = { git = "https://github.com/gschup/bevy_ggrs"}
 ggrs = { git = "https://github.com/gschup/ggrs", features=["sync-send"]}
 
@@ -38,6 +38,8 @@ iyes_loopless = "0.7.0"
 iyes_progress = {version = "0.4.0", features = ["assets", "iyes_loopless"]}
 bevy_prototype_lyon = "0.6.0"
 leafwing-input-manager = "0.5.2"
+
+
 
 bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls" }
 bevy-inspector-egui = "0.12.1"

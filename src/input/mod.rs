@@ -259,8 +259,11 @@ pub fn input(
         local.0 = inp.clone();
 
         let inp: u32 = inp.into();
-        buffer.0.pop_back();
-        buffer.0.push_front(inp);
+        buffer.0.insert(inp);
+        // buffer.0.pop_back();
+        // buffer.0.push_front(inp);
+
+
         Input(inp)
     }
     else {
@@ -313,40 +316,6 @@ pub struct CommandInput {
     window: u16,
 }
 
-// impl CommandInput {
-//     pub fn compare(&self, input: &Buffer<Input>) -> bool {
-//         // let mut input = input.clone();
-//         // input.reverse();
-//         // let mut input_iter = input.iter().rev();
-//         let mut input_iter = input.into_iter();
-
-//         let mut index = 0;
-
-//         for command in &self.list {
-//             loop {
-//                 index += 1;
-//                 if index > self.window {
-//                     return false;
-//                 }
-
-//                 if let Some(next) = input_iter.next() {
-//                     let has = next.0 & command.with == command.with;
-//                     let not = next.0 & command.without == 0;
-
-//                     if has && not {
-//                         break;
-//                     }
-//                 }
-//                 else {
-//                     return false;
-//                 }
-//             }
-//         }
-
-//         return true;
-//     }
-// }
-
 #[derive(Debug, Serialize, Deserialize, FromReflect, Reflect, Clone)]
 #[serde(untagged)]
 pub enum NewMatchExpression {
@@ -367,23 +336,34 @@ pub struct NewCommandInput {
 }
 
 impl NewCommandInput {
-    pub fn compare(&self, input: &VecDeque<u32>) -> bool {
+    pub fn compare(&self, input: &Buffer) -> bool {
         let mut input_iter = input.iter();
         let mut index = 0;
 
         for command in &self.list {
+            
             loop {
                 index += 1;
                 if index > self.window {
                     return false;
                 }
 
+                //println!("Peek at next value: {:?}", input_iter.peek());
+
                 if let Some(next) = input_iter.next() {
                     let next: StateInput = next.into();
+
+                    if next.lp == ButtonPress::Press {
+                        print!("");
+                    }
+
                     let mut command_iter = command.iter();
                     let mut same = true;
                     while let Some(expression) = command_iter.next() {
                         if !next.compare_command(expression.clone()) {
+                            if index == 1 {
+                                return false;
+                            }
                             same = false;
                         }
                     }
@@ -804,7 +784,9 @@ impl From<[u8; 4]> for StateInput {
 mod tests {
     use std::mem::size_of;
 
+    use bevy::reflect::Typed;
     use packed_struct::PackedStruct;
+    use serde::Serialize;
 
     use super::{ButtonPress, StateInput};
 
@@ -827,9 +809,5 @@ mod tests {
         println!("Size of StateInput is {}", size_of::<StateInput>());
     }
 
-    #[test]
-    fn something_else() {
-        println!("{}", StateInput::down_bits(false));
-        println!("{}", StateInput::down_bits(true))
-    }
+ 
 }

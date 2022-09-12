@@ -98,7 +98,8 @@ pub struct State {
     pub duration: Option<u16>,
     pub hitboxes: Option<HashMap<u16, HashSet<Entity>>>,
     pub hurtboxes: Option<HashMap<u16, HashSet<Entity>>>,
-    pub transitions: HashSet<Entity>,
+    //pub transitions: HashSet<Entity>,
+    pub transitions: Vec<Entity>,
     pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>)
 }
 
@@ -109,7 +110,8 @@ impl State {
             duration: serialized.duration,
             hitboxes: None,
             hurtboxes: None,
-            transitions: HashSet::new(),
+            //transitions: HashSet::new(),
+            transitions: Vec::new(),
             triggers: serialized.triggers
         }
     }
@@ -126,7 +128,7 @@ impl State {
 #[serde(rename_all = "camelCase")]
 pub enum Conditions {
     // used for the current state
-    In(u16),
+    In(Vec<u16>),
     NotIn(u16),
     Command(NewCommandInput),
     // when current state is at the end of its duration
