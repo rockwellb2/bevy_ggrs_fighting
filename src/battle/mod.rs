@@ -1,10 +1,8 @@
-use std::collections::VecDeque;
-
 use bevy::{
     core::Name,
     math::Vec2,
     prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component},
-    sprite::{Sprite, SpriteBundle}, ui::{Style, UiImage, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}
+    sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}
 };
 
 use bevy_ggrs::{Rollback, RollbackIdProvider};
@@ -15,7 +13,7 @@ use leafwing_input_manager::{InputManagerBundle, prelude::{ActionState, InputMap
 
 
 use crate::{
-    fighter::{data::FighterData, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, StateMap, Health}, Fighter, systems::InputBuffer},
+    fighter::{data::FighterData, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health}, Fighter, systems::InputBuffer},
     Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer,
 };
 
@@ -85,10 +83,7 @@ pub fn spawn_fighters(
     p2p_session: Option<Res<P2PSession<GGRSConfig>>>,
 
     handle_access: Res<PlayerHandleAccess>,
-    //mut state_vecs: ResMut<Assets<SerializedStateVec>>,
     mut data: ResMut<Assets<FighterData>>,
-
-    //asset_server: Res<AssetServer>
 
 ) {
     let fighter1 = data.remove(&handle_access.0.fighter_data).expect("FighterData asset does not exist");

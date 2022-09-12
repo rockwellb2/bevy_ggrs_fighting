@@ -12,10 +12,10 @@ use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider, SessionType};
 use fighter::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, SerializedStateVec,
-        Variables, StateFrame, Health,
+        StateFrame, Health,
     },
     systems::{
-        adjust_facing_system, buffer_insert_system, collision_system, hbox_position_system,
+        adjust_facing_system, collision_system, hbox_position_system,
         hit_event_system, hitbox_component_system, hitbox_removal_system, hitstun_system,
         hurtbox_component_system, hurtbox_removal_system, increment_frame_system, movement_system,
         process_input_system, transition_system, ui_lifebar_system, InputBuffer,
@@ -28,7 +28,7 @@ use game::{
 };
 use ggrs::{Config, PlayerType, SessionBuilder, UdpNonBlockingSocket, SyncTestSession};
 //use bevy_editor_pls::prelude::*;
-use bevy_inspector_egui::WorldInspectorPlugin;
+
 
 use bevy_common_assets::json::JsonAssetPlugin;
 use bevy_prototype_lyon::prelude::*;
@@ -36,8 +36,8 @@ use input::Action;
 use iyes_loopless::prelude::{AppLooplessStateExt, IntoConditionalSystem};
 use iyes_progress::ProgressPlugin;
 use leafwing_input_manager::prelude::InputManagerPlugin;
-use nalgebra::{Vector, Vector3};
-use parry3d::{math::Real, shape::Cuboid};
+
+use parry3d::{shape::Cuboid};
 use structopt::StructOpt;
 
 use std::{env, net::SocketAddr};
@@ -142,26 +142,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .register_rollback_type::<CurrentState>()
         .register_rollback_type::<StateFrame>()
         .register_rollback_type::<Health>()
-        //.register_rollback_type::<Variables>()
         .register_rollback_type::<Active>()
         .register_rollback_type::<InputBuffer>()
         .register_rollback_type::<Facing>()
-        //.register_rollback_type::<FrameCount>()
         .with_rollback_schedule(
             Schedule::default()
                 .with_stage(
                     ROLLBACK_DEFAULT,
                     SystemStage::parallel()
-                        .with_system(
-                            buffer_insert_system
-                                .run_in_state(GameState::Fight)
-                                .label(INPUT_BUFFER),
-                        )
+                        // .with_system(
+                        //     buffer_insert_system
+                        //         .run_in_state(GameState::Fight)
+                        //         .label(INPUT_BUFFER),
+                        // )
                         .with_system(
                             hitstun_system
                                 .run_in_state(GameState::Fight)
                                 .label(HITSTUN)
-                                .after(INPUT_BUFFER),
+                                //.after(INPUT_BUFFER),
                         )
                         .with_system(
                             increment_frame_system
@@ -267,26 +265,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_enter_system(GameState::LoadingFight, create_battle_ui)
         .add_exit_system(GameState::LoadingFight, spawn_fighters)
         .add_enter_system(GameState::Fight, startup.exclusive_system())
-        //.add_system(ui_lifebar_system.run_in_state(GameState::Fight))
         .add_plugin(InputManagerPlugin::<Action>::default())
-
-        //.add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(EditorPlugin)
 
+        // Non-rollback Systems
+        .add_system(ui_lifebar_system.run_in_state(GameState::Fight))
 
-        //.add_plugin(LogPlugin)
-        // .add_plugin(LogDiagnosticsPlugin::default())
-        //.add_plugin(WorldInspectorPlugin::new())
-        .insert_resource(LogSettings {
-            level: Level::DEBUG,
-            filter: "wgpu=error,bevy_render=info,bevy_ecs=trace".to_string(),
-        })
-
-
-
+        
         .insert_resource(sess)
-
-        //.insert_resource(SessionType::P2PSession)
         .insert_resource(SessionType::SyncTestSession)
         .add_plugin(FighterPlugin)
         .register_type::<Player>()

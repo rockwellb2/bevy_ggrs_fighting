@@ -6,7 +6,7 @@ use bevy::utils::hashbrown::{HashMap, HashSet};
 use bevy::{
     ecs::reflect::ReflectComponent,
     math::Vec3,
-    prelude::{Component, Query, Transform, With},
+    prelude::{Component},
     reflect::{Reflect, ReflectDeserialize},
 };
 use bevy_inspector_egui::Inspectable;
@@ -18,8 +18,6 @@ use serde_json::from_value;
 
 use crate::input::{NewCommandInput, NewMatchExpression};
 
-use super::Fighter;
-use super::systems::InputBuffer;
 
 #[derive(Default, Debug, Serialize, Deserialize, Component, Reflect)]
 #[reflect(Component)]
@@ -98,7 +96,6 @@ pub struct State {
     pub duration: Option<u16>,
     pub hitboxes: Option<HashMap<u16, HashSet<Entity>>>,
     pub hurtboxes: Option<HashMap<u16, HashSet<Entity>>>,
-    //pub transitions: HashSet<Entity>,
     pub transitions: Vec<Entity>,
     pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>)
 }
@@ -110,7 +107,6 @@ impl State {
             duration: serialized.duration,
             hitboxes: None,
             hurtboxes: None,
-            //transitions: HashSet::new(),
             transitions: Vec::new(),
             triggers: serialized.triggers
         }
@@ -140,20 +136,12 @@ pub enum Conditions {
 #[derive(Default, Serialize, Debug, Clone)]
 pub struct SerializedState {
     pub id: u16,
-    //#[serde(default)]
     pub debug_name: Option<String>,
-    //#[serde(default)]
     duration: Option<u16>,
-    //#[serde(default, alias = "hitboxes")]
     pub unsorted_hitboxes: Option<Vec<HitboxData>>,
-    //#[serde(default, alias = "hurtboxes")]
     pub unsorted_hurtboxes: Option<Vec<HurtboxData>>,
-    //#[serde(default)]
     pub modifiers: Option<Vec<Box<dyn StateModifier>>>,
-    //#[serde(default = "SerializedState::transition_default")]
     pub transitions: Vec<u16>,
-    //#[serde(default)]
-    //pub triggers: Vec<NewCommandInput>,
     pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>)
 }
 

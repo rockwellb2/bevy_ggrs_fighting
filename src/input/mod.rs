@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use bevy::prelude::*;
 use bevy::reflect::FromReflect;
 use bytemuck::{Pod, Zeroable};
@@ -17,36 +15,6 @@ use crate::util::Buffer;
 
 pub const BUFFER_SIZE: usize = 10;
 
-pub const RAW_LP: u16 = 1 << 0;
-pub const RAW_MP: u16 = 1 << 1;
-pub const RAW_HP: u16 = 1 << 2;
-pub const RAW_LK: u16 = 1 << 3;
-pub const RAW_MK: u16 = 1 << 4;
-pub const RAW_HK: u16 = 1 << 5;
-
-pub const RAW_LEFT: u16 = 1 << 6;
-pub const RAW_RIGHT: u16 = 1 << 7;
-pub const RAW_UP: u16 = 1 << 8;
-pub const RAW_DOWN: u16 = 1 << 9;
-pub const RAW_EMPTY: u16 = 0;
-
-pub const LP_HELD: u32 = 128;
-pub const LP: u32 = 64;
-
-pub const MP_HELD: u32 = 32;
-pub const MP: u32 = 16;
-
-pub const HP_HELD: u32 = 8;
-pub const HP: u32 = 4;
-
-pub const LK_HELD: u32 = 2;
-pub const LK: u32 = 1;
-
-pub const MK_HELD: u32 = 32768;
-pub const MK: u32 = 16384;
-
-pub const HK_HELD: u32 = 8192;
-pub const HK: u32 = 4096;
 
 pub const LEFT_HELD: u32 = 2048;
 pub const LEFT: u32 = 2560;
@@ -54,37 +22,7 @@ pub const LEFT: u32 = 2560;
 pub const RIGHT_HELD: u32 = 1024;
 pub const RIGHT: u32 = 1536;
 
-pub const UP_HELD: u32 = 8388608;
-pub const UP: u32 = 12582912;
 
-pub const DOWN_HELD: u32 = 256;
-pub const DOWN: u32 = 4194560;
-
-pub const MAP: [(u16, u32, u32); 10] = [
-    (RAW_LP, LP, LP_HELD),
-    (RAW_MP, MP, MP_HELD),
-    (RAW_HP, HP, HP_HELD),
-    (RAW_LK, LK, LK_HELD),
-    (RAW_MK, MK, MK_HELD),
-    (RAW_HK, HK, HK_HELD),
-    (RAW_LEFT, LEFT, LEFT_HELD),
-    (RAW_RIGHT, RIGHT, RIGHT_HELD),
-    (RAW_UP, UP, UP_HELD),
-    (RAW_DOWN, DOWN, DOWN_HELD),
-];
-
-// pub const THING: StateInput = StateInput::new(
-//     ButtonPress::Press,
-//     ButtonPress::None,
-//     ButtonPress::None,
-//     ButtonPress::None,
-//     ButtonPress::Press,
-//     ButtonPress::None,
-//     DirectionalInput::None,
-//     false,
-//     DirectionalInput::None,
-//     false
-// );
 
 #[repr(C)]
 #[derive(Default, Debug, Copy, Clone, PartialEq, Pod, Zeroable, Reflect, FromReflect)]

@@ -1,4 +1,4 @@
-use std::{collections::{VecDeque, hash_map::DefaultHasher}, hash::{Hash, Hasher}};
+
 
 use super::{
     data::{FighterData, Collider, CollisionData, HitEvent},
@@ -12,13 +12,13 @@ use bevy::{
     prelude::{
         Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without,
     },
-    reflect::{Reflect, Typed, List, FromReflect, list_apply, array_hash, utility::GenericTypeInfoCell, ListInfo, TypeInfo, ReflectRef },
+    reflect::{Reflect },
     utils::{default, HashMap, hashbrown::HashSet}, ui::{Style, Val},
 };
 use ggrs::InputStatus;
 use nalgebra::{Isometry3, Vector3};
 use parry3d::{query::intersection_test, shape::Cuboid};
-use regex::internal::Input;
+
 
 use crate::{
     battle::{PlayerEntities, Lifebar},
@@ -133,11 +133,6 @@ pub fn process_input_system(
                                         meets_conditions = false;
                                         break 'all;
                                     }
-
-                                    // if n != &current.0 {
-                                    //     meets_conditions = false;
-                                    //     break 'all;
-                                    // }
                                 },
                                 Conditions::NotIn(n) => {
                                     if n == &current.0 {
@@ -296,19 +291,6 @@ pub fn transition_system(
 pub struct InputBuffer(pub Buffer);
 
 
-pub fn buffer_insert_system(
-    //mut query: Query<&mut InputBuffer, With<Player>>,
-    mut query: Query<(&mut InputBuffer, &Player)>,
-    inputs: Res<Vec<(FightInput, InputStatus)>>,
-) {
-
-    // for (mut buffer, player) in query.iter_mut() {
-    //     if player.0 != 1 {
-    //         return
-    //     }
-    //     buffer.0.push(inputs[0].0 .0)
-    // }
-}
 
 pub fn hitbox_component_system(
     mut commands: Commands,

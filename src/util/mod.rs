@@ -1,10 +1,7 @@
-
-use std::ops::Index;
-
 use bevy::prelude::{Component, ReflectComponent};
 use bevy::reflect::Reflect;
 
-use crate::input::BUFFER_SIZE;
+
 
 pub(crate) mod scripting;
 
