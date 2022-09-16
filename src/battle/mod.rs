@@ -1,7 +1,7 @@
 use bevy::{
     core::Name,
     math::Vec2,
-    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component},
+    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State},
     sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}
 };
 
@@ -14,7 +14,7 @@ use leafwing_input_manager::{InputManagerBundle, prelude::{ActionState, InputMap
 
 use crate::{
     fighter::{data::FighterData, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health}, Fighter, systems::InputBuffer},
-    Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer,
+    Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer, game::{GameState, RoundState},
 };
 
 //#[derive(Default)]
@@ -54,7 +54,7 @@ impl PlayerHandleAccess {
 pub fn load_fighters(
     mut commands: Commands, 
     asset_server: Res<AssetServer>,
-    mut loading: ResMut<AssetsLoading>,
+    // mut loading: ResMut<AssetsLoading>,
 ) {
     let state_list: Handle<SerializedStateVec> = asset_server.load("data/fighters/tahu/states.sl.json");
     let fighter_data: Handle<FighterData> = asset_server.load("data/fighters/tahu/fighter_data.json");
@@ -62,18 +62,41 @@ pub fn load_fighters(
     let f2: Handle<FighterData> = asset_server.load("data/fighters/abe/fighter_data.json");
 
 
-    loading.add(&state_list);
-    loading.add(&fighter_data);
-    loading.add(&f2);
+    // loading.add(&state_list);
+    // loading.add(&fighter_data);
+    // loading.add(&f2);
 
     let p1 = PlayerHandles::new(state_list.clone(), fighter_data);
     let p2 = PlayerHandles::new(state_list, f2);
     let access = PlayerHandleAccess::new(p1, p2);
 
     commands.insert_resource(access);
-    
 
 
+}
+
+pub fn loading_wait(
+    asset_server: Res<AssetServer>,
+    mut state: ResMut<RoundState>,
+
+
+    player_access: Res<PlayerHandleAccess>
+) {
+    let handles = vec![
+        player_access.0.fighter_data.id,
+        player_access.0.state_list.id,
+        player_access.1.fighter_data.id,
+        player_access.1.state_list.id
+    ];
+
+    println!("LOADING...");
+
+    match asset_server.get_group_load_state(handles) {
+        bevy::asset::LoadState::Loaded => {
+            *state = RoundState::ExitLoading
+        },
+        _ => return
+    }
 }
 
 pub fn spawn_fighters(
@@ -84,6 +107,8 @@ pub fn spawn_fighters(
 
     handle_access: Res<PlayerHandleAccess>,
     mut data: ResMut<Assets<FighterData>>,
+
+    mut state: ResMut<RoundState>
 
 ) {
     let fighter1 = data.remove(&handle_access.0.fighter_data).expect("FighterData asset does not exist");
@@ -167,7 +192,7 @@ pub fn spawn_fighters(
         ..default()
     });
 
-    
+    *state = RoundState::EnterRound
 
 
 }
@@ -193,6 +218,7 @@ impl Lifebar {
 
 pub fn create_battle_ui(
     mut commands: Commands,
+    mut state: ResMut<RoundState>
 
 ) {
     commands.spawn_bundle(
@@ -309,5 +335,8 @@ pub fn create_battle_ui(
                 });
             });
         });
+
+    *state = RoundState::Loading
+
 
 }

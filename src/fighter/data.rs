@@ -12,6 +12,7 @@ use super::state::{HitboxData, HurtboxData};
 #[uuid = "d99f5e90-13a4-11ed-861d-0242ac120002"]
 pub struct FighterData {
     pub name: String,
+    #[serde(alias = "walkSpeed")]
     pub walk_speed: f32
 }
 

@@ -1,4 +1,4 @@
-use battle::{create_battle_ui, load_fighters, spawn_fighters};
+use battle::{create_battle_ui, load_fighters, spawn_fighters, loading_wait};
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     ecs::{reflect::ReflectComponent, system::Despawn},
@@ -12,19 +12,19 @@ use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider, SessionType};
 use fighter::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, SerializedStateVec,
-        StateFrame, Health,
+        StateFrame, Health, InHitstun,
     },
     systems::{
         adjust_facing_system, collision_system, hbox_position_system,
         hit_event_system, hitbox_component_system, hitbox_removal_system, hitstun_system,
         hurtbox_component_system, hurtbox_removal_system, increment_frame_system, movement_system,
-        process_input_system, transition_system, ui_lifebar_system, InputBuffer,
+        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system,
     },
     FighterPlugin,
 };
 use game::{
     ADD_HITBOX, ADD_HURTBOX, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
-    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS,
+    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, 
 };
 use ggrs::{Config, PlayerType, SessionBuilder, UdpNonBlockingSocket, SyncTestSession};
 //use bevy_editor_pls::prelude::*;
@@ -40,7 +40,7 @@ use leafwing_input_manager::prelude::InputManagerPlugin;
 use parry3d::{shape::Cuboid};
 use structopt::StructOpt;
 
-use std::{env, net::SocketAddr};
+use std::{env, net::SocketAddr, default};
 
 use crate::{
     battle::{PlayerEntities, PlayerHandleAccess},
@@ -58,13 +58,6 @@ mod util;
 
 const FPS: usize = 60;
 const ROLLBACK_DEFAULT: &str = "rollback_default";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum GameState {
-    Menu,
-    LoadingFight,
-    Fight,
-}
 
 #[derive(Debug)]
 pub struct GGRSConfig;
@@ -110,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_check_distance(opt.check_distance)
 
 
-        .with_input_delay(2)
+        .with_input_delay(3)
         .with_num_players(num_players);
 
     
@@ -145,49 +138,83 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .register_rollback_type::<Active>()
         .register_rollback_type::<InputBuffer>()
         .register_rollback_type::<Facing>()
+        .register_rollback_type::<InHitstun>()
+
+        .register_rollback_type::<RoundState>()
+
         .with_rollback_schedule(
             Schedule::default()
                 .with_stage(
+                    "Setup Stage",
+                    SystemStage::parallel()
+                        .with_run_criteria(on_enter_loading)
+                        .with_system(load_fighters.label("load_fighters"))
+                        .with_system(create_battle_ui.after("load_fighters"))
+                )
+                .with_stage_after(
+                    "Setup Stage",
+                    "Loading Stage",
+                    SystemStage::parallel()
+                        .with_run_criteria(on_loading)
+                        .with_system(loading_wait)
+                )
+                .with_stage_after(
+                    "Loading Stage",
+                    "Exit Loading Stage",
+                    SystemStage::parallel()
+                        .with_run_criteria(on_exit_loading)
+                        .with_system(spawn_fighters)
+                )
+                .with_stage_after(
+                    "Exit Loading Stage",
+                    "Enter Round Stage",
+                    SystemStage::parallel()
+                        .with_run_criteria(on_enter_round)
+                        .with_system(startup.exclusive_system())
+                )
+                .with_stage_after(
+                    "Loading Stage",
                     ROLLBACK_DEFAULT,
                     SystemStage::parallel()
-                        // .with_system(
-                        //     buffer_insert_system
-                        //         .run_in_state(GameState::Fight)
-                        //         .label(INPUT_BUFFER),
-                        // )
+                        .with_run_criteria(on_round)
+                        .with_system(
+                            buffer_insert_system
+                                .label(INPUT_BUFFER)
+                                
+                        )
                         .with_system(
                             hitstun_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(HITSTUN)
-                                //.after(INPUT_BUFFER),
+                                .after(INPUT_BUFFER),
                         )
                         .with_system(
                             increment_frame_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(FRAME_INCREMENT)
                                 .after(HITSTUN),
                         )
                         .with_system(
                             process_input_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(PROCESS)
                                 .after(FRAME_INCREMENT),
                         )
                         .with_system(
                             transition_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(TRANSITION)
                                 .after(PROCESS),
                         )
                         .with_system(
                             movement_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(MOVEMENT)
                                 .after(TRANSITION),
                         )
                         .with_system(
                             adjust_facing_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .after(MOVEMENT),
                         ),
                 )
@@ -195,38 +222,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ROLLBACK_DEFAULT,
                     "Hitbox Stage",
                     SystemStage::parallel()
+                        .with_run_criteria(on_round)
                         .with_system(
                             hitbox_component_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(ADD_HITBOX),
                         )
                         .with_system(
                             hurtbox_component_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .after(ADD_HITBOX)
                                 .label(ADD_HURTBOX),
                         )
                         .with_system(
                             hitbox_removal_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(REMOVE_HITBOX)
                                 .after(ADD_HURTBOX),
                         )
                         .with_system(
                             hurtbox_removal_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(REMOVE_HURTBOX)
                                 .after(REMOVE_HITBOX),
                         )
                         .with_system(
                             hbox_position_system::<HitboxData>
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(UPDATE_HIT_POS)
                                 .after(REMOVE_HURTBOX),
                         )
                         .with_system(
                             hbox_position_system::<HurtboxData>
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(UPDATE_HURT_POS)
                                 .after(UPDATE_HIT_POS),
                         ),
@@ -235,14 +263,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "Hitbox Stage",
                     "Collision Stage",
                     SystemStage::parallel()
+                        .with_run_criteria(on_round)
                         .with_system(
                             collision_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(COLLISION),
                         )
                         .with_system(
                             hit_event_system
-                                .run_in_state(GameState::Fight)
+                                //.run_in_state(GameState::Fight)
                                 .label(HIT_EVENT)
                                 .after(COLLISION),
                         ), 
@@ -254,22 +283,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_plugin(ShapePlugin)
         .add_plugin(JsonAssetPlugin::<SerializedStateVec>::new(&["sl.json"]))
         .add_plugin(JsonAssetPlugin::<FighterData>::new(&["json"]))
-        // Game State Systems and Related Plugins
-        .add_loopless_state(GameState::LoadingFight)
-        .add_plugin(
-            ProgressPlugin::new(GameState::LoadingFight)
-                .continue_to(GameState::Fight)
-                .track_assets(),
-        )
-        .add_enter_system(GameState::LoadingFight, load_fighters)
-        .add_enter_system(GameState::LoadingFight, create_battle_ui)
-        .add_exit_system(GameState::LoadingFight, spawn_fighters)
-        .add_enter_system(GameState::Fight, startup.exclusive_system())
+        
+        .insert_resource(RoundState::EnterLoading)
         .add_plugin(InputManagerPlugin::<Action>::default())
         .add_plugin(EditorPlugin)
+        .add_plugin(FrameTimeDiagnosticsPlugin)
 
         // Non-rollback Systems
-        .add_system(ui_lifebar_system.run_in_state(GameState::Fight))
+       .add_system_set(SystemSet::new()
+            .with_run_criteria(on_round)
+            .with_system(ui_lifebar_system)
+        )
 
         
         .insert_resource(sess)
@@ -296,8 +320,11 @@ fn startup(world: &mut World) {
 
         populate_entities_with_states(world, player1, deserialized);
         populate_entities_with_states(world, player2, deserialized2);
-
     });
+
+
+    let mut round_state = world.resource_mut::<RoundState>();
+    *round_state = RoundState::Round;
 }
 
 fn populate_entities_with_states(

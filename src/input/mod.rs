@@ -43,7 +43,7 @@ pub enum Action {
 
 pub fn input(
     handle: In<PlayerHandle>,
-    mut input_query: Query<(&ActionState<Action>, &mut InputBuffer)>,
+    mut input_query: Query<&ActionState<Action>>,
     mut local: Local<(StateInput, StateInput)>
 
 
@@ -55,11 +55,14 @@ pub fn input(
     // )>,
 ) -> Input 
 {
+    //Input(StateInput::default().into())
+
+
     if handle.0 == 1 {
         return Input(StateInput::default().into());
     }
 
-    if let Ok((action_state, mut buffer)) = input_query.get_single_mut() {
+    if let Ok(action_state) = input_query.get_single_mut() {
         let previous = &local.0;
 
         let button_check = |action: Action| -> ButtonPress {
@@ -123,7 +126,7 @@ pub fn input(
         local.0 = inp.clone();
 
         let inp: u32 = inp.into();
-        buffer.0.insert(inp);
+        //buffer.0.insert(inp);
         Input(inp)
     }
     else {

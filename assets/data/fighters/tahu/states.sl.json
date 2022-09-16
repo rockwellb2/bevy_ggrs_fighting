@@ -5,6 +5,8 @@
         "transitions": [
             1,
             5,
+            700,
+            200,
             100,
             141
         ],
@@ -32,7 +34,7 @@
             { "in": [5] }
         ],
         "trigger2": [
-            { "in": [100, 101, 141] },
+            { "in": [100, 101, 141, 700, 200] },
             { "endDuration": null }
         ],
         "trigger3": [
@@ -93,6 +95,9 @@
         "modifiers": [
             {
                 "Movement": null
+            },
+            {
+                "AdjustFacing": null
             }
         ],
         "hurtboxes": [
@@ -153,6 +158,10 @@
         "id": 100,
         "debug_name": "LP",
         "duration": 15,
+        "transitions": [
+            700,
+            0
+        ],
         "hitboxes": [
             {
                 "startFrame": 3,
@@ -205,6 +214,25 @@
         ]
     },
     {
+        "id": 200,
+        "debug_name": "MP",
+        "duration": 30,
+        "transitions": [0, 700],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["mp", "Press"]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+
+    },
+    {
         "id": 3000,
         "debug_name": "Hitstun"
     },
@@ -230,6 +258,65 @@
 
                 }
             }
+        ]
+    },
+    {
+        "id": 700,
+        "debug_name": "LP+MP",
+        "duration": 27,
+        "trigger1": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"],
+                            ["mp", "Press"]
+                        ]
+                    ],
+                    "window": 1
+                }
+            },
+            { "in": [0, 100] }
+        ],
+        "trigger2": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["mp", "Press"],
+                            ["lp", "Hold"]
+                        ],
+                        [
+                            ["lp", "Press"]
+                        ]
+                    ],
+                    "window": 3
+                }
+            },
+            {
+                "frame": [null, 4]
+            },
+            { "in": [100] }
+        ],
+        "trigger3": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["mp", "Hold"],
+                            ["lp", "Press"]
+                        ],
+                        [
+                            ["mp", "Press"]
+                        ]
+                    ],
+                    "window": 3
+                }
+            },
+            {
+                "frame": [null, 4]
+            },
+            { "in": [200] }
         ]
     }
 ]

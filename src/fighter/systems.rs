@@ -30,6 +30,18 @@ use crate::{
     Player, FPS,
 };
 
+pub fn buffer_insert_system(
+    mut query: Query<(&mut InputBuffer, &Player)>,
+    inputs: Res<Vec<(FightInput, InputStatus)>>,
+) {
+    for (mut buffer, player) in query.iter_mut() {
+        if player.0 != 1 {
+            return
+        }
+        buffer.0.insert(inputs[0].0 .0)
+    }
+}
+
 pub fn movement_system(
     //state_query: Query<&Parent, (With<Movement>)>,
     //mut fighter_query: Query<(&mut Transform, &FighterData), With<Fighter>>,
