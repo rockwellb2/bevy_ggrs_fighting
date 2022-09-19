@@ -10,7 +10,7 @@ use super::{
 use bevy::{
     ecs::{reflect::ReflectComponent, },
     prelude::{
-        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without, ResMut, Name,
+        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without, ResMut, Name, Or,
     },
     reflect::{Reflect },
     utils::{default, HashMap, hashbrown::HashSet}, ui::{Style, Val},
@@ -75,7 +75,7 @@ pub fn movement_system(
     }
 }
 
-pub fn increment_frame_system(mut query: Query<&mut StateFrame>) {
+pub fn increment_frame_system(mut query: Query<&mut StateFrame, Or<(With<Fighter>, With<Active>)>>) {
     for mut frame in query.iter_mut() {
         frame.0 = frame.0.checked_add(1).unwrap_or(1);
     }
@@ -99,13 +99,13 @@ pub fn hitstun_system(
 pub fn process_input_system(
     //mut commands: Commands,
     query: Query<
-        (Entity, &CurrentState, &StateMap, &InputBuffer, &StateFrame, &Player),
+        (Entity, &CurrentState, &StateMap, &InputBuffer, &StateFrame, &Player, &Facing),
         (With<Fighter>, With<Player>),
     >,
     state_query: Query<&State>,
     mut trans_writer: EventWriter<TransitionEvent>
 ) {
-    'fighter: for (fighter, current, map, buffer, frame, player) in query.iter() {
+    'fighter: for (fighter, current, map, buffer, frame, player, facing) in query.iter() {
         //buffer.0.get_mut(0)
 
 
@@ -134,7 +134,7 @@ pub fn process_input_system(
                                     }
                                 },
                                 Conditions::Command(command) => {
-                                    if !command.compare(&buffer.0) {
+                                    if !command.compare(&buffer.0, facing.0) {
                                         meets_conditions = false;
                                         break 'all;
                                     }
@@ -190,7 +190,7 @@ pub fn process_input_system(
                                     }
                                 },
                                 Conditions::Command(command) => {
-                                    if !command.compare(&buffer.0) {
+                                    if !command.compare(&buffer.0, facing.0) {
                                         met = false;
                                         break 'conditions;
                                     }
@@ -425,38 +425,44 @@ pub fn hurtbox_removal_system(
 // Isn't removed until after stage is over, may be a problem?
 pub fn projectile_system(
     mut commands: Commands,
-    query: Query<(Entity, &Owner, &ProjectileData, &StateFrame, &Rollback)>,
-    mut fighter_query: Query<&mut ProjectileReference>
+    mut query: Query<(Entity, &Owner, &ProjectileData, &StateFrame, &mut Visibility, &mut Transform, &mut Velocity), With<Active>>,
+    mut fighter_query: Query<(&mut ProjectileReference, &Facing)>
 
 ) {
-    for (projectile, owner, data, frame, rollback) in query.iter() {
+    for (projectile, owner, data, frame, mut visibility, mut tf, mut velo) in query.iter_mut() {
         if frame.0 == data.life_frames {
-            if let Ok(mut proj_ref) = fighter_query.get_mut(owner.0) {
+            if let Ok((mut proj_ref, _facing)) = fighter_query.get_mut(owner.0) {
                 let ids = proj_ref.projectile_ids.get_mut(&data.name).expect("Projectile is not in ProjectileReference");
                 let mut id_iter = ids.iter_mut();
 
                 loop {
                     if let Some((id, in_use)) = id_iter.next() {
-                        if rollback.id() == *id {
-                            println!("Does it get here in the projectile system?");
+                        if projectile == *id {
+                            println!("Changing in-use");
                             *in_use = false;
-
-                            println!("{}", *in_use);
-
-                            commands.entity(projectile)
-                                .despawn();
-
                             break;
                         }
                     }
-
                     else {
-                        panic!("ID isn't in ProjectileReference");
+                        panic!();
                     }
-
                 }
-            }
 
+                let amount = proj_ref.amount_in_use.get_mut(&data.name).unwrap();
+                *amount -= 1;
+
+                visibility.is_visible = false;
+
+                commands.entity(projectile)
+                    .remove::<Active>();
+
+            }
+        }
+        else {
+            if let Ok((_, facing)) = fighter_query.get(owner.0) {
+                velo.0 += facing.0.sign() * data.acceleration;
+                tf.translation += facing.0.sign() * velo.0 / FPS as f32;
+            }
         }
 
     }
@@ -502,17 +508,30 @@ pub fn adjust_facing_system(
 pub fn object_system(
     mut commands: Commands,
 
-    mut fighter_query: Query<(Entity, &CurrentState, &StateMap, &StateFrame, &Transform, &mut ProjectileReference), With<Fighter>>,
+    mut set: ParamSet<(
+        Query<(&mut Transform, &mut Visibility, &mut StateFrame)>,
+        Query<(Entity, &CurrentState, &StateMap, &StateFrame, &Transform, &mut ProjectileReference, &Facing), With<Fighter>>,
+    )>,
     state_query: Query<(&State, &CreateObject)>
 ) {
-    for (fighter, current, map, frame, tf, mut projectiles) in fighter_query.iter_mut() {
-        let s = map.get(&current.0).expect("State doesn't exist");
+
+    let mut changes: Vec<(Entity, Vec3)> = Vec::new();
+
+    for (_fighter, current, map, frame, tf, mut projectiles, facing) in set.p1().iter_mut() {
+        let s = map.get(&current.0).expect("State does not exist");
 
         if let Ok((_state, create_object)) = state_query.get(*s) {
             match &create_object.0 {
                 Object::Projectile(projectile) => {
                     if projectile.spawn_frame == frame.0 {
-                        // Spawn projectile entity here
+                        let amount = projectiles.amount_in_use.get_mut(&projectile.name).unwrap();
+
+                        if *amount >= projectile.max {
+                            continue;
+                        }
+
+                        *amount += 1;
+
                         let ids = projectiles.projectile_ids.get_mut(&projectile.name).expect("Projectile name doesn't exist");
                         let mut iter = ids.iter_mut();
 
@@ -527,25 +546,29 @@ pub fn object_system(
                                 break None;
                             }
                         };
-                        
+
                         let id = *id.expect("All IDs are in use!");
-                        
-                        commands.spawn_bundle(SpatialBundle {
-                                transform: Transform::from_translation(tf.translation + projectile.start_position),
-                                ..default()
-                            })
-                            .insert(Name::new("Fireball"))
-                            .insert(projectile.clone())
-                            .insert(Velocity(projectile.start_velocity))
-                            .insert(Rollback::new(id))
-                            .insert(StateFrame(0))
-                            .insert(Owner(fighter));
+                        let new_pos = tf.translation + (facing.0.sign() * projectile.start_position);
+                        changes.push((id, new_pos));
+
+                        commands.entity(id)
+                            .insert(Active(HashSet::new()));
                     }
+
                 },
                 Object::None => panic!(),
             }
         }
     }
+
+    changes.into_iter().for_each(|(entity, pos)| {
+        if let Ok((mut tf, mut visibility, mut frame)) = set.p0().get_mut(entity) {
+            tf.translation = pos;
+            visibility.is_visible = true;
+            frame.0 = 0;
+        }
+    });
+
 }
 
 pub fn hbox_position_system<T: HBox>(

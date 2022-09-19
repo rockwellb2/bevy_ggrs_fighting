@@ -1,20 +1,21 @@
 use bevy::{
     core::Name,
     math::Vec2,
-    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle},
+    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle, VisibilityBundle, ComputedVisibility},
     sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}
 };
 
 use bevy_ggrs::{Rollback, RollbackIdProvider};
-use bevy_prototype_lyon::prelude::tess::geom::euclid::num::Round;
+use bevy_prototype_lyon::{prelude::{tess::geom::euclid::num::Round, GeometryBuilder, DrawMode, FillMode}, shapes::{RectangleOrigin, self}};
 use ggrs::{SyncTestSession, P2PSession};
 
 use iyes_progress::prelude::AssetsLoading;
 use leafwing_input_manager::{InputManagerBundle, prelude::{ActionState, InputMap}};
+use parry3d::shape::Cuboid;
 
 
 use crate::{
-    fighter::{data::FighterData, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health, Owner, ProjectileReference}, Fighter, systems::InputBuffer, modifiers::{CreateObject, Object}},
+    fighter::{data::{FighterData, Collider}, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health, Owner, ProjectileReference, Velocity}, Fighter, systems::InputBuffer, modifiers::{CreateObject, Object}},
     Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer, game::{GameState, RoundState},
 };
 
@@ -212,20 +213,76 @@ pub fn extra_setup_system(
     for (create_object, parent) in object_query.iter() {
         match &create_object.0 {
             Object::Projectile(projectile) => {
-                let ids: Vec<(u32, bool)> = (0..projectile.max).map(|_|(rip.next_id(), false)).collect();
+                let shape = shapes::Rectangle {
+                    extents: projectile.dimensions.truncate(),
+                    origin: RectangleOrigin::Center,
+                };
+
+                let cuboid = Cuboid::new((projectile.dimensions / 2.).into());
+
+
+                let mut ids = Vec::new();
+
+                for _ in 0..projectile.max {
+                    let entity = commands
+                        .spawn_bundle(GeometryBuilder::build_as(
+                            &shape,
+                            DrawMode::Fill(FillMode::color(Color::rgba(1., 0., 0., 0.8))),
+                            Transform::default()
+                        ))
+                        .insert_bundle(VisibilityBundle {
+                            visibility: Visibility { is_visible: false },
+                            computed: ComputedVisibility::default()
+                        })
+                        .insert(Name::new(projectile.name.clone()))
+                        .insert(projectile.clone())
+                        .insert(Collider { shape: cuboid })
+                        .insert(Velocity(projectile.start_velocity))
+                        .insert(Rollback::new(rip.next_id()))
+                        .insert(StateFrame(0))
+                        .insert(Owner(parent.get()))
+                        .id()
+                        ;
+
+                    ids.push((entity, false))
+                }
 
                 if let Ok((_tf, projectile_ref)) = parent_query.get_mut(parent.get()) {
                     if let Some(mut projectile_ref) = projectile_ref {
                         projectile_ref.insert_ids(projectile.name.clone(), ids);
+                        projectile_ref.amount_in_use.insert(projectile.name.clone(), 0);
                     }
                     else {
                         let mut projectile_ref = ProjectileReference::new();
                         projectile_ref.insert_ids(projectile.name.clone(), ids);
+                        projectile_ref.amount_in_use.insert(projectile.name.clone(), 0);
 
                         commands.entity(parent.get())
                             .insert(projectile_ref);
                     }
+
+                    
                 }
+
+
+
+
+
+
+                // let ids: Vec<(u32, bool)> = (0..projectile.max).map(|_|(rip.next_id(), false)).collect();
+
+                // if let Ok((_tf, projectile_ref)) = parent_query.get_mut(parent.get()) {
+                //     if let Some(mut projectile_ref) = projectile_ref {
+                //         projectile_ref.insert_ids(projectile.name.clone(), ids);
+                //     }
+                //     else {
+                //         let mut projectile_ref = ProjectileReference::new();
+                //         projectile_ref.insert_ids(projectile.name.clone(), ids);
+
+                //         commands.entity(parent.get())
+                //             .insert(projectile_ref);
+                //     }
+                // }
                 
             },
             Object::None => panic!(),

@@ -269,80 +269,83 @@ pub struct Velocity(pub Vec3);
 #[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
 #[reflect(Component)]
 pub struct ProjectileReference {
-    // projectile name, vec of projectile rollback ids and whether it's in use
-    pub projectile_ids: HashMap<String, Vec<(u32, bool)>>
+    // projectile name, vec of projectile entities and whether it's in use
+    pub projectile_ids: HashMap<String, Vec<(Entity, bool)>>,
     // projectile name, vec of projectiles entities
     //pub projectile_ids: HashMap<String, Vec<Entity>>
-
+    pub amount_in_use: HashMap<String, usize>
 }
 
-impl Inspectable for ProjectileReference {
-    type Attributes = (
-        <String as Inspectable>::Attributes, 
-        <Vec<(u32, bool)> as Inspectable>::Attributes
-    );
+// impl Inspectable for ProjectileReference {
+//     type Attributes = (
+//         <String as Inspectable>::Attributes, 
+//         <Vec<(u32, bool)> as Inspectable>::Attributes
+//     );
 
-    fn ui(&mut self, ui: &mut bevy_inspector_egui::egui::Ui, options: Self::Attributes, context: &mut bevy_inspector_egui::Context) -> bool {
-        let mut changed = false;
+//     fn ui(&mut self, ui: &mut bevy_inspector_egui::egui::Ui, options: Self::Attributes, context: &mut bevy_inspector_egui::Context) -> bool {
+//         let mut changed = false;
 
-        ui.vertical(|ui| {
-            let mut to_delete = None;
-            let mut to_update = Vec::new();
+//         ui.vertical(|ui| {
+//             let mut to_delete = None;
+//             let mut to_update = Vec::new();
 
-            let len = self.projectile_ids.len();
-            for (i, (key, val)) in self.projectile_ids.iter_mut().enumerate() {
-                ui.horizontal(|ui| {
-                    if label_button(ui, "✖", egui::Color32::RED) {
-                        to_delete = Some(key.clone());
-                    }
+//             let len = self.projectile_ids.len();
+//             for (i, (key, val)) in self.projectile_ids.iter_mut().enumerate() {
+//                 ui.horizontal(|ui| {
+//                     if label_button(ui, "✖", egui::Color32::RED) {
+//                         to_delete = Some(key.clone());
+//                     }
 
-                    let mut k = key.clone();
-                    if k.ui(ui, options.0.clone(), &mut context.with_id(i as u64)) {
-                        to_update.push((key.clone(), k));
-                    }
+//                     let mut k = key.clone();
+//                     if k.ui(ui, options.0.clone(), &mut context.with_id(i as u64)) {
+//                         to_update.push((key.clone(), k));
+//                     }
 
-                    changed |= val.ui(ui, options.1.clone(), &mut context.with_id(i as u64));
-                });
+//                     changed |= val.ui(ui, options.1.clone(), &mut context.with_id(i as u64));
+//                 });
 
-                if i != len - 1 {
-                    ui.separator();
-                }
-            }
+//                 if i != len - 1 {
+//                     ui.separator();
+//                 }
+//             }
 
-            ui.vertical_centered_justified(|ui| {
-                if ui.button("+").clicked() {
-                    self.projectile_ids.insert(String::default(), <Vec<(u32, bool)>>::default());
-                    changed = true;
-                }
-            });
+//             ui.vertical_centered_justified(|ui| {
+//                 if ui.button("+").clicked() {
+//                     self.projectile_ids.insert(String::default(), <Vec<(u32, bool)>>::default());
+//                     changed = true;
+//                 }
+//             });
 
-            for (old_key, new_key) in to_update.drain(..) {
-                if let Some(val) = self.projectile_ids.remove(&old_key) {
-                    self.projectile_ids.insert(new_key, val);
-                    changed = true;
-                }
-            }
+//             for (old_key, new_key) in to_update.drain(..) {
+//                 if let Some(val) = self.projectile_ids.remove(&old_key) {
+//                     self.projectile_ids.insert(new_key, val);
+//                     changed = true;
+//                 }
+//             }
 
-            if let Some(key) = to_delete {
-                if self.projectile_ids.remove(&key).is_some() {
-                    changed = true;
-                }
-            }
-        });
+//             if let Some(key) = to_delete {
+//                 if self.projectile_ids.remove(&key).is_some() {
+//                     changed = true;
+//                 }
+//             }
+//         });
 
-        changed
+//         changed
 
-    }
-}
+//     }
+// }
+
+
 
 impl ProjectileReference {
     pub fn new() -> Self {
         Self {
-            projectile_ids: HashMap::new()
+            projectile_ids: HashMap::new(),
+            amount_in_use: HashMap::new()
         }
     }
 
-    pub fn insert_ids(&mut self, name: String, ids: Vec<(u32, bool)>) {
+    pub fn insert_ids(&mut self, name: String, ids: Vec<(Entity, bool)>) {
         self.projectile_ids.insert(name, ids);
     }
 

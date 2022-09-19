@@ -244,9 +244,9 @@
                 "CreateObject": {
                     "Projectile": {
                         "name": "Fireball",
-                        "startPosition": [0, 0, 0],
+                        "startPosition": [1, 0, 0],
                         "dimensions": [1, 1, 1],
-                        "velocity": [5, 0, 0],
+                        "velocity": [7, 0, 0],
                         "damage": 30,
                         "spawnFrame": 10,
                         "lifeFrames": 90

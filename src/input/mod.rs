@@ -199,7 +199,7 @@ pub struct NewCommandInput {
 }
 
 impl NewCommandInput {
-    pub fn compare(&self, input: &Buffer) -> bool {
+    pub fn compare(&self, input: &Buffer, facing: Direction) -> bool {
         let mut input_iter = input.iter();
         let mut index = 0;
 
@@ -212,7 +212,20 @@ impl NewCommandInput {
                 }
 
                 if let Some(next) = input_iter.next() {
-                    let next: StateInput = next.into();
+                    let mut next: StateInput = next.into();
+
+                    if facing == Direction::Left {
+                        match next.x {
+                            DirectionalInput::None => {},
+                            DirectionalInput::Positive => {
+                                next.x = DirectionalInput::Negative;
+                            },
+                            DirectionalInput::Negative =>{
+                                next.x = DirectionalInput::Positive;
+                            },
+                        }
+                    }
+
 
                     let mut command_iter = command.iter();
                     let mut same = true;

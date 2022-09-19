@@ -12,7 +12,7 @@ use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider, SessionType};
 use fighter::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, SerializedStateVec,
-        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData,
+        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity,
     },
     systems::{
         adjust_facing_system, collision_system, hbox_position_system,
@@ -140,8 +140,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .register_rollback_type::<Facing>()
         .register_rollback_type::<InHitstun>()
         .register_rollback_type::<ProjectileReference>()
-
-        .register_rollback_type::<ProjectileData>()
+        .register_rollback_type::<Velocity>()
 
         .register_rollback_type::<RoundState>()
 

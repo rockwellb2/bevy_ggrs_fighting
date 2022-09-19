@@ -48,7 +48,8 @@ impl Plugin for FighterPlugin {
             .register_inspectable::<HitboxData>()
             .register_inspectable::<ProjectileData>()
             .register_inspectable::<Object>()
-            .register_inspectable::<ProjectileReference>()
+            //.register_inspectable::<ProjectileReference>()
+            .register_type::<ProjectileReference>()
             .register_type::<FighterData>();
     }
 }
