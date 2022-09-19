@@ -21,7 +21,7 @@
             },
             "args": [
                 "--num-players", "2",
-                "--check-distance", "2"
+                "--check-distance", "1"
             ],
             "cwd": "${workspaceFolder}",
             "env": {

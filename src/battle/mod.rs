@@ -1,11 +1,12 @@
 use bevy::{
     core::Name,
     math::Vec2,
-    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State},
+    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle},
     sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}
 };
 
 use bevy_ggrs::{Rollback, RollbackIdProvider};
+use bevy_prototype_lyon::prelude::tess::geom::euclid::num::Round;
 use ggrs::{SyncTestSession, P2PSession};
 
 use iyes_progress::prelude::AssetsLoading;
@@ -13,7 +14,7 @@ use leafwing_input_manager::{InputManagerBundle, prelude::{ActionState, InputMap
 
 
 use crate::{
-    fighter::{data::FighterData, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health}, Fighter, systems::InputBuffer},
+    fighter::{data::FighterData, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health, Owner, ProjectileReference}, Fighter, systems::InputBuffer, modifiers::{CreateObject, Object}},
     Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer, game::{GameState, RoundState},
 };
 
@@ -196,6 +197,45 @@ pub fn spawn_fighters(
 
 
 }
+
+
+pub fn extra_setup_system(
+    object_query: Query<(&CreateObject, &Parent)>,
+    mut parent_query: Query<(&Transform, Option<&mut ProjectileReference>)>,
+
+    mut commands: Commands,
+    mut rip: ResMut<RollbackIdProvider>,
+
+    mut round_state: ResMut<RoundState>
+
+) {
+    for (create_object, parent) in object_query.iter() {
+        match &create_object.0 {
+            Object::Projectile(projectile) => {
+                let ids: Vec<(u32, bool)> = (0..projectile.max).map(|_|(rip.next_id(), false)).collect();
+
+                if let Ok((_tf, projectile_ref)) = parent_query.get_mut(parent.get()) {
+                    if let Some(mut projectile_ref) = projectile_ref {
+                        projectile_ref.insert_ids(projectile.name.clone(), ids);
+                    }
+                    else {
+                        let mut projectile_ref = ProjectileReference::new();
+                        projectile_ref.insert_ids(projectile.name.clone(), ids);
+
+                        commands.entity(parent.get())
+                            .insert(projectile_ref);
+                    }
+                }
+                
+            },
+            Object::None => panic!(),
+        }
+    }
+
+    *round_state = RoundState::Round;
+
+}
+
 
 #[derive(Component)]
 pub struct Lifebar {

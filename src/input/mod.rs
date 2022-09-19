@@ -9,6 +9,7 @@ use packed_struct::types::bits::Bits;
 use packed_struct::types::ReservedZero;
 use serde::{de, Deserialize, Serialize};
 
+use crate::fighter::state::{Facing, Direction};
 use crate::fighter::systems::InputBuffer;
 use crate::util::Buffer;
 
@@ -43,26 +44,15 @@ pub enum Action {
 
 pub fn input(
     handle: In<PlayerHandle>,
-    mut input_query: Query<&ActionState<Action>>,
+    mut input_query: Query<(&ActionState<Action>, &Facing)>,
     mut local: Local<(StateInput, StateInput)>
-
-
-
-    //keyboard_input: Res<bevy::input::Input<KeyCode>>,
-    // mut input_params: ParamSet<(
-    //     Query<(&ActionState<Action>, &InputBuffer), With<Fighter>>,
-    //     Query<&mut InputBuffer, With<ActionState<Action>>>
-    // )>,
 ) -> Input 
 {
-    //Input(StateInput::default().into())
-
-
     if handle.0 == 1 {
         return Input(StateInput::default().into());
     }
 
-    if let Ok(action_state) = input_query.get_single_mut() {
+    if let Ok((action_state, facing)) = input_query.get_single_mut() {
         let previous = &local.0;
 
         let button_check = |action: Action| -> ButtonPress {
@@ -92,6 +82,8 @@ pub fn input(
             let check_pos = action_state.pressed(pos);
             let check_neg = action_state.pressed(neg);
 
+
+
             if check_pos {
                 match prev {
                     (DirectionalInput::Positive, _) => (DirectionalInput::Positive, false),
@@ -120,6 +112,14 @@ pub fn input(
 
         let (x, just_pressed_x) = directional_check(Action::Right, Action::Left);
         let (y, just_pressed_y) = directional_check(Action::Up, Action::Down);
+
+        // if facing.0 == Direction::Left {
+        //     x = match x {
+        //         DirectionalInput::None => DirectionalInput::None,
+        //         DirectionalInput::Positive => DirectionalInput::Negative,
+        //         DirectionalInput::Negative => DirectionalInput::Positive,
+        //     }
+        // }
 
         let inp = StateInput::new(lp, mp, hp, lk, mk, hk, x, just_pressed_x, y, just_pressed_y);
 

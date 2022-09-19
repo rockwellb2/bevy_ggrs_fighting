@@ -13,7 +13,11 @@ use super::state::{HitboxData, HurtboxData};
 pub struct FighterData {
     pub name: String,
     #[serde(alias = "walkSpeed")]
-    pub walk_speed: f32
+    pub walk_speed: f32,
+    #[serde(alias = "walkForward", default)]
+    pub walk_forward: f32,
+    #[serde(alias = "walkBack", default)]
+    pub walk_back: f32
 }
 
 #[derive(Component)]

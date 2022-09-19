@@ -1,15 +1,18 @@
 use std::fmt::Debug;
 
+use bevy::ecs::reflect;
 use bevy::prelude::Entity;
-use bevy::reflect::{reflect_trait, FromReflect, TypeUuid};
+use bevy::reflect::{FromReflect, TypeUuid, Reflect};
+use bevy::utils;
 use bevy::utils::hashbrown::{HashMap, HashSet};
 use bevy::{
     ecs::reflect::ReflectComponent,
     math::Vec3,
     prelude::{Component},
-    reflect::{Reflect, ReflectDeserialize},
+    reflect::{ReflectDeserialize},
 };
-use bevy_inspector_egui::Inspectable;
+use bevy_editor_pls::default_windows::inspector::label_button;
+use bevy_inspector_egui::{Inspectable, egui};
 use serde::de::Visitor;
 use serde::{Deserialize, Serialize, de, Deserializer};
 use serde_json::from_value;
@@ -17,6 +20,8 @@ use serde_json::from_value;
 //use bevy_editor_pls::default_windows::inspector::InspectorWindow;
 
 use crate::input::{NewCommandInput, NewMatchExpression};
+
+use super::modifiers::StateModifier;
 
 
 #[derive(Default, Debug, Serialize, Deserialize, Component, Reflect)]
@@ -38,53 +43,6 @@ impl StateMap {
 
     pub fn get<'a>(&'a self, key: &u16) -> Option<&Entity> {
         self.map.get(key)
-    }
-}
-
-#[typetag::serde]
-#[reflect_trait]
-pub trait StateModifier: Sync + Send + 'static + Debug + Reflect {
-    fn dyn_clone(&self) -> Box<dyn StateModifier>;
-}
-
-
-impl Clone for Box<dyn StateModifier> {
-    fn clone(&self) -> Self {
-        self.dyn_clone()
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
-#[reflect(Component, Deserialize, StateModifier)]
-pub struct Movement;
-
-#[typetag::serde]
-impl StateModifier for Movement {
-    fn dyn_clone(&self) -> Box<dyn StateModifier> {
-        Box::new(self.clone())
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
-#[reflect(Component, Deserialize, StateModifier)]
-pub struct InputTransition(pub Vec<(NewCommandInput, u16)>);
-
-#[typetag::serde]
-impl StateModifier for InputTransition {
-    fn dyn_clone(&self) -> Box<dyn StateModifier> {
-        Box::new(self.clone())
-    }
-}
-
-
-#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
-#[reflect(Component, Deserialize, StateModifier)]
-pub struct AdjustFacing;
-
-#[typetag::serde]
-impl StateModifier for AdjustFacing {
-    fn dyn_clone(&self) -> Box<dyn StateModifier> {
-        Box::new(self.clone())
     }
 }
 
@@ -224,7 +182,7 @@ pub trait HBox: Component {
     fn get_offset(&self) -> Vec3;
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable)]
 #[reflect(Component)]
 pub struct HitboxData {
     #[serde(default)]
@@ -276,6 +234,132 @@ impl HBox for HurtboxData {
     }
 }
 
+#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable)]
+#[reflect(Component)]
+pub struct ProjectileData {
+    pub name: String,
+    #[serde(alias = "startPosition", default)]
+    pub start_position: Vec3, 
+    pub dimensions: Vec3,
+    #[serde(alias = "velocity", default)]
+    pub start_velocity: Vec3,
+    #[serde(default)]
+    pub acceleration: Vec3,
+    #[serde(alias = "spawnFrame")]
+    pub spawn_frame: u16,
+    #[serde(alias = "lifeFrames")]
+    pub life_frames: u16,
+    #[serde(default)]
+    pub damage: u16,
+    #[serde(default = "ProjectileData::max_default")]
+    pub max: usize
+
+}
+
+impl ProjectileData {
+    fn max_default() -> usize {
+        1
+    }
+}
+
+#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable)]
+#[reflect(Component)]
+pub struct Velocity(pub Vec3);
+
+#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
+#[reflect(Component)]
+pub struct ProjectileReference {
+    // projectile name, vec of projectile rollback ids and whether it's in use
+    pub projectile_ids: HashMap<String, Vec<(u32, bool)>>
+    // projectile name, vec of projectiles entities
+    //pub projectile_ids: HashMap<String, Vec<Entity>>
+
+}
+
+impl Inspectable for ProjectileReference {
+    type Attributes = (
+        <String as Inspectable>::Attributes, 
+        <Vec<(u32, bool)> as Inspectable>::Attributes
+    );
+
+    fn ui(&mut self, ui: &mut bevy_inspector_egui::egui::Ui, options: Self::Attributes, context: &mut bevy_inspector_egui::Context) -> bool {
+        let mut changed = false;
+
+        ui.vertical(|ui| {
+            let mut to_delete = None;
+            let mut to_update = Vec::new();
+
+            let len = self.projectile_ids.len();
+            for (i, (key, val)) in self.projectile_ids.iter_mut().enumerate() {
+                ui.horizontal(|ui| {
+                    if label_button(ui, "✖", egui::Color32::RED) {
+                        to_delete = Some(key.clone());
+                    }
+
+                    let mut k = key.clone();
+                    if k.ui(ui, options.0.clone(), &mut context.with_id(i as u64)) {
+                        to_update.push((key.clone(), k));
+                    }
+
+                    changed |= val.ui(ui, options.1.clone(), &mut context.with_id(i as u64));
+                });
+
+                if i != len - 1 {
+                    ui.separator();
+                }
+            }
+
+            ui.vertical_centered_justified(|ui| {
+                if ui.button("+").clicked() {
+                    self.projectile_ids.insert(String::default(), <Vec<(u32, bool)>>::default());
+                    changed = true;
+                }
+            });
+
+            for (old_key, new_key) in to_update.drain(..) {
+                if let Some(val) = self.projectile_ids.remove(&old_key) {
+                    self.projectile_ids.insert(new_key, val);
+                    changed = true;
+                }
+            }
+
+            if let Some(key) = to_delete {
+                if self.projectile_ids.remove(&key).is_some() {
+                    changed = true;
+                }
+            }
+        });
+
+        changed
+
+    }
+}
+
+impl ProjectileReference {
+    pub fn new() -> Self {
+        Self {
+            projectile_ids: HashMap::new()
+        }
+    }
+
+    pub fn insert_ids(&mut self, name: String, ids: Vec<(u32, bool)>) {
+        self.projectile_ids.insert(name, ids);
+    }
+
+    // pub fn insert_id(&mut self, name: String, id: Entity) {
+    //     if let Some(entities) = self.projectile_ids.get_mut(&name) {
+    //         entities.push(id);
+    //     }
+    //     else {
+    //         let ids = vec![id];
+    //         self.projectile_ids.insert(name, ids);
+    //     }
+
+    //     //self.projectile_ids.insert(name, ids.iter().copied().collect());
+    // }
+}
+
+
 
 #[derive(Component, Reflect, Default)]
 pub struct Variables(HashMap<String, u32>);
@@ -304,7 +388,7 @@ pub struct StateFrame(pub u16);
 pub struct Owner(pub Entity);
 
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable, Copy)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable, Copy, PartialEq)]
 pub enum Direction {
     Left, 
     #[default]
@@ -316,6 +400,21 @@ impl Direction {
         match self {
             Direction::Left => -1.,
             Direction::Right => 1.,
+        }
+    }
+}
+
+
+impl From<f32> for Direction {
+    fn from(value: f32) -> Self {
+        if value.is_sign_negative() {
+            Direction::Left
+        }
+        else if value.is_sign_positive() {
+            Direction::Right
+        }
+        else {
+            panic!()
         }
     }
 }

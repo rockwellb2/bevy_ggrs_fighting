@@ -6,9 +6,11 @@ pub const FRAME_INCREMENT: &str = "frame_increment";
 pub const PROCESS: &str = "process";
 pub const TRANSITION: &str = "transition";
 pub const MOVEMENT: &str = "movement";
+pub const FACE: &str = "face";
 
 pub const ADD_HITBOX: &str = "insert_transform";
 pub const ADD_HURTBOX: &str = "add_hurtbox";
+pub const PROJECTILE: &str = "projectile";
 pub const REMOVE_HITBOX: &str = "remove_hitbox";
 pub const REMOVE_HURTBOX: &str = "remove_hurtbox";
 pub const UPDATE_HIT_POS: &str = "update_hit_pos";
@@ -33,7 +35,8 @@ pub enum RoundState {
     Loading,
     ExitLoading,
     EnterRound,
-    Round
+    Round,
+    ExtraSetup
 }
 
 
@@ -70,6 +73,13 @@ pub fn on_round(state: Res<RoundState>) -> ShouldRun {
 pub fn on_enter_round(state: Res<RoundState>) -> ShouldRun {
     match *state {
         RoundState::EnterRound => ShouldRun::Yes,
+        _ => ShouldRun::No
+    }
+}
+
+pub fn on_extra_setup(state: Res<RoundState>) -> ShouldRun {
+    match *state {
+        RoundState::ExtraSetup => ShouldRun::Yes,
         _ => ShouldRun::No
     }
 }

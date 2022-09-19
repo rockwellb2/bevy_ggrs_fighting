@@ -3,18 +3,19 @@
 use super::{
     data::{FighterData, Collider, CollisionData, HitEvent},
     state::{
-        Active, AdjustFacing, CurrentState, Direction, Facing, HitboxData, HurtboxData, Movement, Owner, State, StateFrame, StateMap, HBox, Health, Conditions, InHitstun,
+        Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, Owner, State, StateFrame, StateMap, HBox, Health, Conditions, InHitstun, Velocity, ProjectileReference, ProjectileData,
     },
-    Fighter, event::TransitionEvent,
+    Fighter, event::TransitionEvent, modifiers::{Movement, AdjustFacing, CreateObject, Object},
 };
 use bevy::{
     ecs::{reflect::ReflectComponent, },
     prelude::{
-        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without,
+        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without, ResMut, Name,
     },
     reflect::{Reflect },
     utils::{default, HashMap, hashbrown::HashSet}, ui::{Style, Val},
 };
+use bevy_ggrs::{RollbackIdProvider, Rollback};
 use ggrs::InputStatus;
 use nalgebra::{Isometry3, Vector3};
 use parry3d::{query::intersection_test, shape::Cuboid};
@@ -43,8 +44,6 @@ pub fn buffer_insert_system(
 }
 
 pub fn movement_system(
-    //state_query: Query<&Parent, (With<Movement>)>,
-    //mut fighter_query: Query<(&mut Transform, &FighterData), With<Fighter>>,
     mut fighter_query: Query<
         (
             &CurrentState,
@@ -56,9 +55,6 @@ pub fn movement_system(
         (With<Fighter>, Without<InHitstun>)
     >,
     state_query: Query<With<Movement>>,
-    //inputs: Res<Vec<(FightInput, InputStatus)>>,
-    //mut commands: Commands,
-    //frame_count: Res<FrameCount>
 ) {
 
     for (current, map, mut tf, data, buffer) in fighter_query.iter_mut() {
@@ -79,7 +75,7 @@ pub fn movement_system(
     }
 }
 
-pub fn increment_frame_system(mut query: Query<&mut StateFrame, (With<Player>, With<Fighter>)>) {
+pub fn increment_frame_system(mut query: Query<&mut StateFrame>) {
     for mut frame in query.iter_mut() {
         frame.0 = frame.0.checked_add(1).unwrap_or(1);
     }
@@ -110,6 +106,9 @@ pub fn process_input_system(
     mut trans_writer: EventWriter<TransitionEvent>
 ) {
     'fighter: for (fighter, current, map, buffer, frame, player) in query.iter() {
+        //buffer.0.get_mut(0)
+
+
 
         let state: &Entity = map.get(&current.0).expect("State doesn't exist");
 
@@ -423,6 +422,47 @@ pub fn hurtbox_removal_system(
     }
 }
 
+// Isn't removed until after stage is over, may be a problem?
+pub fn projectile_system(
+    mut commands: Commands,
+    query: Query<(Entity, &Owner, &ProjectileData, &StateFrame, &Rollback)>,
+    mut fighter_query: Query<&mut ProjectileReference>
+
+) {
+    for (projectile, owner, data, frame, rollback) in query.iter() {
+        if frame.0 == data.life_frames {
+            if let Ok(mut proj_ref) = fighter_query.get_mut(owner.0) {
+                let ids = proj_ref.projectile_ids.get_mut(&data.name).expect("Projectile is not in ProjectileReference");
+                let mut id_iter = ids.iter_mut();
+
+                loop {
+                    if let Some((id, in_use)) = id_iter.next() {
+                        if rollback.id() == *id {
+                            println!("Does it get here in the projectile system?");
+                            *in_use = false;
+
+                            println!("{}", *in_use);
+
+                            commands.entity(projectile)
+                                .despawn();
+
+                            break;
+                        }
+                    }
+
+                    else {
+                        panic!("ID isn't in ProjectileReference");
+                    }
+
+                }
+            }
+
+        }
+
+    }
+
+}
+
 pub fn adjust_facing_system(
     mut commands: Commands,
 
@@ -454,6 +494,55 @@ pub fn adjust_facing_system(
                 Direction::Right
             } else {
                 Direction::Left
+            }
+        }
+    }
+}
+
+pub fn object_system(
+    mut commands: Commands,
+
+    mut fighter_query: Query<(Entity, &CurrentState, &StateMap, &StateFrame, &Transform, &mut ProjectileReference), With<Fighter>>,
+    state_query: Query<(&State, &CreateObject)>
+) {
+    for (fighter, current, map, frame, tf, mut projectiles) in fighter_query.iter_mut() {
+        let s = map.get(&current.0).expect("State doesn't exist");
+
+        if let Ok((_state, create_object)) = state_query.get(*s) {
+            match &create_object.0 {
+                Object::Projectile(projectile) => {
+                    if projectile.spawn_frame == frame.0 {
+                        // Spawn projectile entity here
+                        let ids = projectiles.projectile_ids.get_mut(&projectile.name).expect("Projectile name doesn't exist");
+                        let mut iter = ids.iter_mut();
+
+                        let id = loop {
+                            if let Some((id, in_use)) = iter.next() {
+                                if !*in_use {
+                                    *in_use = true;
+                                    break Some(id);
+                                }
+                            }
+                            else {
+                                break None;
+                            }
+                        };
+                        
+                        let id = *id.expect("All IDs are in use!");
+                        
+                        commands.spawn_bundle(SpatialBundle {
+                                transform: Transform::from_translation(tf.translation + projectile.start_position),
+                                ..default()
+                            })
+                            .insert(Name::new("Fireball"))
+                            .insert(projectile.clone())
+                            .insert(Velocity(projectile.start_velocity))
+                            .insert(Rollback::new(id))
+                            .insert(StateFrame(0))
+                            .insert(Owner(fighter));
+                    }
+                },
+                Object::None => panic!(),
             }
         }
     }

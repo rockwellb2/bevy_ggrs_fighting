@@ -1,4 +1,4 @@
-use battle::{create_battle_ui, load_fighters, spawn_fighters, loading_wait};
+use battle::{create_battle_ui, load_fighters, spawn_fighters, loading_wait, extra_setup_system};
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     ecs::{reflect::ReflectComponent, system::Despawn},
@@ -12,19 +12,19 @@ use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider, SessionType};
 use fighter::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, SerializedStateVec,
-        StateFrame, Health, InHitstun,
+        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData,
     },
     systems::{
         adjust_facing_system, collision_system, hbox_position_system,
         hit_event_system, hitbox_component_system, hitbox_removal_system, hitstun_system,
         hurtbox_component_system, hurtbox_removal_system, increment_frame_system, movement_system,
-        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system,
+        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system,
     },
     FighterPlugin,
 };
 use game::{
     ADD_HITBOX, ADD_HURTBOX, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
-    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, 
+    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, 
 };
 use ggrs::{Config, PlayerType, SessionBuilder, UdpNonBlockingSocket, SyncTestSession};
 //use bevy_editor_pls::prelude::*;
@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_check_distance(opt.check_distance)
 
 
-        .with_input_delay(3)
+        .with_input_delay(2)
         .with_num_players(num_players);
 
     
@@ -139,6 +139,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .register_rollback_type::<InputBuffer>()
         .register_rollback_type::<Facing>()
         .register_rollback_type::<InHitstun>()
+        .register_rollback_type::<ProjectileReference>()
+
+        .register_rollback_type::<ProjectileData>()
 
         .register_rollback_type::<RoundState>()
 
@@ -171,6 +174,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     SystemStage::parallel()
                         .with_run_criteria(on_enter_round)
                         .with_system(startup.exclusive_system())
+                )
+                .with_stage_after(
+                    "Enter Round Stage",
+                    "Extra Setup Stage",
+                    SystemStage::parallel()
+                        .with_run_criteria(on_extra_setup)
+                        .with_system(extra_setup_system)
                 )
                 .with_stage_after(
                     "Loading Stage",
@@ -215,8 +225,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .with_system(
                             adjust_facing_system
                                 //.run_in_state(GameState::Fight)
+                                .label(FACE)
                                 .after(MOVEMENT),
-                        ),
+                        )
+                        // projectile
+                        .with_system(
+                            object_system
+                            .after(FACE)
+                        )
                 )
                 .with_stage_after(
                     ROLLBACK_DEFAULT,
@@ -235,10 +251,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .label(ADD_HURTBOX),
                         )
                         .with_system(
+                            projectile_system
+                                .after(ADD_HURTBOX)
+                                .label(PROJECTILE)
+
+                        )
+                        .with_system(
                             hitbox_removal_system
                                 //.run_in_state(GameState::Fight)
                                 .label(REMOVE_HITBOX)
-                                .after(ADD_HURTBOX),
+                                .after(PROJECTILE),
                         )
                         .with_system(
                             hurtbox_removal_system
@@ -324,7 +346,7 @@ fn startup(world: &mut World) {
 
 
     let mut round_state = world.resource_mut::<RoundState>();
-    *round_state = RoundState::Round;
+    *round_state = RoundState::ExtraSetup;
 }
 
 fn populate_entities_with_states(
