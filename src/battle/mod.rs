@@ -137,6 +137,7 @@ pub fn spawn_fighters(
         .insert(StateFrame(0))
         .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
         .insert(Health(500))
+        .insert(Velocity(Vec3::ZERO))
 
         .insert_bundle(InputManagerBundle::<Action> {
             action_state: ActionState::default(),
@@ -180,6 +181,7 @@ pub fn spawn_fighters(
         .insert(StateFrame(0))
         .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
         .insert(Health(500))
+        .insert(Velocity(Vec3::ZERO))
         
 
         .id();

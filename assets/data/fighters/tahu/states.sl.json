@@ -5,10 +5,14 @@
         "transitions": [
             1,
             5,
+            32,
+            31,
+            30,
             700,
             200,
             100,
-            141
+            141,
+            106
         ],
         "modifiers": [
             {
@@ -49,6 +53,10 @@
                     "window": 1
                 }
             }
+        ],
+        "trigger4": [
+            { "in": [30, 31, 32, 106] },
+            { "reachGround": null }
         ]
     },
     {
@@ -87,9 +95,12 @@
         "id": 5,
         "debug_name": "Walk",
         "transitions": [
+            32,
+            31,
             1,
             0,
             141
+            
         ],
         "modifiers": [
             {
@@ -154,6 +165,90 @@
         ]
     },
     {
+        "id": 30,
+        "debug_name": "Neutral Jump",
+        "transitions": [
+            106,
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["y", "Positive", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ],
+        "modifiers": [
+            {
+                "Velo": {
+                    "start_velocity": [0, 15, 0],
+                    "acceleration": [0, -0.6, 0]
+                }
+            }
+        ]
+    },
+    {
+        "id": 31,
+        "debug_name": "Forward Jump",
+        "transitions": [
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["y", "Positive", false],
+                            ["x", "Positive", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ],
+        "modifiers": [
+            {
+                "Velo": {
+                    "start_velocity": [5, 14, 0],
+                    "acceleration": [0, -0.6, 0]
+                }
+            }
+        ]
+    },
+    {
+        "id": 32,
+        "debug_name": "Backward Jump",
+        "transitions": [
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["y", "Positive", false],
+                            ["x", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ],
+        "modifiers": [
+            {
+                "Velo": {
+                    "start_velocity": [-5, 14, 0],
+                    "acceleration": [0, -0.6, 0]
+                }
+            }
+        ]
+    },
+    {
         "id": 100,
         "debug_name": "LP",
         "duration": 15,
@@ -212,6 +307,46 @@
             }
         ]
     },
+    {
+        "id": 106,
+        "debug_name": "a.LP",
+        "transitions": [
+            0
+        ],
+        "hitboxes": [
+            {
+                "startFrame": 3,
+                "endFrame": 65535,
+                "damage": 30,
+                "hitstun": 18,
+                "blockstun": 10,
+                "dimensions": [1, 1, 1],
+                "offset": [1, 0, 0]
+            }
+        ],
+        "modifiers": [
+            {
+                "Velo": {
+                    "acceleration": [0, -0.6, 0]
+                }
+            }
+
+
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+    },
+
     {
         "id": 200,
         "debug_name": "MP",

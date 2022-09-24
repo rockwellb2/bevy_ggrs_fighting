@@ -8,7 +8,7 @@ use self::{
     data::{FighterData, HitEvent}, 
     state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference}, 
     systems::InputBuffer, event::TransitionEvent,
-    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object}
+    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object, Velo, VectorType}
 };
 
 pub(crate) mod state;
@@ -28,10 +28,15 @@ impl Plugin for FighterPlugin {
         app
             .add_event::<HitEvent>()
             .add_event::<TransitionEvent>()
+
+            // Modifiers
             .register_type::<Movement>()
             .register_type::<InputTransition>()
             .register_type::<AdjustFacing>()
             .register_type::<CreateObject>()
+            .register_type::<Velo>()
+
+
             .register_type::<Facing>()
             .register_type::<Health>()
             .register_type::<InputBuffer>()
@@ -48,6 +53,8 @@ impl Plugin for FighterPlugin {
             .register_inspectable::<HitboxData>()
             .register_inspectable::<ProjectileData>()
             .register_inspectable::<Object>()
+            .register_inspectable::<VectorType>()
+            .register_inspectable::<Option<VectorType>>()
             //.register_inspectable::<ProjectileReference>()
             .register_type::<ProjectileReference>()
             .register_type::<FighterData>();

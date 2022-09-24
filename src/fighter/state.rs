@@ -88,7 +88,12 @@ pub enum Conditions {
     // when current state is at the end of its duration
     EndDuration,
     // current frame of the stat
-    Frame(Option<u16>, Option<u16>)
+    Frame(Option<u16>, Option<u16>),
+    // if the fighter just touched the ground
+    ReachGround,
+    // hitbox id (optional), frame range cancel 
+    //OnHit(Option<usize>, u16)
+
 }
 
 #[derive(Default, Serialize, Debug, Clone)]
@@ -177,16 +182,20 @@ impl<'de> Deserialize<'de> for SerializedState {
 pub struct SerializedStateVec(pub Vec<SerializedState>);
 
 pub trait HBox: Component {
-    fn get_id(&self) -> u8;
+    fn get_priority(&self) -> u8;
 
     fn get_offset(&self) -> Vec3;
+
+    fn set_id(&mut self, value: usize);
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable)]
 #[reflect(Component)]
 pub struct HitboxData {
     #[serde(default)]
-    pub id: u8,
+    pub priority: u8,
+    #[serde(default)]
+    pub id: Option<usize>,
     pub dimensions: Vec3,
     pub offset: Vec3,
     pub damage: u16,
@@ -201,20 +210,28 @@ pub struct HitboxData {
 }
 
 impl HBox for HitboxData {
-    fn get_id(&self) -> u8 {
-        self.id
+    fn get_priority(&self) -> u8 {
+        self.priority
     }
 
     fn get_offset(&self) -> Vec3 {
         self.offset
     }
+
+    fn set_id(&mut self, value: usize) {
+        self.id = Some(value);
+    }
+
+    
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
 #[reflect(Component)]
 pub struct HurtboxData {
     #[serde(default)]
-    id: u8,
+    priority: u8,
+    #[serde(default)]
+    pub id: Option<usize>,
     pub dimensions: Vec3,
     #[serde(default)]
     pub offset: Vec3,
@@ -225,12 +242,16 @@ pub struct HurtboxData {
 }
 
 impl HBox for HurtboxData {
-    fn get_id(&self) -> u8 {
-        self.id
+    fn get_priority(&self) -> u8 {
+        self.priority
     }
 
     fn get_offset(&self) -> Vec3 {
         self.offset
+    }
+
+    fn set_id(&mut self, value: usize) {
+        self.id = Some(value);
     }
 }
 
@@ -279,7 +300,7 @@ pub struct ProjectileReference {
 // impl Inspectable for ProjectileReference {
 //     type Attributes = (
 //         <String as Inspectable>::Attributes, 
-//         <Vec<(u32, bool)> as Inspectable>::Attributes
+//         <Vec<(Option<Entity>, bool)> as Inspectable>::Attributes
 //     );
 
 //     fn ui(&mut self, ui: &mut bevy_inspector_egui::egui::Ui, options: Self::Attributes, context: &mut bevy_inspector_egui::Context) -> bool {
@@ -291,6 +312,12 @@ pub struct ProjectileReference {
 
 //             let len = self.projectile_ids.len();
 //             for (i, (key, val)) in self.projectile_ids.iter_mut().enumerate() {
+//                 let val: Vec<(Option<&mut Entity>, &mut bool)> = val.iter_mut().map(|(entity, b)| {
+//                     (Some(entity), b)
+//                 }).collect();
+                
+
+
 //                 ui.horizontal(|ui| {
 //                     if label_button(ui, "✖", egui::Color32::RED) {
 //                         to_delete = Some(key.clone());
@@ -304,36 +331,36 @@ pub struct ProjectileReference {
 //                     changed |= val.ui(ui, options.1.clone(), &mut context.with_id(i as u64));
 //                 });
 
-//                 if i != len - 1 {
-//                     ui.separator();
-//                 }
-//             }
+    //             if i != len - 1 {
+    //                 ui.separator();
+    //             }
+    //         }
 
-//             ui.vertical_centered_justified(|ui| {
-//                 if ui.button("+").clicked() {
-//                     self.projectile_ids.insert(String::default(), <Vec<(u32, bool)>>::default());
-//                     changed = true;
-//                 }
-//             });
+    //         ui.vertical_centered_justified(|ui| {
+    //             if ui.button("+").clicked() {
+    //                 self.projectile_ids.insert(String::default(), vec![(Entity::from_raw(0), false)]);
+    //                 changed = true;
+    //             }
+    //         });
 
-//             for (old_key, new_key) in to_update.drain(..) {
-//                 if let Some(val) = self.projectile_ids.remove(&old_key) {
-//                     self.projectile_ids.insert(new_key, val);
-//                     changed = true;
-//                 }
-//             }
+    //         for (old_key, new_key) in to_update.drain(..) {
+    //             if let Some(val) = self.projectile_ids.remove(&old_key) {
+    //                 self.projectile_ids.insert(new_key, val);
+    //                 changed = true;
+    //             }
+    //         }
 
-//             if let Some(key) = to_delete {
-//                 if self.projectile_ids.remove(&key).is_some() {
-//                     changed = true;
-//                 }
-//             }
-//         });
+    //         if let Some(key) = to_delete {
+    //             if self.projectile_ids.remove(&key).is_some() {
+    //                 changed = true;
+    //             }
+    //         }
+    //     });
 
-//         changed
+    //     changed
 
-//     }
-// }
+    // }
+//}
 
 
 
@@ -349,17 +376,6 @@ impl ProjectileReference {
         self.projectile_ids.insert(name, ids);
     }
 
-    // pub fn insert_id(&mut self, name: String, id: Entity) {
-    //     if let Some(entities) = self.projectile_ids.get_mut(&name) {
-    //         entities.push(id);
-    //     }
-    //     else {
-    //         let ids = vec![id];
-    //         self.projectile_ids.insert(name, ids);
-    //     }
-
-    //     //self.projectile_ids.insert(name, ids.iter().copied().collect());
-    // }
 }
 
 

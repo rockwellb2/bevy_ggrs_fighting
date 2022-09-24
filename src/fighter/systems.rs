@@ -5,14 +5,14 @@ use super::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, Owner, State, StateFrame, StateMap, HBox, Health, Conditions, InHitstun, Velocity, ProjectileReference, ProjectileData,
     },
-    Fighter, event::TransitionEvent, modifiers::{Movement, AdjustFacing, CreateObject, Object},
+    Fighter, event::TransitionEvent, modifiers::{Movement, AdjustFacing, CreateObject, Object, Velo, VectorType},
 };
 use bevy::{
     ecs::{reflect::ReflectComponent, },
     prelude::{
-        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without, ResMut, Name, Or,
+        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without, ResMut, Name, Or, Parent,
     },
-    reflect::{Reflect },
+    reflect::{Reflect, Struct, FromReflect},
     utils::{default, HashMap, hashbrown::HashSet}, ui::{Style, Val},
 };
 use bevy_ggrs::{RollbackIdProvider, Rollback};
@@ -75,6 +75,61 @@ pub fn movement_system(
     }
 }
 
+pub fn velo_system(
+    mut query: Query<(&Parent, &Velo)>,
+    mut fighter_query: Query<(&StateMap, &CurrentState, &mut Transform, &mut Velocity, &StateFrame, &FighterData, &Facing)>
+
+) {
+    for (map, current, mut tf, mut velocity, frame, data, facing) in fighter_query.iter_mut() {
+        let s = map.get(&current.0).expect("State doesn't exist");
+
+        if let Ok((_parent, velo)) = query.get(*s) {
+            if frame.0 == 1  {
+                if let Some(start) = &velo.start_velocity {
+                    let mut start: Vec3 = match start {
+                        VectorType::Vec(vector) => *vector,
+                        VectorType::Variable(var_name) => {
+                            let raw = data.field(&var_name).expect("Couldn't get value for field of this name");
+                            let variable = f32::from_reflect(raw).expect("Couldn't create f32 from reflected value");
+
+                            Vec3::new(variable, 0., 0.)
+
+                        },
+                        VectorType::Warning => panic!(),
+                    };
+
+                    start.x *= facing.0.sign();
+                    velocity.0 = start;
+                }
+                
+            }
+            else {
+                if let Some(accel) = &velo.acceleration {
+                    let accel: Vec3 = match accel {
+                        VectorType::Vec(vector) => *vector,
+                        VectorType::Variable(var_name) => {
+                            let raw = data.field(&var_name).expect("Couldn't get value for field of this name");
+                            let variable = f32::from_reflect(raw).expect("Couldn't create f32 from reflected value");
+
+                            Vec3::new(variable, 0., 0.)
+
+                        },
+                        VectorType::Warning => panic!(),
+                    };
+
+                    velocity.0 += accel;
+                }
+            }
+
+            tf.translation += velocity.0 / FPS as f32;
+            tf.translation.y = tf.translation.y.max(0.)
+
+
+        }
+    }
+    
+}
+
 pub fn increment_frame_system(mut query: Query<&mut StateFrame, Or<(With<Fighter>, With<Active>)>>) {
     for mut frame in query.iter_mut() {
         frame.0 = frame.0.checked_add(1).unwrap_or(1);
@@ -99,13 +154,13 @@ pub fn hitstun_system(
 pub fn process_input_system(
     //mut commands: Commands,
     query: Query<
-        (Entity, &CurrentState, &StateMap, &InputBuffer, &StateFrame, &Player, &Facing),
+        (Entity, &CurrentState, &StateMap, &InputBuffer, &StateFrame, &Player, &Facing, &Transform),
         (With<Fighter>, With<Player>),
     >,
     state_query: Query<&State>,
     mut trans_writer: EventWriter<TransitionEvent>
 ) {
-    'fighter: for (fighter, current, map, buffer, frame, player, facing) in query.iter() {
+    'fighter: for (fighter, current, map, buffer, frame, player, facing, tf) in query.iter() {
         //buffer.0.get_mut(0)
 
 
@@ -162,6 +217,18 @@ pub fn process_input_system(
 
                                     
                                 }
+                                Conditions::ReachGround => {
+                                    if tf.translation.y > 0. {
+                                        meets_conditions = false;
+                                        break 'all;
+                                    }
+
+                                },
+                                // Conditions::OnHit(id, range) => {
+                                //     if let Some(id) = id {
+                                //         todo!()
+                                //     }
+                                // },
                             }
                         }
 
@@ -219,6 +286,14 @@ pub fn process_input_system(
 
                                     
                                 }
+                                Conditions::ReachGround => {
+                                    if tf.translation.y > 0. {
+                                        met = false;
+                                        break 'conditions;
+                                    }
+
+                                },
+                                // Conditions::OnHit(_, _) => todo!(),
                             }
                         }
                         if met {
@@ -241,12 +316,18 @@ pub fn process_input_system(
 pub fn transition_system(
     mut commands: Commands,
     mut trans_reader: EventReader<TransitionEvent>,
-    mut fighter_query: Query<(&mut CurrentState, &StateMap, &mut StateFrame, &InputBuffer), With<Fighter>>,
+    mut fighter_query: Query<(Entity, &mut CurrentState, &StateMap, &mut StateFrame, &InputBuffer), With<Fighter>>,
     state_query: Query<&State>,
-    mut hurtbox_query: Query<&mut Visibility>
+
+
+    mut box_set: ParamSet<(
+        Query<&mut Visibility, With<HurtboxData>>,
+        Query<(Entity, &Owner, &mut Visibility), (With<Active>, With<HitboxData>)>
+
+    )>
 ) {
     for event in trans_reader.iter() {
-        if let Ok((mut current, map, mut frame, buffer)) = fighter_query.get_mut(event.fighter) {
+        if let Ok((fighter, mut current, map, mut frame, _buffer)) = fighter_query.get_mut(event.fighter) {
             let entity = map.get(&current.0).expect("State doesn't exist");
 
             if let Ok(state) = state_query.get(*entity) {
@@ -256,13 +337,27 @@ pub fn transition_system(
                             commands.entity(*hurt)
                                 .remove::<Active>();
                             
-                            if let Ok(mut visibility) = hurtbox_query.get_mut(*hurt) {
+                            if let Ok(mut visibility) = box_set.p0().get_mut(*hurt) {
                                 visibility.is_visible = false;
                             }
                         }
                     }
                 }
+
+                for (hurt, owner, mut visibility) in box_set.p1().iter_mut() {
+                    if owner.0 == fighter {
+                        commands.entity(hurt)
+                            .remove::<Active>();
+
+                        visibility.is_visible = false;
+                    }
+
+                }
+
+                
             }
+
+
 
             println!("Transition {} to {}", current.0, event.to_id);
             
@@ -565,7 +660,7 @@ pub fn object_system(
         if let Ok((mut tf, mut visibility, mut frame)) = set.p0().get_mut(entity) {
             tf.translation = pos;
             visibility.is_visible = true;
-            frame.0 = 0;
+            frame.0 = 1;
         }
     });
 
@@ -640,7 +735,7 @@ pub fn collision_system(
                 };
 
                 if let Some(c) = collisions.get(&(hit_owner.0, hurt_owner.0)) {
-                    if hit_data.id >= c.get_attacker_id() {
+                    if hit_data.priority >= c.get_attacker_priority() {
                         break;
                     }
                 }

@@ -34,8 +34,8 @@ pub struct CollisionData {
 }
 
 impl CollisionData {
-    pub fn get_attacker_id(&self) -> u8 {
-        self.attacker_box.id
+    pub fn get_attacker_priority(&self) -> u8 {
+        self.attacker_box.priority
     }
 
     pub fn get_recipient(&self) -> Entity {

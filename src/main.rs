@@ -9,22 +9,23 @@ use bevy::{
 };
 use bevy_editor_pls::EditorPlugin;
 use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider, SessionType};
+use bevy_inspector_egui::WorldInspectorPlugin;
 use fighter::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, SerializedStateVec,
-        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity,
+        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox,
     },
     systems::{
         adjust_facing_system, collision_system, hbox_position_system,
         hit_event_system, hitbox_component_system, hitbox_removal_system, hitstun_system,
         hurtbox_component_system, hurtbox_removal_system, increment_frame_system, movement_system,
-        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system,
+        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, velo_system,
     },
     FighterPlugin,
 };
 use game::{
     ADD_HITBOX, ADD_HURTBOX, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
-    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, 
+    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, 
 };
 use ggrs::{Config, PlayerType, SessionBuilder, UdpNonBlockingSocket, SyncTestSession};
 //use bevy_editor_pls::prelude::*;
@@ -222,10 +223,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .after(TRANSITION),
                         )
                         .with_system(
+                            velo_system
+                                .after(MOVEMENT)
+                                .label(VELO)
+                        )
+                        .with_system(
                             adjust_facing_system
                                 //.run_in_state(GameState::Fight)
                                 .label(FACE)
-                                .after(MOVEMENT),
+                                .after(VELO),
                         )
                         // projectile
                         .with_system(
@@ -307,7 +313,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         .insert_resource(RoundState::EnterLoading)
         .add_plugin(InputManagerPlugin::<Action>::default())
+
+        // Inspector/Editor Plugins
         .add_plugin(EditorPlugin)
+        //.add_plugin(WorldInspectorPlugin::new())
         .add_plugin(FrameTimeDiagnosticsPlugin)
 
         // Non-rollback Systems
@@ -316,10 +325,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_system(ui_lifebar_system)
         )
 
-        
+        // Rollback resources
         .insert_resource(sess)
         .insert_resource(SessionType::SyncTestSession)
+
+        // Custom Plugins
         .add_plugin(FighterPlugin)
+
         .register_type::<Player>()
         .insert_resource(Msaa { samples: 4 });
 
@@ -388,7 +400,9 @@ fn populate_entities_with_states(
             if let Some(hitboxes) = hbox_serialized {
                 let mut ordered: HashMap<u16, HashSet<Entity>> = HashMap::new();
 
-                for hitbox in hitboxes {
+                for (index, mut hitbox) in hitboxes.into_iter().enumerate() {
+                    hitbox.set_id(index);
+
                     let shape = shapes::Rectangle {
                         extents: hitbox.dimensions.truncate(),
                         origin: RectangleOrigin::Center,

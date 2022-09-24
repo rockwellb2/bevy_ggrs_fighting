@@ -1,4 +1,5 @@
 use crate::input::NewCommandInput;
+use bevy::prelude::{Vec3, default};
 use bevy::{reflect::Reflect, prelude::Component};
 use bevy_inspector_egui::Inspectable;
 use serde::{Serialize, Deserialize};
@@ -69,5 +70,30 @@ impl StateModifier for CreateObject {
     fn dyn_clone(&self) -> Box<dyn StateModifier>  {
         Box::new(self.clone())
     }
+}
 
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
+#[reflect(Component, Deserialize, StateModifier)]
+pub struct Velo {
+    #[serde(default)]
+    pub start_velocity: Option<VectorType>,
+    #[serde(default)]
+    pub acceleration: Option<VectorType>,
+
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone, Inspectable)]
+#[serde(untagged)]
+pub enum VectorType {
+    Vec(Vec3),
+    Variable(String),
+    #[default]
+    Warning
+}
+
+#[typetag::serde]
+impl StateModifier for Velo {
+    fn dyn_clone(&self) -> Box<dyn StateModifier>  {
+        Box::new(self.clone())
+    }
 }
