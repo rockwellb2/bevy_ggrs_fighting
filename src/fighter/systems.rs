@@ -43,39 +43,9 @@ pub fn buffer_insert_system(
     }
 }
 
+
+
 pub fn movement_system(
-    mut fighter_query: Query<
-        (
-            &CurrentState,
-            &StateMap,
-            &mut Transform,
-            &FighterData,
-            &InputBuffer,
-        ),
-        (With<Fighter>, Without<InHitstun>)
-    >,
-    state_query: Query<With<Movement>>,
-) {
-
-    for (current, map, mut tf, data, buffer) in fighter_query.iter_mut() {
-
-        let state = map.get(&current.0).expect("State doesn't exist.");
-
-        if let Ok(_) = state_query.get(*state) {
-            let input: &Buffer = &buffer.0;
-
-            if let Some(last) = input.get(0) {
-                if *last & LEFT == LEFT || *last & LEFT_HELD == LEFT_HELD {
-                    tf.translation.x -= data.walk_speed / FPS as f32;
-                } else if *last & RIGHT == RIGHT || *last & RIGHT_HELD == RIGHT_HELD {
-                    tf.translation.x += data.walk_speed / FPS as f32;
-                }
-            }
-        }
-    }
-}
-
-pub fn velo_system(
     mut query: Query<(&Parent, &Velo)>,
     mut fighter_query: Query<(&StateMap, &CurrentState, &mut Transform, &mut Velocity, &StateFrame, &FighterData, &Facing)>
 

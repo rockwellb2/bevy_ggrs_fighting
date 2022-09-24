@@ -19,7 +19,7 @@ use fighter::{
         adjust_facing_system, collision_system, hbox_position_system,
         hit_event_system, hitbox_component_system, hitbox_removal_system, hitstun_system,
         hurtbox_component_system, hurtbox_removal_system, increment_frame_system, movement_system,
-        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, velo_system,
+        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system,
     },
     FighterPlugin,
 };
@@ -221,11 +221,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 //.run_in_state(GameState::Fight)
                                 .label(MOVEMENT)
                                 .after(TRANSITION),
-                        )
-                        .with_system(
-                            velo_system
-                                .after(MOVEMENT)
-                                .label(VELO)
                         )
                         .with_system(
                             adjust_facing_system
