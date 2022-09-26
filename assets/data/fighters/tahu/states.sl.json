@@ -5,6 +5,7 @@
         "transitions": [
             1,
             5,
+            6,
             32,
             31,
             30,
@@ -35,7 +36,7 @@
                     "window": 1
                 }
             },
-            { "in": [5] }
+            { "in": [5, 6] }
         ],
         "trigger2": [
             { "in": [100, 101, 141, 700, 200] },
@@ -93,18 +94,21 @@
     },
     {
         "id": 5,
-        "debug_name": "Walk",
+        "debug_name": "Forward Walk",
         "transitions": [
-            32,
             31,
             1,
+            6,
             0,
             141
             
         ],
         "modifiers": [
             {
-                "Movement": null
+                "Velo": {
+                    "start_velocity": [8, 0, 0],
+                    "acceleration": [0, 0, 0]
+                }
             },
             {
                 "AdjustFacing": null
@@ -132,6 +136,46 @@
                 "command": {
                     "list": [
                         [
+                            ["x", "Positive", true]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+    },
+    {
+        "id": 6,
+        "debug_name": "Back Walk",
+        "transitions": [
+            32,
+            1,
+            5,
+            0,
+            141
+            
+        ],
+        "modifiers": [
+            {
+                "Velo": {
+                    "start_velocity": [-8, 0, 0],
+                    "acceleration": [0, 0, 0]
+                }
+            },
+            {
+                "AdjustFacing": null
+            }
+        ],
+        "hurtboxes": [
+            {
+                "dimensions": [1, 1, 1]
+            }
+        ],
+        "trigger1": [
+            {
+                "command": {
+                    "list": [
+                        [
                             ["x", "Negative", false]
                         ]
                     ],
@@ -139,19 +183,7 @@
                 }
             }
         ],
-        "trigger3": [
-            {
-                "command": {
-                    "list": [
-                        [
-                            ["x", "Positive", true]
-                        ]
-                    ],
-                    "window": 1
-                }
-            }
-        ],
-        "trigger4": [
+        "trigger2": [
             {
                 "command": {
                     "list": [

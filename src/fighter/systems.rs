@@ -3,22 +3,22 @@
 use super::{
     data::{FighterData, Collider, CollisionData, HitEvent},
     state::{
-        Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, Owner, State, StateFrame, StateMap, HBox, Health, Conditions, InHitstun, Velocity, ProjectileReference, ProjectileData,
+        Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, Owner, State, StateFrame, StateMap, HBox, Health, Conditions, InHitstun, Velocity, ProjectileReference, ProjectileData, PlayerAxis,
     },
     Fighter, event::TransitionEvent, modifiers::{Movement, AdjustFacing, CreateObject, Object, Velo, VectorType},
 };
 use bevy::{
     ecs::{reflect::ReflectComponent, },
     prelude::{
-        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without, ResMut, Name, Or, Parent,
+        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without, ResMut, Name, Or, Parent, ChangeTrackers,
     },
     reflect::{Reflect, Struct, FromReflect},
-    utils::{default, HashMap, hashbrown::HashSet}, ui::{Style, Val},
+    utils::{default, HashMap, hashbrown::HashSet}, ui::{Style, Val}, math::Vec3Swizzles,
 };
 use bevy_ggrs::{RollbackIdProvider, Rollback};
 use ggrs::InputStatus;
 use nalgebra::{Isometry3, Vector3};
-use parry3d::{query::intersection_test, shape::Cuboid};
+use parry3d::{query::intersection_test, shape::{Cuboid, Capsule}};
 
 
 use crate::{
@@ -46,11 +46,11 @@ pub fn buffer_insert_system(
 
 
 pub fn movement_system(
-    mut query: Query<(&Parent, &Velo)>,
-    mut fighter_query: Query<(&StateMap, &CurrentState, &mut Transform, &mut Velocity, &StateFrame, &FighterData, &Facing)>
+    query: Query<(&Parent, &Velo)>,
+    mut fighter_query: Query<(&StateMap, &CurrentState, &mut Transform, &mut Velocity, &StateFrame, &FighterData, &Facing, &PlayerAxis)>
 
 ) {
-    for (map, current, mut tf, mut velocity, frame, data, facing) in fighter_query.iter_mut() {
+    for (map, current, mut tf, mut velocity, frame, data, facing, axis) in fighter_query.iter_mut() {
         let s = map.get(&current.0).expect("State doesn't exist");
 
         if let Ok((_parent, velo)) = query.get(*s) {
@@ -91,7 +91,13 @@ pub fn movement_system(
                 }
             }
 
+            // tf.translation += (velocity.0.x / FPS as f32) * axis.x;
+            // tf.translation.y += velocity.0.y / FPS as f32;
+            // tf.translation += (velocity.0.z / FPS as f32) * axis.z;
+
             tf.translation += velocity.0 / FPS as f32;
+
+
             tf.translation.y = tf.translation.y.max(0.)
 
 
@@ -131,153 +137,149 @@ pub fn process_input_system(
     mut trans_writer: EventWriter<TransitionEvent>
 ) {
     'fighter: for (fighter, current, map, buffer, frame, player, facing, tf) in query.iter() {
-        //buffer.0.get_mut(0)
-
 
 
         let state: &Entity = map.get(&current.0).expect("State doesn't exist");
 
         if let Ok(s) = state_query.get(*state) {
-            'transitions: for transition in s.transitions.iter() {
-                if let Ok(to_state) = state_query.get(*transition) {
+             'transitions: for to_state in state_query.iter_many(&s.transitions) {
 
-                    if let Some(all) = &to_state.triggers.0 {
-                        let mut meets_conditions = true;
-                        'all: for condition in all.iter() {
-                            
-                            match condition {
-                                Conditions::In(n) => {
-                                    if !n.contains(&current.0) {
-                                        meets_conditions = false;
-                                        break 'all;
-                                    }
-                                },
-                                Conditions::NotIn(n) => {
-                                    if n == &current.0 {
-                                        meets_conditions = false;
-                                        break 'all;
-                                    }
-                                },
-                                Conditions::Command(command) => {
-                                    if !command.compare(&buffer.0, facing.0) {
-                                        meets_conditions = false;
-                                        break 'all;
-                                    }
-                                },
-                                Conditions::EndDuration => {
-                                    if frame.0 <= s.duration.expect("State doesn't have duration") {
-                                        meets_conditions = false;
-                                        break 'all;
-                                    }
-                                },
-                                Conditions::Frame(start_frame, end_frame) => {
-                                    if let Some(start) = start_frame {
-                                        if frame.0 < *start {
-                                            meets_conditions = false;
-                                            break 'all;
-                                        }
-                                    }
-
-                                    if let Some(end) = end_frame {
-                                        if frame.0 > *end {
-                                            meets_conditions = false;
-                                            break 'all;
-                                        }
-                                    }
-
-                                    
+                if let Some(all) = &to_state.triggers.0 {
+                    let mut meets_conditions = true;
+                    'all: for condition in all.iter() {
+                        
+                        match condition {
+                            Conditions::In(n) => {
+                                if !n.contains(&current.0) {
+                                    meets_conditions = false;
+                                    break 'all;
                                 }
-                                Conditions::ReachGround => {
-                                    if tf.translation.y > 0. {
+                            },
+                            Conditions::NotIn(n) => {
+                                if n == &current.0 {
+                                    meets_conditions = false;
+                                    break 'all;
+                                }
+                            },
+                            Conditions::Command(command) => {
+                                if !command.compare(&buffer.0, facing.0) {
+                                    meets_conditions = false;
+                                    break 'all;
+                                }
+                            },
+                            Conditions::EndDuration => {
+                                if frame.0 <= s.duration.expect("State doesn't have duration") {
+                                    meets_conditions = false;
+                                    break 'all;
+                                }
+                            },
+                            Conditions::Frame(start_frame, end_frame) => {
+                                if let Some(start) = start_frame {
+                                    if frame.0 < *start {
                                         meets_conditions = false;
                                         break 'all;
                                     }
+                                }
 
-                                },
-                                // Conditions::OnHit(id, range) => {
-                                //     if let Some(id) = id {
-                                //         todo!()
-                                //     }
-                                // },
+                                if let Some(end) = end_frame {
+                                    if frame.0 > *end {
+                                        meets_conditions = false;
+                                        break 'all;
+                                    }
+                                }
+
+                                
                             }
-                        }
+                            Conditions::ReachGround => {
+                                if tf.translation.y > 0. {
+                                    meets_conditions = false;
+                                    break 'all;
+                                }
 
-                        if !meets_conditions {
-                            continue 'transitions
+                            },
+                            // Conditions::OnHit(id, range) => {
+                            //     if let Some(id) = id {
+                            //         todo!()
+                            //     }
+                            // },
                         }
                     }
 
-                    let mut others = true;
+                    if !meets_conditions {
+                        continue 'transitions
+                    }
+                }
 
-                    'set: for con_set in to_state.triggers.1.iter() {
-                        let mut met = true;
-                        others = false;
-                        'conditions: for conditions in con_set.iter() {
-                            match conditions {
-                                Conditions::In(n) => {
-                                    if !n.contains(&current.0) {
-                                        met = false;
-                                        break 'conditions;
-                                    }
-                                },
-                                Conditions::NotIn(n) => {
-                                    if n == &current.0 {
-                                        met = false;
-                                        break 'conditions;
-                                    }
-                                },
-                                Conditions::Command(command) => {
-                                    if !command.compare(&buffer.0, facing.0) {
-                                        met = false;
-                                        break 'conditions;
-                                    }
-                                },
+                let mut others = true;
 
-                                Conditions::EndDuration => {
-                                    if frame.0 <= s.duration.expect("State doesn't have duration") {
-                                        met = false;
-                                        break 'conditions;
-                                    }
-                                },
-                                Conditions::Frame(start_frame, end_frame) => {
-                                    if let Some(start) = start_frame {
-                                        if frame.0 < *start {
-                                            met = false;
-                                            break 'conditions;
-                                        }
-                                    }
-
-                                    if let Some(end) = end_frame {
-                                        if frame.0 > *end {
-                                            met = false;
-                                            break 'conditions;
-                                        }
-                                    }
-
-                                    
+                'set: for con_set in to_state.triggers.1.iter() {
+                    let mut met = true;
+                    others = false;
+                    'conditions: for conditions in con_set.iter() {
+                        match conditions {
+                            Conditions::In(n) => {
+                                if !n.contains(&current.0) {
+                                    met = false;
+                                    break 'conditions;
                                 }
-                                Conditions::ReachGround => {
-                                    if tf.translation.y > 0. {
+                            },
+                            Conditions::NotIn(n) => {
+                                if n == &current.0 {
+                                    met = false;
+                                    break 'conditions;
+                                }
+                            },
+                            Conditions::Command(command) => {
+                                if !command.compare(&buffer.0, facing.0) {
+                                    met = false;
+                                    break 'conditions;
+                                }
+                            },
+
+                            Conditions::EndDuration => {
+                                if frame.0 <= s.duration.expect("State doesn't have duration") {
+                                    met = false;
+                                    break 'conditions;
+                                }
+                            },
+                            Conditions::Frame(start_frame, end_frame) => {
+                                if let Some(start) = start_frame {
+                                    if frame.0 < *start {
                                         met = false;
                                         break 'conditions;
                                     }
+                                }
 
-                                },
-                                // Conditions::OnHit(_, _) => todo!(),
+                                if let Some(end) = end_frame {
+                                    if frame.0 > *end {
+                                        met = false;
+                                        break 'conditions;
+                                    }
+                                }
+
+                                
                             }
-                        }
-                        if met {
-                            trans_writer.send(TransitionEvent::new(fighter, to_state.id));
-                            break 'transitions;
+                            Conditions::ReachGround => {
+                                if tf.translation.y > 0. {
+                                    met = false;
+                                    break 'conditions;
+                                }
+
+                            },
+                            // Conditions::OnHit(_, _) => todo!(),
                         }
                     }
-                
-                    if others {
+                    if met {
                         trans_writer.send(TransitionEvent::new(fighter, to_state.id));
                         break 'transitions;
                     }
-                
                 }
+            
+                if others {
+                    trans_writer.send(TransitionEvent::new(fighter, to_state.id));
+                    break 'transitions;
+                }
+            
             }
         }
     }
@@ -668,8 +670,8 @@ pub fn collision_system(
     mut hit_writer: EventWriter<HitEvent>
 ) {
 
-    let mut seen_hitboxes: HashMap<Entity, (Isometry3<f32>, Cuboid, HitboxData)> = HashMap::new();
-    let mut seen_hurtboxes: HashMap<Entity, (Isometry3<f32>, Cuboid, HurtboxData)> = HashMap::new();
+    let mut seen_hitboxes: HashMap<Entity, (Isometry3<f32>, Capsule, HitboxData)> = HashMap::new();
+    let mut seen_hurtboxes: HashMap<Entity, (Isometry3<f32>, Capsule, HurtboxData)> = HashMap::new();
     // Entities are attacker, recipient
     let mut collisions: HashMap<(Entity, Entity), CollisionData> = HashMap::new();
 
@@ -756,6 +758,45 @@ pub fn hit_event_system(
         }
     }
     
+}
+
+pub fn axis_system(
+    players: Res<PlayerEntities>,
+
+
+    mut query: Query<(&Transform, ChangeTrackers<Transform>, &mut PlayerAxis), With<Fighter>>,
+) {
+
+    let [(tf1, changed1, mut axis1),
+        (tf2, changed2, mut axis2)]
+         = query.many_mut(players.as_ref().into());
+
+    if changed1.is_changed() {
+        axis2.opponent_pos = tf1.translation;
+        match (tf2.translation - tf1.translation).xz().try_normalize() {
+            Some(tf) => {
+                axis2.x = (tf.x, 0., tf.y).into();
+                axis2.z = axis2.x.cross(Vec3::Y);
+            },
+            None => (),
+        }
+    }
+
+    if changed2.is_changed() {
+        axis1.opponent_pos = tf2.translation;
+        match (tf2.translation - tf1.translation).xz().try_normalize() {
+            Some(tf) => {
+                axis1.x = (tf.x, 0., tf.y).into();
+                axis1.z = axis1.x.cross(Vec3::Y);
+            },
+            None => (),
+        }
+    }
+    
+    
+
+
+
 }
 
 pub fn ui_lifebar_system(

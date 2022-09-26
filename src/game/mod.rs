@@ -6,6 +6,7 @@ pub const FRAME_INCREMENT: &str = "frame_increment";
 pub const PROCESS: &str = "process";
 pub const TRANSITION: &str = "transition";
 pub const MOVEMENT: &str = "movement";
+pub const AXIS: &str = "axis";
 pub const VELO: &str = "velo";
 pub const FACE: &str = "face";
 

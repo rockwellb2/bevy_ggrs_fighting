@@ -2,7 +2,7 @@ use bevy::prelude::Entity;
 use bevy::reflect::TypeUuid;
 use bevy::{prelude::Component, reflect::Reflect};
 use bevy::ecs::reflect::ReflectComponent;
-use parry3d::shape::Cuboid;
+use parry3d::shape::{Cuboid, Capsule};
 use serde::{Deserialize, Serialize};
 
 use super::state::{HitboxData, HurtboxData};
@@ -22,7 +22,7 @@ pub struct FighterData {
 
 #[derive(Component)]
 pub struct Collider {
-    pub shape: Cuboid
+    pub shape: Capsule
 }
 
 

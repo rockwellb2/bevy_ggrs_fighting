@@ -1,7 +1,7 @@
 use bevy::{
     core::Name,
     math::Vec2,
-    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle, VisibilityBundle, ComputedVisibility},
+    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle, VisibilityBundle, ComputedVisibility, PbrBundle, Mesh, shape, StandardMaterial, Camera3dBundle, PointLightBundle, PointLight},
     sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}
 };
 
@@ -11,11 +11,11 @@ use ggrs::{SyncTestSession, P2PSession};
 
 use iyes_progress::prelude::AssetsLoading;
 use leafwing_input_manager::{InputManagerBundle, prelude::{ActionState, InputMap}};
-use parry3d::shape::Cuboid;
+use parry3d::shape::{Cuboid, Capsule};
 
 
 use crate::{
-    fighter::{data::{FighterData, Collider}, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health, Owner, ProjectileReference, Velocity}, Fighter, systems::InputBuffer, modifiers::{CreateObject, Object}},
+    fighter::{data::{FighterData, Collider}, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health, Owner, ProjectileReference, Velocity, PlayerAxis}, Fighter, systems::InputBuffer, modifiers::{CreateObject, Object}},
     Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer, game::{GameState, RoundState},
 };
 
@@ -29,6 +29,12 @@ impl PlayerEntities {
             2 => self.1,
             _ => panic!("Player number {} doesn't exist!", n),
         }
+    }
+}
+
+impl From<&PlayerEntities> for [Entity; 2] {
+    fn from(value: &PlayerEntities) -> Self {
+        [value.0, value.1]
     }
 }
 
@@ -110,21 +116,30 @@ pub fn spawn_fighters(
     handle_access: Res<PlayerHandleAccess>,
     mut data: ResMut<Assets<FighterData>>,
 
-    mut state: ResMut<RoundState>
+    mut state: ResMut<RoundState>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 
 ) {
     let fighter1 = data.remove(&handle_access.0.fighter_data).expect("FighterData asset does not exist");
     let fighter2 = data.remove(&handle_access.1.fighter_data).expect("FighterData asset does not exist");
 
+
     let player1 = commands
-        .spawn_bundle(SpriteBundle {
-            sprite: Sprite {
-                color: Color::BLUE,
-                custom_size: Some(Vec2::new(1., 1.)),
-                ..default()
-            },
-            visibility: Visibility::visible(),
-            transform: Transform::from_translation(Vec3::new(-2., 0., 0.)),
+        // .spawn_bundle(SpriteBundle {
+        //     sprite: Sprite {
+        //         color: Color::BLUE,
+        //         custom_size: Some(Vec2::new(1., 1.)),
+        //         ..default()
+        //     },
+        //     visibility: Visibility::visible(),
+        //     transform: Transform::from_translation(Vec3::new(-2., 0., 0.)),
+        //     ..default()
+        // })
+        .spawn_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Cube { size: 2.})),
+            material: materials.add(Color::BLUE.into()),
+            transform: Transform::from_xyz(-2., 0., 0.),
             ..default()
         })
         .insert(Name::new("Player 1"))
@@ -138,6 +153,11 @@ pub fn spawn_fighters(
         .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
         .insert(Health(500))
         .insert(Velocity(Vec3::ZERO))
+        .insert(PlayerAxis {
+            opponent_pos: Vec3::new(2., 0., 0.),
+            x: Vec3::X,
+            z: Vec3::Z
+        })
 
         .insert_bundle(InputManagerBundle::<Action> {
             action_state: ActionState::default(),
@@ -162,13 +182,19 @@ pub fn spawn_fighters(
 
     let player2 = 
     commands
-        .spawn_bundle(SpriteBundle {
-            sprite: Sprite {
-                color: Color::RED,
-                custom_size: Some(Vec2::new(1., 1.)),
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new(2., 0., 0.)),
+        // .spawn_bundle(SpriteBundle {
+        //     sprite: Sprite {
+        //         color: Color::RED,
+        //         custom_size: Some(Vec2::new(1., 1.)),
+        //         ..default()
+        //     },
+        //     transform: Transform::from_translation(Vec3::new(2., 0., 0.)),
+        //     ..default()
+        // })
+        .spawn_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Cube { size: 2.})),
+            material: materials.add(Color::RED.into()),
+            transform: Transform::from_xyz(2., 0., 0.),
             ..default()
         })
         .insert(Name::new("Player 2"))
@@ -182,17 +208,29 @@ pub fn spawn_fighters(
         .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
         .insert(Health(500))
         .insert(Velocity(Vec3::ZERO))
+        .insert(PlayerAxis {
+            opponent_pos: Vec3::new(-2., 0., 0.),
+            x: Vec3::X,
+            z: Vec3::Z
+        })
         
 
         .id();
 
     commands.insert_resource(PlayerEntities(player1, player2));
 
-    commands.spawn_bundle(Camera2dBundle {
-        projection: OrthographicProjection {
-            scale: 1. / 50.,
+    commands.spawn_bundle(PointLightBundle {
+        point_light: PointLight {
+            intensity: 1500.,
+            shadows_enabled: true,
             ..default()
         },
+        transform: Transform::from_xyz(4.0, 8.0, 4.0),
+        ..default()
+    });
+
+    commands.spawn_bundle(Camera3dBundle {
+        transform: Transform::from_xyz(0.0, 5., 14.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
 
@@ -209,36 +247,52 @@ pub fn extra_setup_system(
     mut commands: Commands,
     mut rip: ResMut<RollbackIdProvider>,
 
-    mut round_state: ResMut<RoundState>
+    mut round_state: ResMut<RoundState>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>
 
 ) {
+    let projectile_material = materials.add(Color::rgba(0., 1., 0., 0.5).into());
+
+
     for (create_object, parent) in object_query.iter() {
         match &create_object.0 {
             Object::Projectile(projectile) => {
-                let shape = shapes::Rectangle {
-                    extents: projectile.dimensions.truncate(),
-                    origin: RectangleOrigin::Center,
-                };
+                // let shape = shapes::Rectangle {
+                //     extents: projectile.dimensions.truncate(),
+                //     origin: RectangleOrigin::Center,
+                // };
 
-                let cuboid = Cuboid::new((projectile.dimensions / 2.).into());
+                //let cuboid = Cuboid::new((projectile.dimensions / 2.).into());
+                let capsule = Capsule::new_y(projectile.dimensions.y / 2., projectile.dimensions.x / 2.);
 
 
                 let mut ids = Vec::new();
 
                 for _ in 0..projectile.max {
                     let entity = commands
-                        .spawn_bundle(GeometryBuilder::build_as(
-                            &shape,
-                            DrawMode::Fill(FillMode::color(Color::rgba(1., 0., 0., 0.8))),
-                            Transform::default()
-                        ))
-                        .insert_bundle(VisibilityBundle {
+                        // .spawn_bundle(GeometryBuilder::build_as(
+                        //     &shape,
+                        //     DrawMode::Fill(FillMode::color(Color::rgba(1., 0., 0., 0.8))),
+                        //     Transform::default()
+                        // ))
+                        .spawn_bundle(PbrBundle {
+                            mesh: meshes.add(Mesh::from(shape::Capsule {
+                                radius: projectile.dimensions.x,
+                                depth: 0.,
+                                ..default()
+                            })),
+                            material: projectile_material.clone(),
                             visibility: Visibility { is_visible: false },
-                            computed: ComputedVisibility::default()
+                            ..default()
                         })
+                        // .insert_bundle(VisibilityBundle {
+                        //     visibility: Visibility { is_visible: false },
+                        //     computed: ComputedVisibility::default()
+                        //})
                         .insert(Name::new(projectile.name.clone()))
                         .insert(projectile.clone())
-                        .insert(Collider { shape: cuboid })
+                        .insert(Collider { shape: capsule })
                         .insert(Velocity(projectile.start_velocity))
                         .insert(Rollback::new(rip.next_id()))
                         .insert(StateFrame(0))
@@ -265,27 +319,6 @@ pub fn extra_setup_system(
 
                     
                 }
-
-
-
-
-
-
-                // let ids: Vec<(u32, bool)> = (0..projectile.max).map(|_|(rip.next_id(), false)).collect();
-
-                // if let Ok((_tf, projectile_ref)) = parent_query.get_mut(parent.get()) {
-                //     if let Some(mut projectile_ref) = projectile_ref {
-                //         projectile_ref.insert_ids(projectile.name.clone(), ids);
-                //     }
-                //     else {
-                //         let mut projectile_ref = ProjectileReference::new();
-                //         projectile_ref.insert_ids(projectile.name.clone(), ids);
-
-                //         commands.entity(parent.get())
-                //             .insert(projectile_ref);
-                //     }
-                // }
-                
             },
             Object::None => panic!(),
         }

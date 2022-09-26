@@ -450,3 +450,11 @@ pub struct Health(pub u16);
 #[reflect(Component)]
 pub struct InHitstun(pub u16);
 
+
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[reflect(Component)]
+pub struct PlayerAxis {
+    pub opponent_pos: Vec3,
+    pub x: Vec3,
+    pub z: Vec3
+}

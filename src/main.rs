@@ -13,19 +13,19 @@ use bevy_inspector_egui::WorldInspectorPlugin;
 use fighter::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, SerializedStateVec,
-        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox,
+        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox, PlayerAxis,
     },
     systems::{
         adjust_facing_system, collision_system, hbox_position_system,
         hit_event_system, hitbox_component_system, hitbox_removal_system, hitstun_system,
         hurtbox_component_system, hurtbox_removal_system, increment_frame_system, movement_system,
-        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system,
+        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, axis_system,
     },
     FighterPlugin,
 };
 use game::{
     ADD_HITBOX, ADD_HURTBOX, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
-    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, 
+    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, AXIS, 
 };
 use ggrs::{Config, PlayerType, SessionBuilder, UdpNonBlockingSocket, SyncTestSession};
 //use bevy_editor_pls::prelude::*;
@@ -38,7 +38,7 @@ use iyes_loopless::prelude::{AppLooplessStateExt, IntoConditionalSystem};
 use iyes_progress::ProgressPlugin;
 use leafwing_input_manager::prelude::InputManagerPlugin;
 
-use parry3d::{shape::Cuboid};
+use parry3d::{shape::{Cuboid, Capsule}};
 use structopt::StructOpt;
 
 use std::{env, net::SocketAddr, default};
@@ -142,6 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .register_rollback_type::<InHitstun>()
         .register_rollback_type::<ProjectileReference>()
         .register_rollback_type::<Velocity>()
+        .register_rollback_type::<PlayerAxis>()
 
         .register_rollback_type::<RoundState>()
 
@@ -173,7 +174,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "Enter Round Stage",
                     SystemStage::parallel()
                         .with_run_criteria(on_enter_round)
-                        .with_system(startup.exclusive_system())
+                        .with_system(startup.exclusive_system().label("startup"))
+                        .with_system(insert_meshes.after("startup"))
                 )
                 .with_stage_after(
                     "Enter Round Stage",
@@ -223,10 +225,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .after(TRANSITION),
                         )
                         .with_system(
+                            axis_system
+                                .label(AXIS)
+                                .after(MOVEMENT)
+                        )
+                        .with_system(
                             adjust_facing_system
                                 //.run_in_state(GameState::Fight)
                                 .label(FACE)
-                                .after(VELO),
+                                .after(AXIS),
                         )
                         // projectile
                         .with_system(
@@ -398,26 +405,28 @@ fn populate_entities_with_states(
                 for (index, mut hitbox) in hitboxes.into_iter().enumerate() {
                     hitbox.set_id(index);
 
-                    let shape = shapes::Rectangle {
-                        extents: hitbox.dimensions.truncate(),
-                        origin: RectangleOrigin::Center,
-                    };
+                    // let shape = shapes::Rectangle {
+                    //     extents: hitbox.dimensions.truncate(),
+                    //     origin: RectangleOrigin::Center,
+                    // };
 
                     let cuboid = Cuboid::new((hitbox.dimensions / 2.).into());
+                    let capsule = Capsule::new_y(hitbox.dimensions.y / 2., hitbox.dimensions.x);
 
                     let start_frame = hitbox.start_frame;
                     let hitbox_entity = world
                         .spawn()
                         .insert(hitbox)
                         .insert(Rollback::new(rip.next_id()))
-                        .insert(Collider { shape: cuboid })
+                        .insert(Collider { shape: capsule })
                         .insert(Name::new(format!("Hitbox {}", &name)))
                         .insert(Owner(player))
-                        .insert_bundle(GeometryBuilder::build_as(
-                            &shape,
-                            DrawMode::Fill(FillMode::color(Color::rgba(1., 0., 0., 0.8))),
-                            Transform::default(),
-                        ))
+                        // .insert_bundle(GeometryBuilder::build_as(
+                        //     &shape,
+                        //     DrawMode::Fill(FillMode::color(Color::rgba(1., 0., 0., 0.8))),
+                        //     Transform::default(),
+                        // ))
+         
                         .insert_bundle(VisibilityBundle {
                             visibility: Visibility { is_visible: false },
                             computed: ComputedVisibility::default(),
@@ -441,26 +450,27 @@ fn populate_entities_with_states(
                 let mut ordered_hurt: HashMap<u16, HashSet<Entity>> = HashMap::new();
 
                 for hurtbox in hurtboxes {
-                    let shape = shapes::Rectangle {
-                        extents: hurtbox.dimensions.truncate(),
-                        origin: RectangleOrigin::Center,
-                    };
+                    // let shape = shapes::Rectangle {
+                    //     extents: hurtbox.dimensions.truncate(),
+                    //     origin: RectangleOrigin::Center,
+                    // };
 
-                    let cuboid = Cuboid::new((hurtbox.dimensions / 2.).into());
+                    //let cuboid = Cuboid::new((hurtbox.dimensions / 2.).into());
+                    let capsule = Capsule::new_y(hurtbox.dimensions.y / 2., hurtbox.dimensions.x);
 
                     let start_frame = hurtbox.start_frame.unwrap_or_default();
                     let hurtbox_entity = world
                         .spawn()
                         .insert(hurtbox)
                         .insert(Rollback::new(rip.next_id()))
-                        .insert(Collider { shape: cuboid })
+                        .insert(Collider { shape: capsule })
                         .insert(Name::new(format!("Hurtbox {}", &name)))
                         .insert(Owner(player))
-                        .insert_bundle(GeometryBuilder::build_as(
-                            &shape,
-                            DrawMode::Fill(FillMode::color(Color::rgba(1., 1., 0., 0.8))),
-                            Transform::default(),
-                        ))
+                        // .insert_bundle(GeometryBuilder::build_as(
+                        //     &shape,
+                        //     DrawMode::Fill(FillMode::color(Color::rgba(1., 1., 0., 0.8))),
+                        //     Transform::default(),
+                        // ))
                         .insert_bundle(VisibilityBundle {
                             visibility: Visibility { is_visible: false },
                             computed: ComputedVisibility::default(),
@@ -508,6 +518,51 @@ fn populate_entities_with_states(
             .insert(state_map);
 
     });
+}
+
+pub fn insert_meshes(
+    mut commands: Commands, 
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+
+    hitbox_query: Query<(Entity, &HitboxData)>,
+    hurtbox_query: Query<(Entity, &HurtboxData)>
+) {
+    let hitbox_material = materials.add(Color::rgba(1., 0., 0., 0.5).into());
+    let hurtbox_material = materials.add(Color::rgba(1., 1., 0., 0.5).into());
+
+
+    for (entity, hitbox) in hitbox_query.iter() {
+        commands.entity(entity)
+            .insert_bundle(PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Capsule {
+                    radius: hitbox.dimensions.x,
+                    depth: hitbox.dimensions.y,
+                    ..default()
+                })),
+                material: hitbox_material.clone(),
+                visibility: Visibility { is_visible: false },
+                transform: Transform::from_scale(hitbox.dimensions),
+                ..default()
+            });
+    }
+
+    for (entity, hurtbox) in hurtbox_query.iter() {
+        commands.entity(entity)
+            .insert_bundle(PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Capsule {
+                    radius: hurtbox.dimensions.x,
+                    depth: hurtbox.dimensions.y,
+                    ..default()
+                })),
+                material: hurtbox_material.clone(),
+                visibility: Visibility { is_visible: false },
+                transform: Transform::from_scale(hurtbox.dimensions),
+                ..default()
+            });
+    }
+    
+
 }
 
 pub fn increase_frame_system(mut frame_count: ResMut<FrameCount>) {
