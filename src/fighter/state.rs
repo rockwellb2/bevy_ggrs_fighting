@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use bevy::ecs::reflect;
-use bevy::prelude::Entity;
+use bevy::prelude::{Entity, AnimationClip, Handle};
 use bevy::reflect::{FromReflect, TypeUuid, Reflect};
 use bevy::utils;
 use bevy::utils::hashbrown::{HashMap, HashSet};
@@ -458,3 +458,7 @@ pub struct PlayerAxis {
     pub x: Vec3,
     pub z: Vec3
 }
+
+#[derive(Component)]
+pub struct Animation(pub Handle<AnimationClip>);
+

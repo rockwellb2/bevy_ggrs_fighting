@@ -6,7 +6,7 @@ use bevy_inspector_egui::RegisterInspectable;
 
 use self::{
     data::{FighterData, HitEvent}, 
-    state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference, PlayerAxis}, 
+    state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference, PlayerAxis, Animation}, 
     systems::InputBuffer, event::TransitionEvent,
     modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object, Velo, VectorType}
 };

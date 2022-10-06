@@ -52,6 +52,8 @@ pub fn input(
         return Input(StateInput::default().into());
     }
 
+    
+
     if let Ok((action_state, facing)) = input_query.get_single_mut() {
         let previous = &local.0;
 

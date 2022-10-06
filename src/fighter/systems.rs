@@ -3,14 +3,14 @@
 use super::{
     data::{FighterData, Collider, CollisionData, HitEvent},
     state::{
-        Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, Owner, State, StateFrame, StateMap, HBox, Health, Conditions, InHitstun, Velocity, ProjectileReference, ProjectileData, PlayerAxis,
+        Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, Owner, State, StateFrame, StateMap, HBox, Health, Conditions, InHitstun, Velocity, ProjectileReference, ProjectileData, PlayerAxis, Animation,
     },
     Fighter, event::TransitionEvent, modifiers::{Movement, AdjustFacing, CreateObject, Object, Velo, VectorType},
 };
 use bevy::{
     ecs::{reflect::ReflectComponent, },
     prelude::{
-        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without, ResMut, Name, Or, Parent, ChangeTrackers,
+        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without, ResMut, Name, Or, Parent, ChangeTrackers, Camera, GlobalTransform, AnimationPlayer,
     },
     reflect::{Reflect, Struct, FromReflect},
     utils::{default, HashMap, hashbrown::HashSet}, ui::{Style, Val}, math::Vec3Swizzles,
@@ -22,13 +22,13 @@ use parry3d::{query::intersection_test, shape::{Cuboid, Capsule}};
 
 
 use crate::{
-    battle::{PlayerEntities, Lifebar},
+    battle::{PlayerEntities, Lifebar, MatchCamera},
     input::{
         Input as FightInput, LEFT,
         LEFT_HELD, RIGHT, RIGHT_HELD,
     },
     util::Buffer,
-    Player, FPS,
+    Player, FPS, AnimEntity,
 };
 
 pub fn buffer_insert_system(
@@ -91,11 +91,11 @@ pub fn movement_system(
                 }
             }
 
-            // tf.translation += (velocity.0.x / FPS as f32) * axis.x;
-            // tf.translation.y += velocity.0.y / FPS as f32;
-            // tf.translation += (velocity.0.z / FPS as f32) * axis.z;
+            tf.translation += (velocity.0.x / FPS as f32) * axis.x;
+            tf.translation.y += velocity.0.y / FPS as f32;
+            tf.translation += (velocity.0.z / FPS as f32) * axis.z;
 
-            tf.translation += velocity.0 / FPS as f32;
+            //tf.translation += velocity.0 / FPS as f32;
 
 
             tf.translation.y = tf.translation.y.max(0.)
@@ -107,6 +107,7 @@ pub fn movement_system(
 }
 
 pub fn increment_frame_system(mut query: Query<&mut StateFrame, Or<(With<Fighter>, With<Active>)>>) {
+
     for mut frame in query.iter_mut() {
         frame.0 = frame.0.checked_add(1).unwrap_or(1);
     }
@@ -375,7 +376,9 @@ pub fn hitbox_component_system(
                         offset.x *= facing.0.sign();
 
                         let mut transform = tf.clone();
+                        transform.translation.y = 0.;
                         transform.translation += offset;
+                        transform.scale = Vec3::ONE;
 
                         commands
                             .entity(*h)
@@ -436,7 +439,9 @@ pub fn hurtbox_component_system(
                             offset.x *= facing.0.sign();
 
                             let mut transform = tf.clone();
+                            transform.translation.y = 0.;
                             transform.translation += offset;
+                            transform.scale = Vec3::ONE;
 
                             commands
                                 .entity(*h)
@@ -492,11 +497,11 @@ pub fn hurtbox_removal_system(
 // Isn't removed until after stage is over, may be a problem?
 pub fn projectile_system(
     mut commands: Commands,
-    mut query: Query<(Entity, &Owner, &ProjectileData, &StateFrame, &mut Visibility, &mut Transform, &mut Velocity), With<Active>>,
+    mut query: Query<(Entity, &Owner, &ProjectileData, &StateFrame, &mut Visibility, &mut Transform, &mut Velocity, &PlayerAxis), With<Active>>,
     mut fighter_query: Query<(&mut ProjectileReference, &Facing)>
 
 ) {
-    for (projectile, owner, data, frame, mut visibility, mut tf, mut velo) in query.iter_mut() {
+    for (projectile, owner, data, frame, mut visibility, mut tf, mut velo, axis) in query.iter_mut() {
         if frame.0 == data.life_frames {
             if let Ok((mut proj_ref, _facing)) = fighter_query.get_mut(owner.0) {
                 let ids = proj_ref.projectile_ids.get_mut(&data.name).expect("Projectile is not in ProjectileReference");
@@ -505,7 +510,7 @@ pub fn projectile_system(
                 loop {
                     if let Some((id, in_use)) = id_iter.next() {
                         if projectile == *id {
-                            println!("Changing in-use");
+                            //println!("Changing in-use");
                             *in_use = false;
                             break;
                         }
@@ -528,7 +533,11 @@ pub fn projectile_system(
         else {
             if let Ok((_, facing)) = fighter_query.get(owner.0) {
                 velo.0 += facing.0.sign() * data.acceleration;
-                tf.translation += facing.0.sign() * velo.0 / FPS as f32;
+                //tf.translation += facing.0.sign() * velo.0 / FPS as f32;
+
+                tf.translation += (velo.0.x / FPS as f32) * axis.x;
+                tf.translation += (velo.0.z / FPS as f32) * axis.z;
+                tf.translation.y += velo.0.y / FPS as f32;
             }
         }
 
@@ -577,14 +586,14 @@ pub fn object_system(
 
     mut set: ParamSet<(
         Query<(&mut Transform, &mut Visibility, &mut StateFrame)>,
-        Query<(Entity, &CurrentState, &StateMap, &StateFrame, &Transform, &mut ProjectileReference, &Facing), With<Fighter>>,
+        Query<(Entity, &CurrentState, &StateMap, &StateFrame, &Transform, &mut ProjectileReference, &Facing, &PlayerAxis), With<Fighter>>,
     )>,
     state_query: Query<(&State, &CreateObject)>
 ) {
 
     let mut changes: Vec<(Entity, Vec3)> = Vec::new();
 
-    for (_fighter, current, map, frame, tf, mut projectiles, facing) in set.p1().iter_mut() {
+    for (_fighter, current, map, frame, tf, mut projectiles, facing, axis) in set.p1().iter_mut() {
         let s = map.get(&current.0).expect("State does not exist");
 
         if let Ok((_state, create_object)) = state_query.get(*s) {
@@ -619,6 +628,7 @@ pub fn object_system(
                         changes.push((id, new_pos));
 
                         commands.entity(id)
+                            .insert(axis.clone())
                             .insert(Active(HashSet::new()));
                     }
 
@@ -641,21 +651,27 @@ pub fn object_system(
 pub fn hbox_position_system<T: HBox>(
     mut set: ParamSet<(
         Query<(&T, &Owner, &mut Transform), With<Active>>, // Hbox Query
-        Query<(Entity, &Transform, &Facing), (With<Fighter>, Changed<Transform>)> // Fighter Query
+        Query<(Entity, &Transform, &Facing, &PlayerAxis), (With<Fighter>, Changed<Transform>)> // Fighter Query
     )>,
 ) {
-    let mut changed: HashMap<Entity, (Vec3, Direction)> = HashMap::new();
+    let mut changed: HashMap<Entity, (Vec3, Direction, PlayerAxis)> = HashMap::new();
 
-    for (player, f_tf, facing) in set.p1().iter() {
-        changed.insert(player, (f_tf.translation, facing.0));
+    for (player, f_tf, facing, axis) in set.p1().iter() {
+        changed.insert(player, (f_tf.translation, facing.0, axis.clone()));
     }
 
     for (hbox, owner, mut h_tf) in set.p0().iter_mut() {
-        if let Some((pos, direction)) = changed.get(&owner.0) {
+        if let Some((pos, direction, axis)) = changed.get(&owner.0) {
             let mut offset = hbox.get_offset();
-            offset.x *= direction.sign();
+            //offset.x *= direction.sign();
             h_tf.translation = *pos;
-            h_tf.translation += offset;
+
+            h_tf.translation += axis.x * offset.x;
+            h_tf.translation += axis.z * offset.z;
+            h_tf.translation.y += offset.y;
+
+
+            //h_tf.translation += offset;
         }
     }
 }
@@ -762,8 +778,6 @@ pub fn hit_event_system(
 
 pub fn axis_system(
     players: Res<PlayerEntities>,
-
-
     mut query: Query<(&Transform, ChangeTrackers<Transform>, &mut PlayerAxis), With<Fighter>>,
 ) {
 
@@ -771,7 +785,7 @@ pub fn axis_system(
         (tf2, changed2, mut axis2)]
          = query.many_mut(players.as_ref().into());
 
-    if changed1.is_changed() {
+    if changed1.is_changed() || changed2.is_changed() {
         axis2.opponent_pos = tf1.translation;
         match (tf2.translation - tf1.translation).xz().try_normalize() {
             Some(tf) => {
@@ -780,9 +794,7 @@ pub fn axis_system(
             },
             None => (),
         }
-    }
 
-    if changed2.is_changed() {
         axis1.opponent_pos = tf2.translation;
         match (tf2.translation - tf1.translation).xz().try_normalize() {
             Some(tf) => {
@@ -792,7 +804,8 @@ pub fn axis_system(
             None => (),
         }
     }
-    
+
+
     
 
 
@@ -813,4 +826,90 @@ pub fn ui_lifebar_system(
         }
     }
 
+}
+
+pub fn camera_system(
+    mut set: ParamSet<(
+        Query<&mut Transform, With<MatchCamera>>,
+        Query<(&Transform, ChangeTrackers<Transform>)>
+    )>,
+
+    players: Res<PlayerEntities>
+) {
+    let player_query = set.p1();
+    let [(tf1, change1), (tf2, change2)] = player_query.many(players.as_ref().into());
+
+    if change1.is_changed() || change2.is_changed() {
+        
+        let mid = tf1.translation.lerp(tf2.translation, 0.5);
+        let direction = (tf1.translation - tf2.translation).xz();
+        let direction: Vec3 = (direction.x, 0., direction.y).into();
+        let perp = direction.cross(Vec3::Y);
+
+        // let tf1 = tf1.translation.clone();
+        // let tf2 = tf2.translation.clone();
+
+        if let Ok(mut cam_tf) = set.p0().get_single_mut() {
+            cam_tf.translation = mid + perp * -2.;
+            cam_tf.look_at(mid, Vec3::Y);
+        }
+
+    }
+}
+
+pub fn animation_system( 
+    mut commands: Commands,
+    mut animation_play: Query<(Entity, &Parent, &mut AnimationPlayer)>,
+    fighter_query: Query<(Entity, Option<&AnimEntity>, &CurrentState, &StateMap), With<Fighter>>,
+    parent_query: Query<&Parent>,
+    state_query: Query<&Animation, With<State>>
+) {
+    for (entity, anim_entity, current, map) in fighter_query.iter() {
+        if let Some(anim) = anim_entity {
+            for (_, _, mut player) in animation_play.get_mut(anim.0) {
+                let state = map.get(&current.0).expect("State doesn't exist");
+                let animation = state_query.get(*state).expect("Animation doesn't exist");
+                
+                if player.is_paused() {
+                    println!("Is it getting here?");
+                    player.play(animation.0.clone_weak());
+                }
+                
+
+            }
+        }
+        else {
+            for (play_ent, parent, mut play) in animation_play.iter_mut() {
+                for grandparent in parent_query.get(parent.get()) {
+                    if grandparent.get() == entity {
+                        commands.entity(entity)
+                        .insert(AnimEntity(play_ent));
+                    }
+                }
+
+                play.pause();
+
+            }
+
+
+            
+        }
+    }
+
+}
+
+pub fn add_animation_player_system(
+    mut commands: Commands,
+    anim_player_query: Query<(Entity, &AnimationPlayer)>,
+    parent_query: Query<&Parent>
+) {
+    for (anim, _) in anim_player_query.iter() {
+        println!("What about here?");
+        for parent in parent_query.get(anim) {
+            for fighter in parent_query.get(parent.get()) {
+                commands.entity(fighter.get())
+                    .insert(AnimEntity(anim));
+            }
+        }
+    }
 }

@@ -2,7 +2,7 @@ use bevy::{
     core::Name,
     math::Vec2,
     prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle, VisibilityBundle, ComputedVisibility, PbrBundle, Mesh, shape, StandardMaterial, Camera3dBundle, PointLightBundle, PointLight},
-    sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}
+    sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}, scene::{SceneBundle, Scene}
 };
 
 use bevy_ggrs::{Rollback, RollbackIdProvider};
@@ -42,11 +42,17 @@ impl From<&PlayerEntities> for [Entity; 2] {
 pub struct PlayerHandles {
     pub state_list: Handle<SerializedStateVec>,
     pub fighter_data: Handle<FighterData>,
+    pub model: Handle<Scene>
 }
 
 impl PlayerHandles {
-    pub fn new(state_list: Handle<SerializedStateVec>, fighter_data: Handle<FighterData>) -> PlayerHandles {
-        PlayerHandles { state_list, fighter_data }
+    pub fn new(
+        state_list: Handle<SerializedStateVec>, 
+        fighter_data: Handle<FighterData>,
+        model: Handle<Scene>
+    ) -> PlayerHandles 
+    {
+        PlayerHandles { state_list, fighter_data, model }
     }
 }
 
@@ -66,16 +72,18 @@ pub fn load_fighters(
 ) {
     let state_list: Handle<SerializedStateVec> = asset_server.load("data/fighters/tahu/states.sl.json");
     let fighter_data: Handle<FighterData> = asset_server.load("data/fighters/tahu/fighter_data.json");
+    let model: Handle<Scene> = asset_server.load("models/ryu.glb#Scene0");
+
 
     let f2: Handle<FighterData> = asset_server.load("data/fighters/abe/fighter_data.json");
 
 
-    // loading.add(&state_list);
-    // loading.add(&fighter_data);
-    // loading.add(&f2);
 
-    let p1 = PlayerHandles::new(state_list.clone(), fighter_data);
-    let p2 = PlayerHandles::new(state_list, f2);
+
+
+
+    let p1 = PlayerHandles::new(state_list.clone(), fighter_data, model.clone());
+    let p2 = PlayerHandles::new(state_list, f2, model);
     let access = PlayerHandleAccess::new(p1, p2);
 
     commands.insert_resource(access);
@@ -94,7 +102,9 @@ pub fn loading_wait(
         player_access.0.fighter_data.id,
         player_access.0.state_list.id,
         player_access.1.fighter_data.id,
-        player_access.1.state_list.id
+        player_access.1.state_list.id,
+        player_access.0.model.id,
+        player_access.1.model.id,
     ];
 
     println!("LOADING...");
@@ -107,6 +117,7 @@ pub fn loading_wait(
     }
 }
 
+
 pub fn spawn_fighters(
     mut commands: Commands, 
     mut rip: ResMut<RollbackIdProvider>,
@@ -115,7 +126,9 @@ pub fn spawn_fighters(
 
     handle_access: Res<PlayerHandleAccess>,
     mut data: ResMut<Assets<FighterData>>,
+    mut models: ResMut<Assets<Scene>>,
 
+    asset_server: Res<AssetServer>,
     mut state: ResMut<RoundState>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -124,22 +137,23 @@ pub fn spawn_fighters(
     let fighter1 = data.remove(&handle_access.0.fighter_data).expect("FighterData asset does not exist");
     let fighter2 = data.remove(&handle_access.1.fighter_data).expect("FighterData asset does not exist");
 
+    //let model1 = models.remove(&handle_access.0.model).expect("Scene asset does not exist");
+
 
     let player1 = commands
-        // .spawn_bundle(SpriteBundle {
-        //     sprite: Sprite {
-        //         color: Color::BLUE,
-        //         custom_size: Some(Vec2::new(1., 1.)),
-        //         ..default()
-        //     },
-        //     visibility: Visibility::visible(),
-        //     transform: Transform::from_translation(Vec3::new(-2., 0., 0.)),
+        // .spawn_bundle(PbrBundle {
+        //     mesh: meshes.add(Mesh::from(shape::Cube { size: 2.})),
+        //     material: materials.add(Color::BLUE.into()),
+        //     transform: Transform::from_xyz(-2., 0., 0.),
         //     ..default()
         // })
-        .spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 2.})),
-            material: materials.add(Color::BLUE.into()),
-            transform: Transform::from_xyz(-2., 0., 0.),
+        .spawn_bundle(SceneBundle {
+            scene: handle_access.0.model.clone(),
+            transform: Transform { 
+                translation: (-2., 0., 0.).into(),  
+                //scale: Vec3::splat(5.),
+                ..default()
+            },
             ..default()
         })
         .insert(Name::new("Player 1"))
@@ -182,19 +196,19 @@ pub fn spawn_fighters(
 
     let player2 = 
     commands
-        // .spawn_bundle(SpriteBundle {
-        //     sprite: Sprite {
-        //         color: Color::RED,
-        //         custom_size: Some(Vec2::new(1., 1.)),
-        //         ..default()
-        //     },
-        //     transform: Transform::from_translation(Vec3::new(2., 0., 0.)),
+        // .spawn_bundle(PbrBundle {
+        //     mesh: meshes.add(Mesh::from(shape::Cube { size: 2.})),
+        //     material: materials.add(Color::RED.into()),
+        //     transform: Transform::from_xyz(2., 0., 0.),
         //     ..default()
         // })
-        .spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 2.})),
-            material: materials.add(Color::RED.into()),
-            transform: Transform::from_xyz(2., 0., 0.),
+        .spawn_bundle(SceneBundle {
+            scene: handle_access.0.model.clone(),
+            transform: Transform { 
+                translation: (2., 0., 0.).into(),  
+                scale: (-1., 1., 1.).into(),
+                ..default()
+            },
             ..default()
         })
         .insert(Name::new("Player 2"))
@@ -221,7 +235,7 @@ pub fn spawn_fighters(
 
     commands.spawn_bundle(PointLightBundle {
         point_light: PointLight {
-            intensity: 1500.,
+            intensity: 1_500.,
             shadows_enabled: true,
             ..default()
         },
@@ -232,12 +246,16 @@ pub fn spawn_fighters(
     commands.spawn_bundle(Camera3dBundle {
         transform: Transform::from_xyz(0.0, 5., 14.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
-    });
+    })
+    .insert(MatchCamera);
 
     *state = RoundState::EnterRound
 
 
 }
+
+#[derive(Component)]
+pub struct MatchCamera;
 
 
 pub fn extra_setup_system(

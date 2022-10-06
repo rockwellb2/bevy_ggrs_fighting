@@ -43,7 +43,7 @@
             { "endDuration": null }
         ],
         "trigger3": [
-            { "in": [1]},
+            { "in": [1, 30, 31, 32]},
             { 
                 "command": {
                     "list": [
@@ -54,10 +54,6 @@
                     "window": 1
                 }
             }
-        ],
-        "trigger4": [
-            { "in": [30, 31, 32, 106] },
-            { "reachGround": null }
         ]
     },
     {
@@ -198,9 +194,8 @@
     },
     {
         "id": 30,
-        "debug_name": "Neutral Jump",
+        "debug_name": "8",
         "transitions": [
-            106,
             0
         ],
         "triggerAll": [
@@ -218,15 +213,14 @@
         "modifiers": [
             {
                 "Velo": {
-                    "start_velocity": [0, 15, 0],
-                    "acceleration": [0, -0.6, 0]
+                    "start_velocity": [0, 0, -15]
                 }
             }
         ]
     },
     {
         "id": 31,
-        "debug_name": "Forward Jump",
+        "debug_name": "9",
         "transitions": [
             0
         ],
@@ -246,15 +240,14 @@
         "modifiers": [
             {
                 "Velo": {
-                    "start_velocity": [5, 14, 0],
-                    "acceleration": [0, -0.6, 0]
+                    "start_velocity": [5, 0, -14]
                 }
             }
         ]
     },
     {
         "id": 32,
-        "debug_name": "Backward Jump",
+        "debug_name": "7",
         "transitions": [
             0
         ],
@@ -274,8 +267,7 @@
         "modifiers": [
             {
                 "Velo": {
-                    "start_velocity": [-5, 14, 0],
-                    "acceleration": [0, -0.6, 0]
+                    "start_velocity": [-5, 0, -14]
                 }
             }
         ]
@@ -416,7 +408,7 @@
                         "velocity": [7, 0, 0],
                         "damage": 30,
                         "spawnFrame": 10,
-                        "lifeFrames": 90
+                        "lifeFrames": 180
 
                     }
                 }

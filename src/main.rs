@@ -13,13 +13,13 @@ use bevy_inspector_egui::WorldInspectorPlugin;
 use fighter::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, SerializedStateVec,
-        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox, PlayerAxis,
+        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox, PlayerAxis, Animation,
     },
     systems::{
         adjust_facing_system, collision_system, hbox_position_system,
         hit_event_system, hitbox_component_system, hitbox_removal_system, hitstun_system,
         hurtbox_component_system, hurtbox_removal_system, increment_frame_system, movement_system,
-        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, axis_system,
+        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, axis_system, camera_system, animation_system, add_animation_player_system,
     },
     FighterPlugin,
 };
@@ -175,14 +175,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     SystemStage::parallel()
                         .with_run_criteria(on_enter_round)
                         .with_system(startup.exclusive_system().label("startup"))
-                        .with_system(insert_meshes.after("startup"))
+                        .with_system(insert_animations.label("insert_anim"))
+                        .with_system(insert_meshes.after("insert_anim"))
                 )
                 .with_stage_after(
                     "Enter Round Stage",
                     "Extra Setup Stage",
                     SystemStage::parallel()
                         .with_run_criteria(on_extra_setup)
-                        .with_system(extra_setup_system)
+                        .with_system(add_animation_player_system.before("extra"))
+                        .with_system(extra_setup_system.label("extra"))
                 )
                 .with_stage_after(
                     "Loading Stage",
@@ -325,6 +327,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
        .add_system_set(SystemSet::new()
             .with_run_criteria(on_round)
             .with_system(ui_lifebar_system)
+            .with_system(camera_system)
+            .with_system(animation_system)
         )
 
         // Rollback resources
@@ -372,6 +376,10 @@ fn populate_entities_with_states(
 
     world.resource_scope(|world, mut rip: Mut<RollbackIdProvider>| {
         for mut state in deserialized {
+            
+
+
+
             let name = state
                 .debug_name
                 .as_ref()
@@ -383,6 +391,7 @@ fn populate_entities_with_states(
                 .insert_bundle(VisibilityBundle::default())
                 .insert(Rollback::new(rip.next_id()))
                 .id();
+
 
             {
                 world.entity_mut(player).push_children(&[entity]);
@@ -561,9 +570,38 @@ pub fn insert_meshes(
                 ..default()
             });
     }
-    
+}
+
+pub fn insert_animations(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    query: Query<Entity, With<FightState>>,
+    anim_player_query: Query<Entity, With<AnimationPlayer>>,
+    parent_query: Query<&Parent>
+
+) {
+    for entity in query.iter() {
+        commands.entity(entity)
+            .insert(Animation(asset_server.load("models/ryu.glb#Animation0")));
+    }
+
+    // println!("Hey does it get here???");
+    // for anim in anim_player_query.iter() {
+    //     println!("What about here?");
+    //     for parent in parent_query.get(anim) {
+    //         for fighter in parent_query.get(parent.get()) {
+    //             commands.entity(fighter.get())
+    //                 .insert(AnimEntity(anim));
+
+    //         }
+    //     }
+
+    // }
 
 }
+
+#[derive(Component)]
+pub struct AnimEntity(pub Entity);
 
 pub fn increase_frame_system(mut frame_count: ResMut<FrameCount>) {
     frame_count.frame += 1;
