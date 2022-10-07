@@ -871,7 +871,6 @@ pub fn animation_system(
                 let animation = state_query.get(*state).expect("Animation doesn't exist");
                 
                 if player.is_paused() {
-                    println!("Is it getting here?");
                     player.play(animation.0.clone_weak());
                 }
                 

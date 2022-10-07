@@ -2,7 +2,7 @@ use bevy::{
     core::Name,
     math::Vec2,
     prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle, VisibilityBundle, ComputedVisibility, PbrBundle, Mesh, shape, StandardMaterial, Camera3dBundle, PointLightBundle, PointLight},
-    sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}, scene::{SceneBundle, Scene}
+    sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}, scene::{SceneBundle, Scene}, gltf::Gltf
 };
 
 use bevy_ggrs::{Rollback, RollbackIdProvider};
@@ -42,14 +42,14 @@ impl From<&PlayerEntities> for [Entity; 2] {
 pub struct PlayerHandles {
     pub state_list: Handle<SerializedStateVec>,
     pub fighter_data: Handle<FighterData>,
-    pub model: Handle<Scene>
+    pub model: Handle<Gltf>
 }
 
 impl PlayerHandles {
     pub fn new(
         state_list: Handle<SerializedStateVec>, 
         fighter_data: Handle<FighterData>,
-        model: Handle<Scene>
+        model: Handle<Gltf>
     ) -> PlayerHandles 
     {
         PlayerHandles { state_list, fighter_data, model }
@@ -63,6 +63,14 @@ impl PlayerHandleAccess {
     pub fn new(p1: PlayerHandles, p2: PlayerHandles) -> Self {
         Self(p1, p2)
     }
+
+    pub fn get(&self, id: u8) -> &PlayerHandles {
+        match id {
+            1 => &self.0,
+            2 => &self.1,
+            _ => panic!(),
+        }
+    }
 }
 
 pub fn load_fighters(
@@ -72,7 +80,7 @@ pub fn load_fighters(
 ) {
     let state_list: Handle<SerializedStateVec> = asset_server.load("data/fighters/tahu/states.sl.json");
     let fighter_data: Handle<FighterData> = asset_server.load("data/fighters/tahu/fighter_data.json");
-    let model: Handle<Scene> = asset_server.load("models/ryu.glb#Scene0");
+    let model: Handle<Gltf> = asset_server.load("models/ryu.glb");
 
 
     let f2: Handle<FighterData> = asset_server.load("data/fighters/abe/fighter_data.json");
@@ -121,34 +129,23 @@ pub fn loading_wait(
 pub fn spawn_fighters(
     mut commands: Commands, 
     mut rip: ResMut<RollbackIdProvider>,
-    sync_test_session: Option<Res<SyncTestSession<GGRSConfig>>>,
-    p2p_session: Option<Res<P2PSession<GGRSConfig>>>,
 
     handle_access: Res<PlayerHandleAccess>,
     mut data: ResMut<Assets<FighterData>>,
-    mut models: ResMut<Assets<Scene>>,
+    assets_gltf: Res<Assets<Gltf>>,
 
-    asset_server: Res<AssetServer>,
     mut state: ResMut<RoundState>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    
 
 ) {
     let fighter1 = data.remove(&handle_access.0.fighter_data).expect("FighterData asset does not exist");
     let fighter2 = data.remove(&handle_access.1.fighter_data).expect("FighterData asset does not exist");
 
-    //let model1 = models.remove(&handle_access.0.model).expect("Scene asset does not exist");
-
 
     let player1 = commands
-        // .spawn_bundle(PbrBundle {
-        //     mesh: meshes.add(Mesh::from(shape::Cube { size: 2.})),
-        //     material: materials.add(Color::BLUE.into()),
-        //     transform: Transform::from_xyz(-2., 0., 0.),
-        //     ..default()
-        // })
+
         .spawn_bundle(SceneBundle {
-            scene: handle_access.0.model.clone(),
+            scene: assets_gltf.get(&handle_access.0.model).expect("Asset doesn't exist").scenes[0].clone(),
             transform: Transform { 
                 translation: (-2., 0., 0.).into(),  
                 //scale: Vec3::splat(5.),
@@ -196,14 +193,9 @@ pub fn spawn_fighters(
 
     let player2 = 
     commands
-        // .spawn_bundle(PbrBundle {
-        //     mesh: meshes.add(Mesh::from(shape::Cube { size: 2.})),
-        //     material: materials.add(Color::RED.into()),
-        //     transform: Transform::from_xyz(2., 0., 0.),
-        //     ..default()
-        // })
+
         .spawn_bundle(SceneBundle {
-            scene: handle_access.0.model.clone(),
+            scene: assets_gltf.get(&handle_access.1.model).expect("Asset doesn't exist").scenes[0].clone(),
             transform: Transform { 
                 translation: (2., 0., 0.).into(),  
                 scale: (-1., 1., 1.).into(),

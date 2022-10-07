@@ -27,7 +27,7 @@ use super::modifiers::StateModifier;
 #[derive(Default, Debug, Serialize, Deserialize, Component, Reflect)]
 #[reflect(Component)]
 pub struct StateMap {
-    map: HashMap<u16, Entity>,
+    pub map: HashMap<u16, Entity>,
 }
 
 impl StateMap {
@@ -196,7 +196,9 @@ pub struct HitboxData {
     pub priority: u8,
     #[serde(default)]
     pub id: Option<usize>,
-    pub dimensions: Vec3,
+    pub radius: f32,
+    #[serde(alias = "halfHeight")]
+    pub half_height: f32,
     pub offset: Vec3,
     pub damage: u16,
     pub hitstun: u16,

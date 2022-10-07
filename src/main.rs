@@ -5,7 +5,7 @@ use bevy::{
     prelude::*,
     reflect::{FromType, TypeRegistry, TypeRegistryInternal},
     utils::{HashMap, HashSet},
-    window::PresentMode, log::{LogPlugin, LogSettings, Level},
+    window::PresentMode, log::{LogPlugin, LogSettings, Level}, gltf::Gltf,
 };
 use bevy_editor_pls::EditorPlugin;
 use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider, SessionType};
@@ -21,7 +21,7 @@ use fighter::{
         hurtbox_component_system, hurtbox_removal_system, increment_frame_system, movement_system,
         process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, axis_system, camera_system, animation_system, add_animation_player_system,
     },
-    FighterPlugin,
+    FighterPlugin, Fighter,
 };
 use game::{
     ADD_HITBOX, ADD_HURTBOX, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
@@ -328,7 +328,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_run_criteria(on_round)
             .with_system(ui_lifebar_system)
             .with_system(camera_system)
-            .with_system(animation_system)
+            //.with_system(animation_system)
         )
 
         // Rollback resources
@@ -419,8 +419,8 @@ fn populate_entities_with_states(
                     //     origin: RectangleOrigin::Center,
                     // };
 
-                    let cuboid = Cuboid::new((hitbox.dimensions / 2.).into());
-                    let capsule = Capsule::new_y(hitbox.dimensions.y / 2., hitbox.dimensions.x);
+                    
+                    let capsule = Capsule::new_y(hitbox.half_height, hitbox.radius);
 
                     let start_frame = hitbox.start_frame;
                     let hitbox_entity = world
@@ -545,13 +545,13 @@ pub fn insert_meshes(
         commands.entity(entity)
             .insert_bundle(PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Capsule {
-                    radius: hitbox.dimensions.x,
-                    depth: hitbox.dimensions.y,
+                    radius: hitbox.radius,
+                    depth: hitbox.half_height * 2.,
                     ..default()
                 })),
                 material: hitbox_material.clone(),
                 visibility: Visibility { is_visible: false },
-                transform: Transform::from_scale(hitbox.dimensions),
+                //transform: Transform::from_scale(hitbox.dimensions),
                 ..default()
             });
     }
@@ -566,7 +566,7 @@ pub fn insert_meshes(
                 })),
                 material: hurtbox_material.clone(),
                 visibility: Visibility { is_visible: false },
-                transform: Transform::from_scale(hurtbox.dimensions),
+                //transform: Transform::from_scale(hurtbox.dimensions),
                 ..default()
             });
     }
@@ -574,29 +574,28 @@ pub fn insert_meshes(
 
 pub fn insert_animations(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    query: Query<Entity, With<FightState>>,
-    anim_player_query: Query<Entity, With<AnimationPlayer>>,
-    parent_query: Query<&Parent>
-
+    assets_gltf: Res<Assets<Gltf>>,
+    handle_access: Res<PlayerHandleAccess>,
+    query: Query<(Entity, &Name)>,
+    fighter_query: Query<(&Player, &StateMap), With<Fighter>>
 ) {
-    for entity in query.iter() {
-        commands.entity(entity)
-            .insert(Animation(asset_server.load("models/ryu.glb#Animation0")));
+    for (player, map) in fighter_query.iter() {
+        let handle = handle_access.get(player.0).model.clone();
+        let gltf = assets_gltf.get(&handle).expect("GLTF handle doesn't exist");
+        let animations = &gltf.named_animations;
+        for (entity, name) in query.iter_many(map.map.values()) {
+            if let Some(animation) = animations.get(&name.to_string()) {
+                commands.entity(entity)
+                    .insert(Animation(animation.clone()));
+            }
+            
+            
+
+
+        }
+
     }
-
-    // println!("Hey does it get here???");
-    // for anim in anim_player_query.iter() {
-    //     println!("What about here?");
-    //     for parent in parent_query.get(anim) {
-    //         for fighter in parent_query.get(parent.get()) {
-    //             commands.entity(fighter.get())
-    //                 .insert(AnimEntity(anim));
-
-    //         }
-    //     }
-
-    // }
+    
 
 }
 
