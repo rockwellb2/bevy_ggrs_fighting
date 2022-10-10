@@ -129,6 +129,8 @@ pub fn loading_wait(
 pub fn spawn_fighters(
     mut commands: Commands, 
     mut rip: ResMut<RollbackIdProvider>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 
     handle_access: Res<PlayerHandleAccess>,
     mut data: ResMut<Assets<FighterData>>,
@@ -148,9 +150,9 @@ pub fn spawn_fighters(
             scene: assets_gltf.get(&handle_access.0.model).expect("Asset doesn't exist").scenes[0].clone(),
             transform: Transform { 
                 translation: (-2., 0., 0.).into(),  
-                //scale: Vec3::splat(5.),
+                scale: Vec3::splat(3.),
                 ..default()
-            },
+            }.looking_at((2., 0., 0.).into(), Vec3::Y),
             ..default()
         })
         .insert(Name::new("Player 1"))
@@ -198,9 +200,10 @@ pub fn spawn_fighters(
             scene: assets_gltf.get(&handle_access.1.model).expect("Asset doesn't exist").scenes[0].clone(),
             transform: Transform { 
                 translation: (2., 0., 0.).into(),  
-                scale: (-1., 1., 1.).into(),
+                //scale: (-3., 3., 3.).into(),
+                scale: Vec3::splat(3.),
                 ..default()
-            },
+            }.looking_at((-2., 0., 0.).into(), Vec3::Y),
             ..default()
         })
         .insert(Name::new("Player 2"))
@@ -227,11 +230,13 @@ pub fn spawn_fighters(
 
     commands.spawn_bundle(PointLightBundle {
         point_light: PointLight {
-            intensity: 1_500.,
+            intensity: 30_000.,
             shadows_enabled: true,
+            radius: 50.,
+            range: 100.,
             ..default()
         },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
+        transform: Transform::from_xyz(4.0, 20.0, 4.0),
         ..default()
     });
 
@@ -240,6 +245,13 @@ pub fn spawn_fighters(
         ..default()
     })
     .insert(MatchCamera);
+
+    commands.spawn_bundle(PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::Plane { size: 100. })),
+        material: materials.add(Color::WHITE.into()),
+        ..default()
+    })
+    .insert(Name::new("Ground"));
 
     *state = RoundState::EnterRound
 

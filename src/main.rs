@@ -25,7 +25,7 @@ use fighter::{
 };
 use game::{
     ADD_HITBOX, ADD_HURTBOX, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
-    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, AXIS, 
+    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, AXIS, on_armature, 
 };
 use ggrs::{Config, PlayerType, SessionBuilder, UdpNonBlockingSocket, SyncTestSession};
 //use bevy_editor_pls::prelude::*;
@@ -41,7 +41,7 @@ use leafwing_input_manager::prelude::InputManagerPlugin;
 use parry3d::{shape::{Cuboid, Capsule}};
 use structopt::StructOpt;
 
-use std::{env, net::SocketAddr, default};
+use std::{env, net::SocketAddr, default, f32::consts::FRAC_PI_2};
 
 use crate::{
     battle::{PlayerEntities, PlayerHandleAccess},
@@ -186,6 +186,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .with_system(add_animation_player_system.before("extra"))
                         .with_system(extra_setup_system.label("extra"))
                 )
+                
                 .with_stage_after(
                     "Loading Stage",
                     ROLLBACK_DEFAULT,
@@ -328,7 +329,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_run_criteria(on_round)
             .with_system(ui_lifebar_system)
             .with_system(camera_system)
-            //.with_system(animation_system)
+            .with_system(animation_system)
         )
 
         // Rollback resources
@@ -535,13 +536,20 @@ pub fn insert_meshes(
     mut materials: ResMut<Assets<StandardMaterial>>,
 
     hitbox_query: Query<(Entity, &HitboxData)>,
-    hurtbox_query: Query<(Entity, &HurtboxData)>
+    hurtbox_query: Query<(Entity, &HurtboxData)>,
+
+    armature_query: Query<With<AnimationPlayer>>
 ) {
-    let hitbox_material = materials.add(Color::rgba(1., 0., 0., 0.5).into());
-    let hurtbox_material = materials.add(Color::rgba(1., 1., 0., 0.5).into());
+    let hitbox_material = materials.add(Color::rgba(1., 0., 0., 0.3).into());
+    let hurtbox_material = materials.add(Color::rgba(1., 1., 0., 0.3).into());
 
 
     for (entity, hitbox) in hitbox_query.iter() {
+        let mut transform = Transform::default();
+        transform.rotate_x(hitbox.rotation.0);
+        transform.rotate_z(hitbox.rotation.1);
+
+
         commands.entity(entity)
             .insert_bundle(PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Capsule {
@@ -551,7 +559,7 @@ pub fn insert_meshes(
                 })),
                 material: hitbox_material.clone(),
                 visibility: Visibility { is_visible: false },
-                //transform: Transform::from_scale(hitbox.dimensions),
+                transform,
                 ..default()
             });
     }
@@ -570,6 +578,9 @@ pub fn insert_meshes(
                 ..default()
             });
     }
+
+    println!("Armature query length: {:?}", armature_query.iter().len());
+
 }
 
 pub fn insert_animations(
@@ -577,7 +588,9 @@ pub fn insert_animations(
     assets_gltf: Res<Assets<Gltf>>,
     handle_access: Res<PlayerHandleAccess>,
     query: Query<(Entity, &Name)>,
-    fighter_query: Query<(&Player, &StateMap), With<Fighter>>
+    fighter_query: Query<(&Player, &StateMap), With<Fighter>>,
+
+    //mut armature_query: Query<(&Name, &mut Transform)>
 ) {
     for (player, map) in fighter_query.iter() {
         let handle = handle_access.get(player.0).model.clone();
@@ -588,15 +601,8 @@ pub fn insert_animations(
                 commands.entity(entity)
                     .insert(Animation(animation.clone()));
             }
-            
-            
-
-
         }
-
     }
-    
-
 }
 
 #[derive(Component)]

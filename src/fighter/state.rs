@@ -200,6 +200,8 @@ pub struct HitboxData {
     #[serde(alias = "halfHeight")]
     pub half_height: f32,
     pub offset: Vec3,
+    #[serde(default, deserialize_with = "deserialize_rotation")]
+    pub rotation: (f32, f32),
     pub damage: u16,
     pub hitstun: u16,
     pub blockstun: u16,
@@ -209,6 +211,39 @@ pub struct HitboxData {
     pub end_frame: u16,
     #[serde(default)]
     rehit: Option<u16> // Number frames after hitting that hitbox can hit again
+}
+
+fn deserialize_rotation<'de, D>(deserializer: D) -> Result<(f32, f32), D::Error>
+where
+    D: de::Deserializer<'de>, 
+{
+    struct RotVisitor;
+
+    impl<'de> Visitor<'de> for RotVisitor {
+        type Value = (f32, f32);
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a tuple containing a the x and z rotations in radians")
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>, 
+        {
+            let mut x: f32 = seq.next_element()?.expect("Couldn't convert to f32");
+            let mut z: f32 = seq.next_element()?.expect("Couldn't convert to f32");
+
+            x = x.to_radians();
+            z = z.to_radians();
+
+            Ok((x, z))
+            
+        }
+    }
+
+
+    deserializer.deserialize_seq(RotVisitor)
+
 }
 
 impl HBox for HitboxData {
@@ -227,7 +262,7 @@ impl HBox for HitboxData {
     
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable)]
 #[reflect(Component)]
 pub struct HurtboxData {
     #[serde(default)]

@@ -21,6 +21,9 @@ pub const COLLISION: &str = "collision";
 pub const HIT_EVENT: &str = "hit_event";
 
 
+pub const FRAME: f32 = 1. / 60.;
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect, Component, Default)]
 pub enum GameState {
     #[default]
@@ -38,7 +41,8 @@ pub enum RoundState {
     ExitLoading,
     EnterRound,
     Round,
-    ExtraSetup
+    ExtraSetup,
+    Armature
 }
 
 
@@ -82,6 +86,13 @@ pub fn on_enter_round(state: Res<RoundState>) -> ShouldRun {
 pub fn on_extra_setup(state: Res<RoundState>) -> ShouldRun {
     match *state {
         RoundState::ExtraSetup => ShouldRun::Yes,
+        _ => ShouldRun::No
+    }
+}
+
+pub fn on_armature(state: Res<RoundState>) -> ShouldRun {
+    match *state {
+        RoundState::Armature => ShouldRun::Yes,
         _ => ShouldRun::No
     }
 }

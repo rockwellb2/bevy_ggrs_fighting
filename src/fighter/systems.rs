@@ -1,5 +1,7 @@
 
 
+use std::f32::consts::{PI, FRAC_PI_2};
+
 use super::{
     data::{FighterData, Collider, CollisionData, HitEvent},
     state::{
@@ -17,7 +19,7 @@ use bevy::{
 };
 use bevy_ggrs::{RollbackIdProvider, Rollback};
 use ggrs::InputStatus;
-use nalgebra::{Isometry3, Vector3};
+use nalgebra::{Isometry3, Vector3, UnitQuaternion};
 use parry3d::{query::intersection_test, shape::{Cuboid, Capsule}};
 
 
@@ -28,7 +30,7 @@ use crate::{
         LEFT_HELD, RIGHT, RIGHT_HELD,
     },
     util::Buffer,
-    Player, FPS, AnimEntity,
+    Player, FPS, AnimEntity, game::FRAME,
 };
 
 pub fn buffer_insert_system(
@@ -98,7 +100,10 @@ pub fn movement_system(
             //tf.translation += velocity.0 / FPS as f32;
 
 
-            tf.translation.y = tf.translation.y.max(0.)
+            tf.translation.y = tf.translation.y.max(0.);
+
+            tf.look_at(axis.opponent_pos, Vec3::Y);
+            //tf.rotate_axis(Vec3::Y, FRAC_PI_2);
 
 
         }
@@ -358,13 +363,14 @@ pub fn hitbox_component_system(
             &StateFrame,
             &InputBuffer,
             &Facing,
+            &PlayerAxis
         ),
         (With<Fighter>, Without<InHitstun>)
     >,
     state_query: Query<&State>,
     hitbox_query: Query<&HitboxData>,
 ) {
-    for (current, map, tf, frame, _buffer, facing) in fighter_query.iter_mut() {
+    for (current, map, tf, frame, _buffer, facing, axis) in fighter_query.iter_mut() {
         let state = map.get(&current.0).expect("State doesn't exist.");
 
         if let Ok(s) = state_query.get(*state) {
@@ -373,12 +379,20 @@ pub fn hitbox_component_system(
                     for h in set {
                         let hitbox = hitbox_query.get(*h).expect("Hitbox entity does not exist");
                         let mut offset = hitbox.offset;
-                        offset.x *= facing.0.sign();
 
-                        let mut transform = tf.clone();
+                        //offset.x *= facing.0.sign();
+
+                        let mut transform = Transform::from_translation(tf.translation);
+                        transform.rotate_x(hitbox.rotation.0);
+                        transform.rotate_z(hitbox.rotation.1);
+                        transform.rotate(tf.rotation);
                         transform.translation.y = 0.;
-                        transform.translation += offset;
-                        transform.scale = Vec3::ONE;
+                        //transform.translation += offset;
+                        transform.translation += offset.x * axis.x;
+                        transform.translation += offset.z * axis.z;
+                        transform.translation.y += offset.y;
+
+                        //transform.look_at(axis.opponent_pos, Vec3::Y);
 
                         commands
                             .entity(*h)
@@ -419,13 +433,14 @@ pub fn hurtbox_component_system(
             &StateFrame,
             &InputBuffer,
             &Facing,
+            &PlayerAxis
         ),
         With<Fighter>,
     >,
     state_query: Query<&State>,
     hurtbox_query: Query<&HurtboxData>,
 ) {
-    for (current, map, tf, frame, _buffer, facing) in fighter_query.iter_mut() {
+    for (current, map, tf, frame, _buffer, facing, axis) in fighter_query.iter_mut() {
         let state = map.get(&current.0).expect("State doesn't exist.");
 
         if let Ok(s) = state_query.get(*state) {
@@ -435,13 +450,13 @@ pub fn hurtbox_component_system(
                         for h in zero_set {
                             let hurtbox =
                                 hurtbox_query.get(*h).expect("Hurtbox entity does not exist");
-                            let mut offset = hurtbox.offset;
-                            offset.x *= facing.0.sign();
+                            let offset = hurtbox.offset;
 
-                            let mut transform = tf.clone();
+                            let mut transform = Transform::from_translation(tf.translation);
                             transform.translation.y = 0.;
-                            transform.translation += offset;
-                            transform.scale = Vec3::ONE;
+                            transform.translation += offset.x * axis.x;
+                            transform.translation += offset.z * axis.z;
+                            transform.translation.y += offset.y;
 
                             commands
                                 .entity(*h)
@@ -457,11 +472,13 @@ pub fn hurtbox_component_system(
                 if let Some(set) = hurtboxes.get(&frame.0) {
                     for h in set {
                         let hurtbox = hurtbox_query.get(*h).expect("Hurtbox entity does not exist");
-                        let mut offset = hurtbox.offset;
-                        offset.x *= facing.0.sign();
+                        let offset = hurtbox.offset;
 
-                        let mut transform = tf.clone();
-                        transform.translation += offset;
+                            let mut transform = Transform::from_translation(tf.translation);
+                            transform.translation.y = 0.;
+                            transform.translation += offset.x * axis.x;
+                            transform.translation += offset.z * axis.z;
+                            transform.translation.y += offset.y;
 
                         commands
                             .entity(*h)
@@ -703,8 +720,8 @@ pub fn collision_system(
                 }
                 else {
                     let (data, hit_collider, hit_tf) = hit_query.get(hitbox).unwrap();
-                    let hit_vec: Vector3<f32> = hit_tf.translation.into();
-                    let iso = Isometry3::from(hit_vec);
+                    //let iso = Isometry3::from(hit_vec);
+                    let iso: Isometry3<f32> = (hit_tf.translation, hit_tf.rotation).into();
 
                     seen_hitboxes.insert(hitbox, (iso.clone(), hit_collider.shape.clone(), data.clone()));
                     (iso, hit_collider.shape, data.clone())
@@ -715,8 +732,9 @@ pub fn collision_system(
                 }
                 else {
                     let (data, hurt_collider, hurt_tf) = hurt_query.get(hurtbox).unwrap();
-                    let hurt_vec: Vector3<f32> = hurt_tf.translation.into();
-                    let iso = Isometry3::from(hurt_vec);
+                    //let hurt_vec: Vector3<f32> = hurt_tf.translation.into();
+                    //let iso = Isometry3::from(hurt_vec);
+                    let iso: Isometry3<f32> = (hurt_tf.translation, hurt_tf.rotation).into();
 
                     seen_hurtboxes.insert(hurtbox, (iso.clone(), hurt_collider.shape.clone(), data.clone()));
                     (iso, hurt_collider.shape, data.clone())
@@ -787,7 +805,7 @@ pub fn axis_system(
 
     if changed1.is_changed() || changed2.is_changed() {
         axis2.opponent_pos = tf1.translation;
-        match (tf2.translation - tf1.translation).xz().try_normalize() {
+        match (tf1.translation - tf2.translation).xz().try_normalize() {
             Some(tf) => {
                 axis2.x = (tf.x, 0., tf.y).into();
                 axis2.z = axis2.x.cross(Vec3::Y);
@@ -841,7 +859,7 @@ pub fn camera_system(
 
     if change1.is_changed() || change2.is_changed() {
         
-        let mid = tf1.translation.lerp(tf2.translation, 0.5);
+        let mut mid = tf1.translation.lerp(tf2.translation, 0.5);
         let direction = (tf1.translation - tf2.translation).xz();
         let direction: Vec3 = (direction.x, 0., direction.y).into();
         let perp = direction.cross(Vec3::Y);
@@ -850,7 +868,9 @@ pub fn camera_system(
         // let tf2 = tf2.translation.clone();
 
         if let Ok(mut cam_tf) = set.p0().get_single_mut() {
-            cam_tf.translation = mid + perp * -2.;
+            cam_tf.translation = mid + perp * -3.;
+            mid.y = 4.;
+            cam_tf.translation.y = 4.;
             cam_tf.look_at(mid, Vec3::Y);
         }
 
@@ -860,25 +880,23 @@ pub fn camera_system(
 pub fn animation_system( 
     mut commands: Commands,
     mut animation_play: Query<(Entity, &Parent, &mut AnimationPlayer)>,
-    fighter_query: Query<(Entity, Option<&AnimEntity>, &CurrentState, &StateMap), With<Fighter>>,
+    fighter_query: Query<(Entity, Option<&AnimEntity>, &CurrentState, &StateMap, &StateFrame), With<Fighter>>,
     parent_query: Query<&Parent>,
     state_query: Query<&Animation, With<State>>
 ) {
-    for (entity, anim_entity, current, map) in fighter_query.iter() {
+    for (entity, anim_entity, current, map, frame) in fighter_query.iter() {
         if let Some(anim) = anim_entity {
             for (_, _, mut player) in animation_play.get_mut(anim.0) {
                 let state = map.get(&current.0).expect("State doesn't exist");
-                let animation = state_query.get(*state).expect("Animation doesn't exist");
-                
-                if player.is_paused() {
+                if let Ok(animation) = state_query.get(*state) {
                     player.play(animation.0.clone_weak());
+                    player.set_elapsed(frame.0 as f32 * FRAME);
                 }
-                
 
             }
         }
         else {
-            for (play_ent, parent, mut play) in animation_play.iter_mut() {
+            for (play_ent, parent, mut _play) in animation_play.iter_mut() {
                 for grandparent in parent_query.get(parent.get()) {
                     if grandparent.get() == entity {
                         commands.entity(entity)
@@ -886,7 +904,6 @@ pub fn animation_system(
                     }
                 }
 
-                play.pause();
 
             }
 
