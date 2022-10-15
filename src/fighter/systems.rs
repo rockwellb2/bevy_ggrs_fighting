@@ -12,7 +12,7 @@ use super::{
 use bevy::{
     ecs::{reflect::ReflectComponent, },
     prelude::{
-        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without, ResMut, Name, Or, Parent, ChangeTrackers, Camera, GlobalTransform, AnimationPlayer,
+        Commands, Component, Entity, Query, Res, SpatialBundle, Transform, Visibility, With, ParamSet, Changed, Vec3, EventWriter, EventReader, Without, ResMut, Name, Or, Parent, ChangeTrackers, Camera, GlobalTransform, AnimationPlayer, KeyCode,
     },
     reflect::{Reflect, Struct, FromReflect},
     utils::{default, HashMap, hashbrown::HashSet}, ui::{Style, Val}, math::Vec3Swizzles,
@@ -22,6 +22,7 @@ use ggrs::InputStatus;
 use nalgebra::{Isometry3, Vector3, UnitQuaternion};
 use parry3d::{query::intersection_test, shape::{Cuboid, Capsule}};
 
+use bevy::input::Input;
 
 use crate::{
     battle::{PlayerEntities, Lifebar, MatchCamera},
@@ -30,7 +31,7 @@ use crate::{
         LEFT_HELD, RIGHT, RIGHT_HELD,
     },
     util::Buffer,
-    Player, FPS, AnimEntity, game::FRAME,
+    Player, FPS, AnimEntity, game::{FRAME, Paused, RoundState}, GameDebug,
 };
 
 pub fn buffer_insert_system(
@@ -453,6 +454,9 @@ pub fn hurtbox_component_system(
                             let offset = hurtbox.offset;
 
                             let mut transform = Transform::from_translation(tf.translation);
+                            transform.rotate_x(hurtbox.rotation.0);
+                            transform.rotate_z(hurtbox.rotation.1);
+                            transform.rotate(tf.rotation);
                             transform.translation.y = 0.;
                             transform.translation += offset.x * axis.x;
                             transform.translation += offset.z * axis.z;
@@ -475,6 +479,9 @@ pub fn hurtbox_component_system(
                         let offset = hurtbox.offset;
 
                             let mut transform = Transform::from_translation(tf.translation);
+                            transform.rotate_x(hurtbox.rotation.0);
+                            transform.rotate_z(hurtbox.rotation.1);
+                            transform.rotate(tf.rotation);
                             transform.translation.y = 0.;
                             transform.translation += offset.x * axis.x;
                             transform.translation += offset.z * axis.z;
@@ -890,9 +897,10 @@ pub fn animation_system(
                 let state = map.get(&current.0).expect("State doesn't exist");
                 if let Ok(animation) = state_query.get(*state) {
                     player.play(animation.0.clone_weak());
-                    player.set_elapsed(frame.0 as f32 * FRAME);
-                }
 
+                    player.set_elapsed((frame.0 as f32 * FRAME) % animation.length());
+                    player.pause();
+                }
             }
         }
         else {
@@ -928,4 +936,42 @@ pub fn add_animation_player_system(
             }
         }
     }
+}
+
+pub fn pause_system(
+    input: Res<Input<KeyCode>>,
+    mut paused: ResMut<Paused>,
+    mut state: ResMut<RoundState>,
+    mut frame_query: Query<&mut StateFrame>
+) {
+    if input.just_pressed(KeyCode::Space) {
+        paused.0 = !paused.0;
+    }
+
+    if paused.0 {
+        if input.just_pressed(KeyCode::Right) {
+            *state = RoundState::AdvanceFrame;
+            for mut frame in frame_query.iter_mut() {
+                frame.0 += 1;
+            }
+        }
+        else {
+            *state = RoundState::Paused;
+        }
+    }
+    else {
+        *state = RoundState::Round;
+    }
+
+}
+
+pub fn last_debug_system(
+    paused: Res<Paused>,
+    mut state: ResMut<RoundState>
+) {
+    if paused.0 {
+        *state = RoundState::Paused;
+    }
+
+
 }

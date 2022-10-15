@@ -7,6 +7,32 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug mode",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=bevy_ggrs_fighting",
+                    "--package=bevy_ggrs_fighting"
+                ],
+                "filter": {
+                    "name": "bevy_ggrs_fighting",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--num-players", "2",
+                "--check-distance", "0",
+                "-d"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "CARGO_MANIFEST_DIR": "${workspaceFolder}", 
+            },
+
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Run executable 'bevy_ggrs_fighting' with synctest args",
             "cargo": {
                 "args": [

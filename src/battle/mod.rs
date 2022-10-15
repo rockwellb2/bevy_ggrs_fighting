@@ -2,7 +2,7 @@ use bevy::{
     core::Name,
     math::Vec2,
     prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle, VisibilityBundle, ComputedVisibility, PbrBundle, Mesh, shape, StandardMaterial, Camera3dBundle, PointLightBundle, PointLight},
-    sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}, scene::{SceneBundle, Scene}, gltf::Gltf
+    sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}, scene::{SceneBundle, Scene}, gltf::{Gltf, GltfExtras}
 };
 
 use bevy_ggrs::{Rollback, RollbackIdProvider};
@@ -16,7 +16,7 @@ use parry3d::shape::{Cuboid, Capsule};
 
 use crate::{
     fighter::{data::{FighterData, Collider}, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health, Owner, ProjectileReference, Velocity, PlayerAxis}, Fighter, systems::InputBuffer, modifiers::{CreateObject, Object}},
-    Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer, game::{GameState, RoundState},
+    Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer, game::{GameState, RoundState}, GameDebug,
 };
 
 //#[derive(Default)]
@@ -80,14 +80,10 @@ pub fn load_fighters(
 ) {
     let state_list: Handle<SerializedStateVec> = asset_server.load("data/fighters/tahu/states.sl.json");
     let fighter_data: Handle<FighterData> = asset_server.load("data/fighters/tahu/fighter_data.json");
-    let model: Handle<Gltf> = asset_server.load("models/ryu.glb");
+    let model: Handle<Gltf> = asset_server.load("models/ryu1.glb");
 
 
     let f2: Handle<FighterData> = asset_server.load("data/fighters/abe/fighter_data.json");
-
-
-
-
 
 
     let p1 = PlayerHandles::new(state_list.clone(), fighter_data, model.clone());
@@ -137,8 +133,7 @@ pub fn spawn_fighters(
     assets_gltf: Res<Assets<Gltf>>,
 
     mut state: ResMut<RoundState>,
-    
-
+    debug: Res<GameDebug>
 ) {
     let fighter1 = data.remove(&handle_access.0.fighter_data).expect("FighterData asset does not exist");
     let fighter2 = data.remove(&handle_access.1.fighter_data).expect("FighterData asset does not exist");
@@ -158,7 +153,7 @@ pub fn spawn_fighters(
         .insert(Name::new("Player 1"))
         .insert(Fighter)
         .insert(fighter1)
-        .insert(Rollback::new(rip.next_id()))
+        //.insert(Rollback::new(rip.next_id()))˝
         .insert(CurrentState(0))
         .insert(Player(1))
         .insert(Facing(Direction::Right))
@@ -209,7 +204,7 @@ pub fn spawn_fighters(
         .insert(Name::new("Player 2"))
         .insert(Fighter)
         .insert(fighter2)
-        .insert(Rollback::new(rip.next_id()))
+        //.insert(Rollback::new(rip.next_id()))
         .insert(CurrentState(0))
         .insert(Player(2))
         .insert(Facing(Direction::Left))
@@ -222,9 +217,12 @@ pub fn spawn_fighters(
             x: Vec3::X,
             z: Vec3::Z
         })
-        
-
         .id();
+
+    if !debug.0 {
+        commands.entity(player1).insert(Rollback::new(rip.next_id()));
+        commands.entity(player2).insert(Rollback::new(rip.next_id()));
+    }
 
     commands.insert_resource(PlayerEntities(player1, player2));
 

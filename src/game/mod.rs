@@ -1,5 +1,7 @@
 use bevy::{reflect::Reflect, prelude::{Component, ResMut, Res}, ecs::schedule::ShouldRun};
 
+use crate::GameDebug;
+
 pub const INPUT_BUFFER: &str = "input_buffer";
 pub const HITSTUN: &str = "hitstun";
 pub const FRAME_INCREMENT: &str = "frame_increment";
@@ -24,6 +26,63 @@ pub const HIT_EVENT: &str = "hit_event";
 pub const FRAME: f32 = 1. / 60.;
 
 
+pub struct Paused(pub bool);
+
+pub fn not_if_paused(paused: Res<Paused>) -> ShouldRun {
+    return if paused.0 {
+        ShouldRun::No
+    }
+    else {
+        ShouldRun::Yes
+    }
+
+}
+
+pub fn if_paused(paused: Res<Paused>) -> ShouldRun {
+    return if paused.0 {
+        ShouldRun::Yes
+    }
+    else {
+        ShouldRun::No
+    }
+}
+
+
+pub fn on_debug(
+    debug: Res<GameDebug>,
+    state: Res<RoundState>
+) -> ShouldRun {
+    if debug.0  {
+        match *state {
+            RoundState::Paused | RoundState::Round => ShouldRun::Yes,
+            _ => ShouldRun::No
+        }
+    }
+    else {
+        ShouldRun::No
+    }
+
+}
+
+pub fn on_debug_and_game_paused(
+    debug: Res<GameDebug>,
+    paused: Res<Paused>
+) -> ShouldRun {
+    if debug.0 && paused.0 {
+        ShouldRun::Yes
+    }
+    else {
+        ShouldRun::No
+    }
+}
+
+pub fn paused_advance_or_round(state: Res<RoundState>) -> ShouldRun {
+    match *state {
+        RoundState::Paused | RoundState::AdvanceFrame | RoundState::Round => ShouldRun::Yes,
+        _ => ShouldRun::No
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect, Component, Default)]
 pub enum GameState {
     #[default]
@@ -42,7 +101,8 @@ pub enum RoundState {
     EnterRound,
     Round,
     ExtraSetup,
-    Armature
+    Paused,
+    AdvanceFrame
 }
 
 
@@ -68,10 +128,8 @@ pub fn on_exit_loading(state: Res<RoundState>) -> ShouldRun {
 }
 
 pub fn on_round(state: Res<RoundState>) -> ShouldRun {
-   //println!("In Round!");
-
     match *state {
-        RoundState::Round => ShouldRun::Yes,
+        RoundState::Round | RoundState::AdvanceFrame => ShouldRun::Yes,
         _ => ShouldRun::No
     }
 }
@@ -90,9 +148,3 @@ pub fn on_extra_setup(state: Res<RoundState>) -> ShouldRun {
     }
 }
 
-pub fn on_armature(state: Res<RoundState>) -> ShouldRun {
-    match *state {
-        RoundState::Armature => ShouldRun::Yes,
-        _ => ShouldRun::No
-    }
-}

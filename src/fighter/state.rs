@@ -269,7 +269,11 @@ pub struct HurtboxData {
     priority: u8,
     #[serde(default)]
     pub id: Option<usize>,
-    pub dimensions: Vec3,
+    pub radius: f32,
+    #[serde(alias = "halfHeight")]
+    pub half_height: f32,
+    #[serde(default, deserialize_with = "deserialize_rotation")]
+    pub rotation: (f32, f32),
     #[serde(default)]
     pub offset: Vec3,
     #[serde(default, alias = "startFrame")]
@@ -497,5 +501,11 @@ pub struct PlayerAxis {
 }
 
 #[derive(Component)]
-pub struct Animation(pub Handle<AnimationClip>);
+pub struct Animation(pub Handle<AnimationClip>, pub f32);
+
+impl Animation {
+    pub fn length(&self) -> f32 {
+        self.1
+    }
+}
 

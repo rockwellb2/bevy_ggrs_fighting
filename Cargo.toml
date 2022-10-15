@@ -38,6 +38,7 @@ iyes_loopless = "0.7.0"
 iyes_progress = {version = "0.4.0", features = ["assets", "iyes_loopless"]}
 bevy_prototype_lyon = "0.6.0"
 leafwing-input-manager = "0.5.2"
+bevy-scene-hook = "4.1.0"
 
 
 

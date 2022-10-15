@@ -19,13 +19,13 @@ use fighter::{
         adjust_facing_system, collision_system, hbox_position_system,
         hit_event_system, hitbox_component_system, hitbox_removal_system, hitstun_system,
         hurtbox_component_system, hurtbox_removal_system, increment_frame_system, movement_system,
-        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, axis_system, camera_system, animation_system, add_animation_player_system,
+        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, axis_system, camera_system, animation_system, add_animation_player_system, pause_system, last_debug_system,
     },
     FighterPlugin, Fighter,
 };
 use game::{
     ADD_HITBOX, ADD_HURTBOX, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
-    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, AXIS, on_armature, 
+    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, AXIS, not_if_paused, Paused, if_paused, on_debug, on_debug_and_game_paused, paused_advance_or_round, 
 };
 use ggrs::{Config, PlayerType, SessionBuilder, UdpNonBlockingSocket, SyncTestSession};
 //use bevy_editor_pls::prelude::*;
@@ -83,12 +83,16 @@ pub struct Player(u8);
 
 // }
 
+pub struct GameDebug(pub bool);
+
 #[derive(StructOpt)]
 struct Opt {
     #[structopt(short, long)]
     num_players: usize,
     #[structopt(short, long)]
     check_distance: usize,
+    #[structopt(short, long)]
+    debug_mode: bool
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -149,6 +153,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_rollback_schedule(
             Schedule::default()
                 .with_stage(
+                    "Debug Stage 1",
+                    SystemStage::parallel()
+                 )
+                .with_stage_after(
+                    "Debug Stage 1",
                     "Setup Stage",
                     SystemStage::parallel()
                         .with_run_criteria(on_enter_loading)
@@ -206,6 +215,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .with_system(
                             increment_frame_system
                                 //.run_in_state(GameState::Fight)
+                                .with_run_criteria(not_if_paused)
                                 .label(FRAME_INCREMENT)
                                 .after(HITSTUN),
                         )
@@ -232,16 +242,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .label(AXIS)
                                 .after(MOVEMENT)
                         )
-                        .with_system(
-                            adjust_facing_system
-                                //.run_in_state(GameState::Fight)
-                                .label(FACE)
-                                .after(AXIS),
-                        )
+                        // .with_system(
+                        //     adjust_facing_system
+                        //         //.run_in_state(GameState::Fight)
+                        //         .label(FACE)
+                        //         .after(AXIS),
+                        // )
                         // projectile
                         .with_system(
                             object_system
-                            .after(FACE)
+                            //.after(FACE) 
+                            .after(AXIS)
                         )
                 )
                 .with_stage_after(
@@ -307,6 +318,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .label(HIT_EVENT)
                                 .after(COLLISION),
                         ), 
+                )
+                .with_stage_after(
+                    "Collision Stage", 
+                    "Debug Stage 2", 
+                    SystemStage::parallel()
+
                 ),
         )
         .build(&mut app);
@@ -332,6 +349,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_system(animation_system)
         )
 
+        // Debug Systems
+        .add_system(bevy::window::close_on_esc)
+        .add_system(pause_system.with_run_criteria(paused_advance_or_round))
+
+        // Debug Resources
+        .insert_resource(GameDebug(opt.debug_mode))
+
         // Rollback resources
         .insert_resource(sess)
         .insert_resource(SessionType::SyncTestSession)
@@ -340,8 +364,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_plugin(FighterPlugin)
 
         .register_type::<Player>()
-        .insert_resource(Msaa { samples: 4 });
+        .insert_resource(Paused(false))
+        .insert_resource(Msaa { samples: 1 });
 
+        
 
     app.run();
 
@@ -466,7 +492,7 @@ fn populate_entities_with_states(
                     // };
 
                     //let cuboid = Cuboid::new((hurtbox.dimensions / 2.).into());
-                    let capsule = Capsule::new_y(hurtbox.dimensions.y / 2., hurtbox.dimensions.x);
+                    let capsule = Capsule::new_y(hurtbox.half_height, hurtbox.radius);
 
                     let start_frame = hurtbox.start_frame.unwrap_or_default();
                     let hurtbox_entity = world
@@ -568,8 +594,8 @@ pub fn insert_meshes(
         commands.entity(entity)
             .insert_bundle(PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Capsule {
-                    radius: hurtbox.dimensions.x,
-                    depth: hurtbox.dimensions.y,
+                    radius: hurtbox.radius,
+                    depth: hurtbox.half_height * 2.,
                     ..default()
                 })),
                 material: hurtbox_material.clone(),
@@ -590,6 +616,8 @@ pub fn insert_animations(
     query: Query<(Entity, &Name)>,
     fighter_query: Query<(&Player, &StateMap), With<Fighter>>,
 
+    animation_clips: Res<Assets<AnimationClip>>
+
     //mut armature_query: Query<(&Name, &mut Transform)>
 ) {
     for (player, map) in fighter_query.iter() {
@@ -598,8 +626,13 @@ pub fn insert_animations(
         let animations = &gltf.named_animations;
         for (entity, name) in query.iter_many(map.map.values()) {
             if let Some(animation) = animations.get(&name.to_string()) {
+                let length = animation_clips
+                    .get(&animation)
+                    .expect("AnimationClip doesn't exist")
+                    .duration();
+
                 commands.entity(entity)
-                    .insert(Animation(animation.clone()));
+                    .insert(Animation(animation.clone(), length));
             }
         }
     }
