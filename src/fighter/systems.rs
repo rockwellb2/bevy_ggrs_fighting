@@ -5,7 +5,7 @@ use std::f32::consts::{PI, FRAC_PI_2};
 use super::{
     data::{FighterData, Collider, CollisionData, HitEvent},
     state::{
-        Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, Owner, State, StateFrame, StateMap, HBox, Health, Conditions, InHitstun, Velocity, ProjectileReference, ProjectileData, PlayerAxis, Animation,
+        Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, Owner, State, StateFrame, StateMap, HBox, Health, Conditions, InHitstun, Velocity, ProjectileReference, ProjectileData, PlayerAxis, Animation, Hurtboxes,
     },
     Fighter, event::TransitionEvent, modifiers::{Movement, AdjustFacing, CreateObject, Object, Velo, VectorType},
 };
@@ -307,36 +307,6 @@ pub fn transition_system(
 ) {
     for event in trans_reader.iter() {
         if let Ok((fighter, mut current, map, mut frame, _buffer)) = fighter_query.get_mut(event.fighter) {
-            let entity = map.get(&current.0).expect("State doesn't exist");
-
-            if let Ok(state) = state_query.get(*entity) {
-                if let Some(hurt_map) = &state.hurtboxes {
-                    if let Some(hurtboxes) = hurt_map.get(&0) {
-                        for hurt in hurtboxes {
-                            commands.entity(*hurt)
-                                .remove::<Active>();
-                            
-                            if let Ok(mut visibility) = box_set.p0().get_mut(*hurt) {
-                                visibility.is_visible = false;
-                            }
-                        }
-                    }
-                }
-
-                for (hurt, owner, mut visibility) in box_set.p1().iter_mut() {
-                    if owner.0 == fighter {
-                        commands.entity(hurt)
-                            .remove::<Active>();
-
-                        visibility.is_visible = false;
-                    }
-
-                }
-
-                
-            }
-
-
 
             println!("Transition {} to {}", current.0, event.to_id);
             
@@ -392,6 +362,7 @@ pub fn hitbox_component_system(
                         transform.translation += offset.x * axis.x;
                         transform.translation += offset.z * axis.z;
                         transform.translation.y += offset.y;
+                        //transform.scale = Vec3::splat(0.3);
 
                         //transform.look_at(axis.opponent_pos, Vec3::Y);
 
@@ -441,64 +412,66 @@ pub fn hurtbox_component_system(
     state_query: Query<&State>,
     hurtbox_query: Query<&HurtboxData>,
 ) {
-    for (current, map, tf, frame, _buffer, facing, axis) in fighter_query.iter_mut() {
-        let state = map.get(&current.0).expect("State doesn't exist.");
+    // for (current, map, tf, frame, _buffer, facing, axis) in fighter_query.iter_mut() {
+    //     let state = map.get(&current.0).expect("State doesn't exist.");
 
-        if let Ok(s) = state_query.get(*state) {
-            if let Some(hurtboxes) = &s.hurtboxes {
-                if frame.0 == 1 {
-                    if let Some(zero_set) = hurtboxes.get(&0) {
-                        for h in zero_set {
-                            let hurtbox =
-                                hurtbox_query.get(*h).expect("Hurtbox entity does not exist");
-                            let offset = hurtbox.offset;
+    //     if let Ok(s) = state_query.get(*state) {
+    //         if let Some(hurtboxes) = &s.hurtboxes {
+    //             if frame.0 == 1 {
+    //                 if let Some(zero_set) = hurtboxes.get(&0) {
+    //                     for h in zero_set {
+    //                         let hurtbox =
+    //                             hurtbox_query.get(*h).expect("Hurtbox entity does not exist");
+    //                         let offset = hurtbox.offset;
 
-                            let mut transform = Transform::from_translation(tf.translation);
-                            transform.rotate_x(hurtbox.rotation.0);
-                            transform.rotate_z(hurtbox.rotation.1);
-                            transform.rotate(tf.rotation);
-                            transform.translation.y = 0.;
-                            transform.translation += offset.x * axis.x;
-                            transform.translation += offset.z * axis.z;
-                            transform.translation.y += offset.y;
+    //                         let mut transform = Transform::from_translation(tf.translation);
+    //                         transform.rotate_x(hurtbox.rotation.0);
+    //                         transform.rotate_z(hurtbox.rotation.1);
+    //                         transform.rotate(tf.rotation);
+    //                         transform.translation.y = 0.;
+    //                         transform.translation += offset.x * axis.x;
+    //                         transform.translation += offset.z * axis.z;
+    //                         transform.translation.y += offset.y;
 
-                            commands
-                                .entity(*h)
-                                .insert(Active(HashSet::new()))
-                                .insert_bundle(SpatialBundle {
-                                    transform,
-                                    ..default()
-                                });
-                        }
-                    }
-                }
+    //                         commands
+    //                             .entity(*h)
+    //                             .insert(Active(HashSet::new()))
+    //                             .insert_bundle(SpatialBundle {
+    //                                 transform,
+    //                                 ..default()
+    //                             });
+    //                     }
+    //                 }
+    //             }
 
-                if let Some(set) = hurtboxes.get(&frame.0) {
-                    for h in set {
-                        let hurtbox = hurtbox_query.get(*h).expect("Hurtbox entity does not exist");
-                        let offset = hurtbox.offset;
+    //             if let Some(set) = hurtboxes.get(&frame.0) {
+    //                 for h in set {
+    //                     let hurtbox = hurtbox_query.get(*h).expect("Hurtbox entity does not exist");
+    //                     let offset = hurtbox.offset;
 
-                            let mut transform = Transform::from_translation(tf.translation);
-                            transform.rotate_x(hurtbox.rotation.0);
-                            transform.rotate_z(hurtbox.rotation.1);
-                            transform.rotate(tf.rotation);
-                            transform.translation.y = 0.;
-                            transform.translation += offset.x * axis.x;
-                            transform.translation += offset.z * axis.z;
-                            transform.translation.y += offset.y;
+    //                         let mut transform = Transform::from_translation(tf.translation);
+    //                         transform.rotate_x(hurtbox.rotation.0);
+    //                         transform.rotate_z(hurtbox.rotation.1);
+    //                         transform.rotate(tf.rotation);
+    //                         transform.translation.y = 0.;
+    //                         transform.translation += offset.x * axis.x;
+    //                         transform.translation += offset.z * axis.z;
+    //                         transform.translation.y += offset.y;
 
-                        commands
-                            .entity(*h)
-                            .insert(Active(HashSet::new()))
-                            .insert_bundle(SpatialBundle {
-                                transform,
-                                ..default()
-                            });
-                    }
-                }
-            }
-        }
-    }
+    //                     commands
+    //                         .entity(*h)
+    //                         .insert(Active(HashSet::new()))
+    //                         .insert_bundle(SpatialBundle {
+    //                             transform,
+    //                             ..default()
+    //                         });
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+
 }
 
 pub fn hurtbox_removal_system(
@@ -506,16 +479,16 @@ pub fn hurtbox_removal_system(
     mut query: Query<(Entity, &HurtboxData, &Owner, &mut Visibility), With<Active>>,
     fighter_query: Query<&StateFrame, With<Fighter>>,
 ) {
-    for (entity, data, owner, mut visible) in query.iter_mut() {
-        let frame = fighter_query.get(owner.0).expect("Owner doesn't exist");
+    // for (entity, data, owner, mut visible) in query.iter_mut() {
+    //     let frame = fighter_query.get(owner.0).expect("Owner doesn't exist");
 
-        if let Some(end_frame) = data.end_frame {
-            if frame.0 > end_frame {
-                visible.is_visible = false;
-                commands.entity(entity).remove::<Active>();
-            }
-        }
-    }
+    //     if let Some(end_frame) = data.end_frame {
+    //         if frame.0 > end_frame {
+    //             visible.is_visible = false;
+    //             commands.entity(entity).remove::<Active>();
+    //         }
+    //     }
+    // }
 }
 
 // Isn't removed until after stage is over, may be a problem?
@@ -702,12 +675,16 @@ pub fn hbox_position_system<T: HBox>(
 
 pub fn collision_system(
     mut hitbox_query: Query<(Entity, &Owner, &mut Active), With<HitboxData>>,
-    hurtbox_query: Query<(Entity, &Owner), (With<HurtboxData>, With<Active>)>,
+    hurtbox_query: Query<(Entity, &Owner, &Name), With<HurtboxData>>,
 
     hit_query: Query<(&HitboxData, &Collider, &Transform)>,
-    hurt_query: Query<(&HurtboxData, &Collider, &Transform)>,
+    hurt_query: Query<(&HurtboxData, &Collider, &GlobalTransform)>,
 
-    mut hit_writer: EventWriter<HitEvent>
+    fighter_query: Query<&Hurtboxes, With<Fighter>>,
+
+    mut hit_writer: EventWriter<HitEvent>,
+
+    players: Res<PlayerEntities>
 ) {
 
     let mut seen_hitboxes: HashMap<Entity, (Isometry3<f32>, Capsule, HitboxData)> = HashMap::new();
@@ -715,8 +692,16 @@ pub fn collision_system(
     // Entities are attacker, recipient
     let mut collisions: HashMap<(Entity, Entity), CollisionData> = HashMap::new();
 
+
+
+    let [hurtboxes1, hurtboxes2] = fighter_query.many(players.as_ref().into());
+
+
     for (hitbox, hit_owner, active) in hitbox_query.iter_mut() {
-        for (hurtbox, hurt_owner) in hurtbox_query.iter() {
+    
+
+        for (hurtbox, hurt_owner, hurt_name) in hurtbox_query.iter() {
+            //println!("Within hurtbox query");
             if active.0.contains(&hurt_owner.0) {
                 break;
             }
@@ -729,6 +714,7 @@ pub fn collision_system(
                     let (data, hit_collider, hit_tf) = hit_query.get(hitbox).unwrap();
                     //let iso = Isometry3::from(hit_vec);
                     let iso: Isometry3<f32> = (hit_tf.translation, hit_tf.rotation).into();
+                    let iso = iso;
 
                     seen_hitboxes.insert(hitbox, (iso.clone(), hit_collider.shape.clone(), data.clone()));
                     (iso, hit_collider.shape, data.clone())
@@ -741,6 +727,7 @@ pub fn collision_system(
                     let (data, hurt_collider, hurt_tf) = hurt_query.get(hurtbox).unwrap();
                     //let hurt_vec: Vector3<f32> = hurt_tf.translation.into();
                     //let iso = Isometry3::from(hurt_vec);
+                    let hurt_tf = hurt_tf.compute_transform();
                     let iso: Isometry3<f32> = (hurt_tf.translation, hurt_tf.rotation).into();
 
                     seen_hurtboxes.insert(hurtbox, (iso.clone(), hurt_collider.shape.clone(), data.clone()));
@@ -753,6 +740,9 @@ pub fn collision_system(
                     }
                 }
 
+                // let hit_shape = hit_shape.transform_by(&hit_iso);
+                // let hurt_shape = hurt_shape.transform_by(&hurt_iso);
+
 
                 if let Ok(intersect) = intersection_test(&hit_iso, &hit_shape, &hurt_iso, &hurt_shape) {
                     if intersect { 
@@ -762,6 +752,11 @@ pub fn collision_system(
                             recipient_box: hurt_data, 
                             recipient: hurt_owner.0 
                         });
+
+                        println!("Intersecting hurtbox name: {}", hurt_name.as_str());
+
+
+
                     }
                 }
 
@@ -875,9 +870,9 @@ pub fn camera_system(
         // let tf2 = tf2.translation.clone();
 
         if let Ok(mut cam_tf) = set.p0().get_single_mut() {
-            cam_tf.translation = mid + perp * -3.;
-            mid.y = 4.;
-            cam_tf.translation.y = 4.;
+            cam_tf.translation = mid + perp * -2.;
+            mid.y = 1.2;
+            cam_tf.translation.y = 1.2;
             cam_tf.look_at(mid, Vec3::Y);
         }
 
@@ -972,6 +967,4 @@ pub fn last_debug_system(
     if paused.0 {
         *state = RoundState::Paused;
     }
-
-
 }

@@ -296,6 +296,25 @@ impl HBox for HurtboxData {
     }
 }
 
+#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
+pub struct Hurtboxes(Vec<Entity>);
+
+impl Hurtboxes {
+    pub fn new() -> Hurtboxes {
+        Hurtboxes(Vec::new())
+    }
+
+    pub fn list(&self) -> &Vec<Entity> {
+        &self.0
+    }
+
+    pub fn add(&mut self, hurtbox: Entity) {
+        self.0.push(hurtbox);
+    }
+}
+
+
+
 #[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable)]
 #[reflect(Component)]
 pub struct ProjectileData {

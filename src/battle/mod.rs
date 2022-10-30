@@ -1,12 +1,13 @@
 use bevy::{
     core::Name,
     math::Vec2,
-    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle, VisibilityBundle, ComputedVisibility, PbrBundle, Mesh, shape, StandardMaterial, Camera3dBundle, PointLightBundle, PointLight},
-    sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}, scene::{SceneBundle, Scene}, gltf::{Gltf, GltfExtras}
+    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle, VisibilityBundle, ComputedVisibility, PbrBundle, Mesh, shape, StandardMaterial, Camera3dBundle, PointLightBundle, PointLight, Children, DespawnRecursiveExt},
+    sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}, scene::{SceneBundle, Scene}, gltf::{Gltf, GltfExtras}, ecs::{world::EntityRef, system::EntityCommands}
 };
 
 use bevy_ggrs::{Rollback, RollbackIdProvider};
 use bevy_prototype_lyon::{prelude::{tess::geom::euclid::num::Round, GeometryBuilder, DrawMode, FillMode}, shapes::{RectangleOrigin, self}};
+use bevy_scene_hook::{HookedSceneBundle, SceneHook};
 use ggrs::{SyncTestSession, P2PSession};
 
 use iyes_progress::prelude::AssetsLoading;
@@ -15,7 +16,7 @@ use parry3d::shape::{Cuboid, Capsule};
 
 
 use crate::{
-    fighter::{data::{FighterData, Collider}, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health, Owner, ProjectileReference, Velocity, PlayerAxis}, Fighter, systems::InputBuffer, modifiers::{CreateObject, Object}},
+    fighter::{data::{FighterData, Collider}, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health, Owner, ProjectileReference, Velocity, PlayerAxis, HurtboxData, Hurtboxes}, Fighter, systems::InputBuffer, modifiers::{CreateObject, Object}},
     Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer, game::{GameState, RoundState}, GameDebug,
 };
 
@@ -80,7 +81,7 @@ pub fn load_fighters(
 ) {
     let state_list: Handle<SerializedStateVec> = asset_server.load("data/fighters/tahu/states.sl.json");
     let fighter_data: Handle<FighterData> = asset_server.load("data/fighters/tahu/fighter_data.json");
-    let model: Handle<Gltf> = asset_server.load("models/ryu1.glb");
+    let model: Handle<Gltf> = asset_server.load("models/ryu_new.glb");
 
 
     let f2: Handle<FighterData> = asset_server.load("data/fighters/abe/fighter_data.json");
@@ -138,22 +139,51 @@ pub fn spawn_fighters(
     let fighter1 = data.remove(&handle_access.0.fighter_data).expect("FighterData asset does not exist");
     let fighter2 = data.remove(&handle_access.1.fighter_data).expect("FighterData asset does not exist");
 
+    let mut hurt_mat: StandardMaterial = Color::rgba(1., 1., 0., 0.3).into();
+    hurt_mat.unlit = true;
+    hurt_mat.cull_mode = None;
+
+    //let hitbox_material = materials.add(Color::rgba(1., 0., 0., 0.3).into());
+    let hurtbox_material = materials.add(hurt_mat);
+
+    let hook = move |entity: &EntityRef, cmds: &mut EntityCommands| {
+        if let Some(extras) = entity.get::<GltfExtras>() {
+
+            let hurt: HurtboxData = serde_json::de::from_str(extras.value.as_str()).expect("Could not deserialize as HurtboxData");
+            let capsule = Capsule::new_y(hurt.half_height - hurt.radius, hurt.radius);
+            cmds
+                .insert(hurt)
+                .insert(Collider { shape: capsule });
+
+            let commands = cmds.commands();
+
+            let children  = entity.get::<Children>().expect("Entity does not have Children");
+            for child in children.iter() {
+                commands.entity(*child)
+                    .insert(hurtbox_material.clone());
+            }
+        }
+    };
+
+
 
     let player1 = commands
-
-        .spawn_bundle(SceneBundle {
-            scene: assets_gltf.get(&handle_access.0.model).expect("Asset doesn't exist").scenes[0].clone(),
-            transform: Transform { 
-                translation: (-2., 0., 0.).into(),  
-                scale: Vec3::splat(3.),
+        .spawn_bundle(HookedSceneBundle {
+            scene: SceneBundle {
+                scene: assets_gltf.get(&handle_access.0.model).expect("Asset doesn't exist").scenes[0].clone(),
+                transform: Transform { 
+                    translation: (-2., 0., 0.).into(),  
+                    //scale: Vec3::splat(3.),
+                    ..default()
+                }.looking_at((2., 0., 0.).into(), Vec3::Y),
                 ..default()
-            }.looking_at((2., 0., 0.).into(), Vec3::Y),
-            ..default()
+            },
+            hook: SceneHook::new(hook.clone())
         })
         .insert(Name::new("Player 1"))
         .insert(Fighter)
         .insert(fighter1)
-        //.insert(Rollback::new(rip.next_id()))˝
+        .insert(Rollback::new(rip.next_id()))
         .insert(CurrentState(0))
         .insert(Player(1))
         .insert(Facing(Direction::Right))
@@ -161,6 +191,7 @@ pub fn spawn_fighters(
         .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
         .insert(Health(500))
         .insert(Velocity(Vec3::ZERO))
+        .insert(Hurtboxes::new())
         .insert(PlayerAxis {
             opponent_pos: Vec3::new(2., 0., 0.),
             x: Vec3::X,
@@ -191,20 +222,22 @@ pub fn spawn_fighters(
     let player2 = 
     commands
 
-        .spawn_bundle(SceneBundle {
-            scene: assets_gltf.get(&handle_access.1.model).expect("Asset doesn't exist").scenes[0].clone(),
-            transform: Transform { 
-                translation: (2., 0., 0.).into(),  
-                //scale: (-3., 3., 3.).into(),
-                scale: Vec3::splat(3.),
+        .spawn_bundle(HookedSceneBundle {
+            scene: SceneBundle {
+                scene: assets_gltf.get(&handle_access.1.model).expect("Asset doesn't exist").scenes[0].clone(),
+                transform: Transform { 
+                    translation: (2., 0., 0.).into(),  
+                    //scale: Vec3::splat(3.),
+                    ..default()
+                }.looking_at((-2., 0., 0.).into(), Vec3::Y),
                 ..default()
-            }.looking_at((-2., 0., 0.).into(), Vec3::Y),
-            ..default()
+            },
+            hook: SceneHook::new(hook)
         })
         .insert(Name::new("Player 2"))
         .insert(Fighter)
         .insert(fighter2)
-        //.insert(Rollback::new(rip.next_id()))
+        .insert(Rollback::new(rip.next_id()))
         .insert(CurrentState(0))
         .insert(Player(2))
         .insert(Facing(Direction::Left))
@@ -212,6 +245,7 @@ pub fn spawn_fighters(
         .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
         .insert(Health(500))
         .insert(Velocity(Vec3::ZERO))
+        .insert(Hurtboxes::new())
         .insert(PlayerAxis {
             opponent_pos: Vec3::new(-2., 0., 0.),
             x: Vec3::X,
@@ -239,7 +273,7 @@ pub fn spawn_fighters(
     });
 
     commands.spawn_bundle(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, 5., 14.0).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_xyz(0.0, 0.8, 14.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     })
     .insert(MatchCamera);
@@ -251,7 +285,7 @@ pub fn spawn_fighters(
     })
     .insert(Name::new("Ground"));
 
-    *state = RoundState::EnterRound
+    *state = RoundState::Armature
 
 
 }

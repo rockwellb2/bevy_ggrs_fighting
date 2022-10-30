@@ -10,10 +10,11 @@ use bevy::{
 use bevy_editor_pls::EditorPlugin;
 use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider, SessionType};
 use bevy_inspector_egui::WorldInspectorPlugin;
+use bevy_scene_hook::HookPlugin;
 use fighter::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, SerializedStateVec,
-        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox, PlayerAxis, Animation,
+        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox, PlayerAxis, Animation, Hurtboxes,
     },
     systems::{
         adjust_facing_system, collision_system, hbox_position_system,
@@ -25,7 +26,7 @@ use fighter::{
 };
 use game::{
     ADD_HITBOX, ADD_HURTBOX, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
-    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, AXIS, not_if_paused, Paused, if_paused, on_debug, on_debug_and_game_paused, paused_advance_or_round, 
+    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, AXIS, not_if_paused, Paused, if_paused, on_debug, on_debug_and_game_paused, paused_advance_or_round, on_armature, 
 };
 use ggrs::{Config, PlayerType, SessionBuilder, UdpNonBlockingSocket, SyncTestSession};
 //use bevy_editor_pls::prelude::*;
@@ -179,7 +180,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .with_system(spawn_fighters)
                 )
                 .with_stage_after(
-                    "Exit Loading Stage",
+                    "Exit Loading Stage", 
+                    "Armature Stage", 
+                SystemStage::parallel()
+                    .with_run_criteria(on_armature)
+                    .with_system(armature_system)
+            )
+                .with_stage_after(
+                    "Armature Stage",
                     "Enter Round Stage",
                     SystemStage::parallel()
                         .with_run_criteria(on_enter_round)
@@ -251,8 +259,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // projectile
                         .with_system(
                             object_system
-                            //.after(FACE) 
+                            .label("object")
                             .after(AXIS)
+                        )
+                        .with_system(
+                            animation_system
+                            .after("object")
                         )
                 )
                 .with_stage_after(
@@ -346,7 +358,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_run_criteria(on_round)
             .with_system(ui_lifebar_system)
             .with_system(camera_system)
-            .with_system(animation_system)
+            //.with_system(animation_system)
         )
 
         // Debug Systems
@@ -362,6 +374,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Custom Plugins
         .add_plugin(FighterPlugin)
+        .add_plugin(HookPlugin)
 
         .register_type::<Player>()
         .insert_resource(Paused(false))
@@ -447,7 +460,7 @@ fn populate_entities_with_states(
                     // };
 
                     
-                    let capsule = Capsule::new_y(hitbox.half_height, hitbox.radius);
+                    let capsule = Capsule::new_y(hitbox.half_height - hitbox.radius, hitbox.radius);
 
                     let start_frame = hitbox.start_frame;
                     let hitbox_entity = world
@@ -482,49 +495,49 @@ fn populate_entities_with_states(
             }
 
             // HURTBOXES
-            if let Some(hurtboxes) = hurtbox_serialized {
-                let mut ordered_hurt: HashMap<u16, HashSet<Entity>> = HashMap::new();
+            // if let Some(hurtboxes) = hurtbox_serialized {
+            //     let mut ordered_hurt: HashMap<u16, HashSet<Entity>> = HashMap::new();
 
-                for hurtbox in hurtboxes {
-                    // let shape = shapes::Rectangle {
-                    //     extents: hurtbox.dimensions.truncate(),
-                    //     origin: RectangleOrigin::Center,
-                    // };
+            //     for hurtbox in hurtboxes {
+            //         // let shape = shapes::Rectangle {
+            //         //     extents: hurtbox.dimensions.truncate(),
+            //         //     origin: RectangleOrigin::Center,
+            //         // };
 
-                    //let cuboid = Cuboid::new((hurtbox.dimensions / 2.).into());
-                    let capsule = Capsule::new_y(hurtbox.half_height, hurtbox.radius);
+            //         //let cuboid = Cuboid::new((hurtbox.dimensions / 2.).into());
+            //         let capsule = Capsule::new_y(hurtbox.half_height, hurtbox.radius);
 
-                    let start_frame = hurtbox.start_frame.unwrap_or_default();
-                    let hurtbox_entity = world
-                        .spawn()
-                        .insert(hurtbox)
-                        .insert(Rollback::new(rip.next_id()))
-                        .insert(Collider { shape: capsule })
-                        .insert(Name::new(format!("Hurtbox {}", &name)))
-                        .insert(Owner(player))
-                        // .insert_bundle(GeometryBuilder::build_as(
-                        //     &shape,
-                        //     DrawMode::Fill(FillMode::color(Color::rgba(1., 1., 0., 0.8))),
-                        //     Transform::default(),
-                        // ))
-                        .insert_bundle(VisibilityBundle {
-                            visibility: Visibility { is_visible: false },
-                            computed: ComputedVisibility::default(),
-                        })
-                        .id();
+            //         let start_frame = hurtbox.start_frame.unwrap_or_default();
+            //         let hurtbox_entity = world
+            //             .spawn()
+            //             .insert(hurtbox)
+            //             .insert(Rollback::new(rip.next_id()))
+            //             .insert(Collider { shape: capsule })
+            //             .insert(Name::new(format!("Hurtbox {}", &name)))
+            //             .insert(Owner(player))
+            //             // .insert_bundle(GeometryBuilder::build_as(
+            //             //     &shape,
+            //             //     DrawMode::Fill(FillMode::color(Color::rgba(1., 1., 0., 0.8))),
+            //             //     Transform::default(),
+            //             // ))
+            //             .insert_bundle(VisibilityBundle {
+            //                 visibility: Visibility { is_visible: false },
+            //                 computed: ComputedVisibility::default(),
+            //             })
+            //             .id();
 
-                    if ordered_hurt.contains_key(&start_frame) {
-                        let set = ordered_hurt.get_mut(&start_frame).unwrap();
-                        set.insert(hurtbox_entity);
-                    } else {
-                        let mut set = HashSet::<Entity>::new();
-                        set.insert(hurtbox_entity);
-                        ordered_hurt.insert(start_frame, set);
-                    }
-                }
+            //         if ordered_hurt.contains_key(&start_frame) {
+            //             let set = ordered_hurt.get_mut(&start_frame).unwrap();
+            //             set.insert(hurtbox_entity);
+            //         } else {
+            //             let mut set = HashSet::<Entity>::new();
+            //             set.insert(hurtbox_entity);
+            //             ordered_hurt.insert(start_frame, set);
+            //         }
+            //     }
 
-                state.add_hurtboxes(ordered_hurt);
-            }
+            //     state.add_hurtboxes(ordered_hurt);
+            // }
 
             // MODIFIERS
             if let Some(modifiers) = mods_serialized {
@@ -574,13 +587,14 @@ pub fn insert_meshes(
         let mut transform = Transform::default();
         transform.rotate_x(hitbox.rotation.0);
         transform.rotate_z(hitbox.rotation.1);
+        transform.scale = Vec3::splat(0.1);
 
 
         commands.entity(entity)
             .insert_bundle(PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Capsule {
                     radius: hitbox.radius,
-                    depth: hitbox.half_height * 2.,
+                    depth: hitbox.half_height * 2. - hitbox.radius * 2.,
                     ..default()
                 })),
                 material: hitbox_material.clone(),
@@ -591,18 +605,18 @@ pub fn insert_meshes(
     }
 
     for (entity, hurtbox) in hurtbox_query.iter() {
-        commands.entity(entity)
-            .insert_bundle(PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Capsule {
-                    radius: hurtbox.radius,
-                    depth: hurtbox.half_height * 2.,
-                    ..default()
-                })),
-                material: hurtbox_material.clone(),
-                visibility: Visibility { is_visible: false },
-                //transform: Transform::from_scale(hurtbox.dimensions),
-                ..default()
-            });
+        // commands.entity(entity)
+        //     .insert_bundle(PbrBundle {
+        //         mesh: meshes.add(Mesh::from(shape::Capsule {
+        //             radius: hurtbox.radius,
+        //             depth: hurtbox.half_height * 2.,
+        //             ..default()
+        //         })),
+        //         material: hurtbox_material.clone(),
+        //         visibility: Visibility { is_visible: false },
+        //         //transform: Transform::from_scale(hurtbox.dimensions),
+        //         ..default()
+        //     });
     }
 
     println!("Armature query length: {:?}", armature_query.iter().len());
@@ -649,4 +663,41 @@ pub fn increase_frame_system(mut frame_count: ResMut<FrameCount>) {
 #[reflect(Hash)]
 pub struct FrameCount {
     pub frame: u32,
+}
+
+
+pub fn armature_system(
+    mut commands: Commands,
+    hurtbox_query: Query<(Entity, &HurtboxData)>,
+    parent_query: Query<&Parent>,
+    mut state: ResMut<RoundState>,
+    mut fighter_query: Query<&mut Hurtboxes>
+) {
+
+    let hurt_iter = hurtbox_query.iter();
+
+    if hurt_iter.len() > 0 {
+        for (hurt_ent, _hurtbox) in hurt_iter {
+            let mut ancestor = parent_query.get(hurt_ent).expect("Entity doesn't have Parent");
+            loop {
+                if let Ok(parent) = parent_query.get(ancestor.get()) {
+                    ancestor = parent;
+                }
+                else {
+                    break;
+                }
+            }
+
+            commands.entity(hurt_ent)
+                .insert(Owner(ancestor.get()));
+            
+            let mut hurtboxes = fighter_query.get_mut(ancestor.get()).expect("Does not have Hurtboxes component");
+            hurtboxes.add(hurt_ent);
+
+
+        }
+        *state = RoundState::EnterRound;
+    }
+
+    
 }

@@ -303,9 +303,9 @@
                 "damage": 30,
                 "hitstun": 18,
                 "blockstun": 10,
-                "radius": 0.5,
-                "halfHeight": 0.2,
-                "offset": [2.6, 5, -0.2],
+                "radius": 0.11,
+                "halfHeight": 0.19,
+                "offset": [0.7, 1.6, 0],
                 "rotation": [90, 0]
             }
         ],

@@ -102,7 +102,8 @@ pub enum RoundState {
     Round,
     ExtraSetup,
     Paused,
-    AdvanceFrame
+    AdvanceFrame,
+    Armature
 }
 
 
@@ -144,6 +145,13 @@ pub fn on_enter_round(state: Res<RoundState>) -> ShouldRun {
 pub fn on_extra_setup(state: Res<RoundState>) -> ShouldRun {
     match *state {
         RoundState::ExtraSetup => ShouldRun::Yes,
+        _ => ShouldRun::No
+    }
+}
+
+pub fn on_armature(state: Res<RoundState>) -> ShouldRun {
+    match *state {
+        RoundState::Armature => ShouldRun::Yes,
         _ => ShouldRun::No
     }
 }
