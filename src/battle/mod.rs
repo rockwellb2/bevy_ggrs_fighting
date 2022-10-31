@@ -1,8 +1,8 @@
 use bevy::{
     core::Name,
     math::Vec2,
-    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle, VisibilityBundle, ComputedVisibility, PbrBundle, Mesh, shape, StandardMaterial, Camera3dBundle, PointLightBundle, PointLight, Children, DespawnRecursiveExt},
-    sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}, scene::{SceneBundle, Scene}, gltf::{Gltf, GltfExtras}, ecs::{world::EntityRef, system::EntityCommands}
+    prelude::{default, Color, Commands, Entity, ResMut, Res, AssetServer, Handle, Assets, Camera2dBundle, OrthographicProjection, Visibility, Transform, Vec3, KeyCode, NodeBundle, BuildChildren, Component, State, Query, Parent, SpatialBundle, VisibilityBundle, ComputedVisibility, PbrBundle, Mesh, shape, StandardMaterial, Camera3dBundle, PointLightBundle, PointLight, Children, DespawnRecursiveExt, With},
+    sprite::{Sprite, SpriteBundle}, ui::{Style, Size, Val, Display, JustifyContent, AlignSelf, UiRect, FlexDirection}, scene::{SceneBundle, Scene}, gltf::{Gltf, GltfExtras}, ecs::{world::EntityRef, system::EntityCommands}, utils::hashbrown::HashMap
 };
 
 use bevy_ggrs::{Rollback, RollbackIdProvider};
@@ -16,7 +16,7 @@ use parry3d::shape::{Cuboid, Capsule};
 
 
 use crate::{
-    fighter::{data::{FighterData, Collider}, state::{CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health, Owner, ProjectileReference, Velocity, PlayerAxis, HurtboxData, Hurtboxes}, Fighter, systems::InputBuffer, modifiers::{CreateObject, Object}},
+    fighter::{data::{FighterData, Collider}, state::{State as FightState, CurrentState, StateFrame, SerializedStateVec, Direction, Facing, Health, Owner, ProjectileReference, Velocity, PlayerAxis, HurtboxData, Hurtboxes, BoneMap}, Fighter, systems::InputBuffer, modifiers::{CreateObject, Object}},
     Player, GGRSConfig, input::{BUFFER_SIZE, Action}, util::Buffer, game::{GameState, RoundState}, GameDebug,
 };
 
@@ -189,6 +189,7 @@ pub fn spawn_fighters(
         .insert(Facing(Direction::Right))
         .insert(StateFrame(0))
         .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
+        .insert(BoneMap(HashMap::new()))
         .insert(Health(500))
         .insert(Velocity(Vec3::ZERO))
         .insert(Hurtboxes::new())
@@ -243,6 +244,7 @@ pub fn spawn_fighters(
         .insert(Facing(Direction::Left))
         .insert(StateFrame(0))
         .insert(InputBuffer(Buffer::with_capacity(BUFFER_SIZE)))
+        .insert(BoneMap(HashMap::new()))
         .insert(Health(500))
         .insert(Velocity(Vec3::ZERO))
         .insert(Hurtboxes::new())
@@ -303,7 +305,13 @@ pub fn extra_setup_system(
 
     mut round_state: ResMut<RoundState>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>
+    mut materials: ResMut<Assets<StandardMaterial>>,
+
+    mut state_query: Query<(&mut FightState, &Parent)>,
+    mut bonemap_query: Query<&mut BoneMap>,
+    bone_name_query: Query<(&Name, Entity), With<Transform>>,
+
+    bone_parent_query: Query<&Parent>
 
 ) {
     let projectile_material = materials.add(Color::rgba(0., 1., 0., 0.5).into());
@@ -377,6 +385,50 @@ pub fn extra_setup_system(
             Object::None => panic!(),
         }
     }
+
+
+
+    for (mut fight_state, parent) in state_query.iter_mut() {
+        if let Some(hitboxes) = &mut fight_state.hitboxes {
+            for boxes in hitboxes.values_mut() {
+                for hitbox in boxes {
+                    let bone_name = hitbox.bone.clone();
+
+                    if let Ok(mut bonemap) = bonemap_query.get_mut(parent.get()) {
+                        if let Some(bone_entity) = bonemap.0.get(&bone_name) {
+                            hitbox.bone_entity = Some(*bone_entity);
+                        }
+                        else {
+                            for (name, bone_entity) in bone_name_query.iter() {
+                                if &name.to_string() == &bone_name {
+                                    let mut ancestor = bone_parent_query.get(bone_entity).expect("Bone doesn't have parent");
+                                    loop {
+                                        if let Ok(bone_parent) = bone_parent_query.get(ancestor.get()) {
+                                            ancestor = bone_parent;
+                                        }
+                                        else {
+                                            break;
+                                        }
+                                    }
+
+                                    if parent.get() == ancestor.get() {
+                                        bonemap.0.insert(bone_name, bone_entity);
+                                        hitbox.bone_entity = Some(bone_entity);
+                                        println!("It somehow got here, doing bone things");
+                                        break;
+
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+
 
     *round_state = RoundState::Round;
 

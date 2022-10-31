@@ -298,6 +298,7 @@
         ],
         "hitboxes": [
             {
+                "bone": "arm left wrist",
                 "startFrame": 10,
                 "endFrame": 12,
                 "damage": 30,
@@ -364,18 +365,6 @@
         "debug_name": "a.LP",
         "transitions": [
             0
-        ],
-        "hitboxes": [
-            {
-                "startFrame": 3,
-                "endFrame": 65535,
-                "damage": 30,
-                "hitstun": 18,
-                "blockstun": 10,
-                "radius": 1,
-                "halfHeight": 1,
-                "offset": [1, 0, 0]
-            }
         ],
         "modifiers": [
             {

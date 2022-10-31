@@ -341,43 +341,44 @@ pub fn hitbox_component_system(
     state_query: Query<&State>,
     hitbox_query: Query<&HitboxData>,
 ) {
-    for (current, map, tf, frame, _buffer, facing, axis) in fighter_query.iter_mut() {
-        let state = map.get(&current.0).expect("State doesn't exist.");
+    // for (current, map, tf, frame, _buffer, facing, axis) in fighter_query.iter_mut() {
+    //     let state = map.get(&current.0).expect("State doesn't exist.");
 
-        if let Ok(s) = state_query.get(*state) {
-            if let Some(hitboxes) = &s.hitboxes {
-                if let Some(set) = hitboxes.get(&frame.0) {
-                    for h in set {
-                        let hitbox = hitbox_query.get(*h).expect("Hitbox entity does not exist");
-                        let mut offset = hitbox.offset;
+    //     if let Ok(s) = state_query.get(*state) {
+    //         if let Some(hitboxes) = &s.hitboxes {
+    //             if let Some(set) = hitboxes.get(&frame.0) {
+    //                 for h in set {
+    //                     let hitbox = hitbox_query.get(*h).expect("Hitbox entity does not exist");
+    //                     let mut offset = hitbox.offset;
 
-                        //offset.x *= facing.0.sign();
+    //                     //offset.x *= facing.0.sign();
 
-                        let mut transform = Transform::from_translation(tf.translation);
-                        transform.rotate_x(hitbox.rotation.0);
-                        transform.rotate_z(hitbox.rotation.1);
-                        transform.rotate(tf.rotation);
-                        transform.translation.y = 0.;
-                        //transform.translation += offset;
-                        transform.translation += offset.x * axis.x;
-                        transform.translation += offset.z * axis.z;
-                        transform.translation.y += offset.y;
-                        //transform.scale = Vec3::splat(0.3);
+    //                     let mut transform = Transform::from_translation(tf.translation);
+    //                     transform.rotate_x(hitbox.rotation.0);
+    //                     transform.rotate_z(hitbox.rotation.1);
+    //                     transform.rotate(tf.rotation);
+    //                     transform.translation.y = 0.;
+    //                     //transform.translation += offset;
+    //                     transform.translation += offset.x * axis.x;
+    //                     transform.translation += offset.z * axis.z;
+    //                     transform.translation.y += offset.y;
+    //                     //transform.scale = Vec3::splat(0.3);
 
-                        //transform.look_at(axis.opponent_pos, Vec3::Y);
+    //                     //transform.look_at(axis.opponent_pos, Vec3::Y);
 
-                        commands
-                            .entity(*h)
-                            .insert(Active(HashSet::new()))
-                            .insert_bundle(SpatialBundle {
-                                transform,
-                                ..default()
-                            });
-                    }
-                }
-            }
-        }
-    }
+    //                     commands
+    //                         .entity(*h)
+    //                         .insert(Active(HashSet::new()))
+    //                         .insert_bundle(SpatialBundle {
+    //                             transform,
+    //                             ..default()
+    //                         });
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
 }
 
 pub fn hitbox_removal_system(

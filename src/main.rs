@@ -14,7 +14,7 @@ use bevy_scene_hook::HookPlugin;
 use fighter::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, SerializedStateVec,
-        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox, PlayerAxis, Animation, Hurtboxes,
+        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox, PlayerAxis, Animation, Hurtboxes, BoneMap,
     },
     systems::{
         adjust_facing_system, collision_system, hbox_position_system,
@@ -449,45 +449,21 @@ fn populate_entities_with_states(
 
             // HITBOXES
             if let Some(hitboxes) = hbox_serialized {
-                let mut ordered: HashMap<u16, HashSet<Entity>> = HashMap::new();
+                let mut ordered: HashMap<u16, Vec<HitboxData>> = HashMap::new();
 
                 for (index, mut hitbox) in hitboxes.into_iter().enumerate() {
                     hitbox.set_id(index);
-
-                    // let shape = shapes::Rectangle {
-                    //     extents: hitbox.dimensions.truncate(),
-                    //     origin: RectangleOrigin::Center,
-                    // };
-
                     
-                    let capsule = Capsule::new_y(hitbox.half_height - hitbox.radius, hitbox.radius);
+                    //let capsule = Capsule::new_y(hitbox.half_height - hitbox.radius, hitbox.radius);
 
                     let start_frame = hitbox.start_frame;
-                    let hitbox_entity = world
-                        .spawn()
-                        .insert(hitbox)
-                        .insert(Rollback::new(rip.next_id()))
-                        .insert(Collider { shape: capsule })
-                        .insert(Name::new(format!("Hitbox {}", &name)))
-                        .insert(Owner(player))
-                        // .insert_bundle(GeometryBuilder::build_as(
-                        //     &shape,
-                        //     DrawMode::Fill(FillMode::color(Color::rgba(1., 0., 0., 0.8))),
-                        //     Transform::default(),
-                        // ))
-         
-                        .insert_bundle(VisibilityBundle {
-                            visibility: Visibility { is_visible: false },
-                            computed: ComputedVisibility::default(),
-                        })
-                        .id();
 
                     if ordered.contains_key(&start_frame) {
                         let set = ordered.get_mut(&start_frame).unwrap();
-                        set.insert(hitbox_entity);
+                        set.push(hitbox);
                     } else {
-                        let mut set = HashSet::<Entity>::new();
-                        set.insert(hitbox_entity);
+                        let mut set = Vec::<HitboxData>::new();
+                        set.push(hitbox);
                         ordered.insert(start_frame, set);
                     }
                 }
@@ -671,7 +647,11 @@ pub fn armature_system(
     hurtbox_query: Query<(Entity, &HurtboxData)>,
     parent_query: Query<&Parent>,
     mut state: ResMut<RoundState>,
-    mut fighter_query: Query<&mut Hurtboxes>
+    mut fighter_query: Query<&mut Hurtboxes>,
+
+    mut state_query: Query<(&mut FightState, &Parent)>,
+    mut bonemap_query: Query<&mut BoneMap>,
+    bone_name_query: Query<(&Name, Entity), With<Transform>>
 ) {
 
     let hurt_iter = hurtbox_query.iter();
@@ -696,8 +676,64 @@ pub fn armature_system(
 
 
         }
+
+        // for (mut fight_state, parent) in state_query.iter_mut() {
+        //     if let Some(hitboxes) = &mut fight_state.hitboxes {
+        //         for boxes in hitboxes.values_mut() {
+        //             for hitbox in boxes {
+        //                 let bone_name = hitbox.bone.clone();
+
+        //                 if let Ok(mut bonemap) = bonemap_query.get_mut(parent.get()) {
+        //                     if let Some(bone_entity) = bonemap.0.get(&bone_name) {
+        //                         hitbox.bone_entity = Some(*bone_entity);
+        //                     }
+        //                     else {
+        //                         for (name, bone_entity) in bone_name_query.iter() {
+        //                             if &name.to_string() == &bone_name {
+        //                                 let mut ancestor = parent_query.get(bone_entity).expect("Bone doesn't have parent");
+        //                                 loop {
+        //                                     if let Ok(bone_parent) = parent_query.get(ancestor.get()) {
+        //                                         ancestor = bone_parent;
+        //                                     }
+        //                                     else {
+        //                                         break;
+        //                                     }
+        //                                 }
+
+        //                                 if parent.get() == ancestor.get() {
+        //                                     bonemap.0.insert(bone_name, bone_entity);
+        //                                     hitbox.bone_entity = Some(bone_entity);
+        //                                     println!("It somehow got here, doing bone things");
+        //                                     break;
+
+        //                                 }
+
+        
+                                        
+                                        
+
+
+        //                             }
+        //                         }
+
+        //                     }
+        //                 }
+
+
+                        
+
+        //             }
+        //         }
+
+
+        //     }
+
+        // }
+
+
         *state = RoundState::EnterRound;
     }
 
     
 }
+

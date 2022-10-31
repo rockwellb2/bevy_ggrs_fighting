@@ -52,7 +52,7 @@ impl StateMap {
 pub struct State {
     pub id: u16,
     pub duration: Option<u16>,
-    pub hitboxes: Option<HashMap<u16, HashSet<Entity>>>,
+    pub hitboxes: Option<HashMap<u16, Vec<HitboxData>>>,
     pub hurtboxes: Option<HashMap<u16, HashSet<Entity>>>,
     pub transitions: Vec<Entity>,
     pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>)
@@ -70,7 +70,7 @@ impl State {
         }
     }
 
-    pub fn add_hitboxes(&mut self, hitboxes: HashMap<u16, HashSet<Entity>>) {
+    pub fn add_hitboxes(&mut self, hitboxes: HashMap<u16, Vec<HitboxData>>) {
         self.hitboxes = Some(hitboxes);
     }
 
@@ -196,6 +196,9 @@ pub struct HitboxData {
     pub priority: u8,
     #[serde(default)]
     pub id: Option<usize>,
+    pub bone: String,
+    #[serde(default)]
+    pub bone_entity: Option<Entity>,
     pub radius: f32,
     #[serde(alias = "halfHeight")]
     pub half_height: f32,
@@ -261,6 +264,9 @@ impl HBox for HitboxData {
 
     
 }
+
+#[derive(Component)]
+pub struct BoneMap(pub HashMap<String, Entity>);
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable)]
 #[reflect(Component)]
