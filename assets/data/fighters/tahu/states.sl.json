@@ -11,6 +11,7 @@
             30,
             700,
             200,
+            108,
             100,
             102,
             141,
@@ -57,7 +58,7 @@
             { "in": [5, 6] }
         ],
         "trigger2": [
-            { "in": [100, 101, 102, 105, 104, 170, 141, 700, 200, 29] },
+            { "in": [100, 101, 102, 105, 104, 170, 141, 700, 200, 29, 108] },
             { "endDuration": null }
         ],
         "trigger3": [
@@ -92,6 +93,7 @@
         "debug_name": "2",
         "transitions": [
             102,
+            101,
             0
         ],
         "hurtboxes": [
@@ -129,6 +131,7 @@
             6,
             0,
             141,
+            108,
             105
             
         ],
@@ -233,6 +236,7 @@
         "debug_name": "Crouch",
         "transitions": [
             4011,
+            160,
             29
         ],
         "trigger1": [
@@ -247,6 +251,10 @@
                     "window": 1
                 }
             }
+        ],
+        "trigger2": [
+            { "in": [101, 160]},
+            { "endDuration": null }
         ]
     },
     {
@@ -404,10 +412,9 @@
         "id": 101,
         "debug_name": "2LP",
         "transitions": [
-            1,
-            0
+            20
         ],
-        "duration": 13,
+        "duration": 63,
         "triggerAll": [
             {
                 "command": {
@@ -439,7 +446,7 @@
                 "blockstun": 10,
                 "radius": 0.17,
                 "halfHeight": 0.3,
-                "offset": [0, 0, 0]
+                "offset": [0, 0.1, 0.05]
             }
         ],
         "triggerAll": [
@@ -456,8 +463,6 @@
                 }
             }
         ]
-
-        
     },
     {
         "id": 104,
@@ -532,6 +537,32 @@
 
     },
     {
+        "id": 108,
+        "debug_name": "66LP",
+        "duration": 85,
+        "transitions": [
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"]
+                        ],
+                        [
+                            ["x", "Positive", true]
+                        ],
+                        [
+                            ["x", "Positive", true]
+                        ]
+                    ],
+                    "window": 15
+                }
+            }
+        ]
+    },
+    {
         "id": 106,
         "debug_name": "a.LP",
         "transitions": [
@@ -561,6 +592,29 @@
         ]
     },
     {
+        "id": 160,
+        "debug_name": "FC2LP",
+        "duration": 27,
+        "transitions": [
+            20
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"],
+                            ["y", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+
+            }
+        ]
+
+    },
+    {
         "id": 170,
         "debug_name": "WhileRisingLP",
         "transitions": [
@@ -577,7 +631,7 @@
                 "blockstun": 10,
                 "radius": 0.21,
                 "halfHeight": 0.33,
-                "offset": [0, 0.1, 0]
+                "offset": [0, 0, 0]
             }
         ],
         "triggerAll": [
@@ -627,12 +681,12 @@
                 "CreateObject": {
                     "Projectile": {
                         "name": "Fireball",
-                        "startPosition": [1, 3, 0],
-                        "dimensions": [1, 1, 1],
-                        "velocity": [7, 0, 0],
+                        "startPosition": [0.5, 1, 0],
+                        "dimensions": [0.3, 0.1, 0.1],
+                        "velocity": [1.5, 0, 0],
                         "damage": 30,
                         "spawnFrame": 10,
-                        "lifeFrames": 180
+                        "lifeFrames": 120
 
                     }
                 }

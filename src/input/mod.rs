@@ -13,7 +13,7 @@ use crate::fighter::state::{Facing, Direction};
 use crate::fighter::systems::InputBuffer;
 use crate::util::Buffer;
 
-pub const BUFFER_SIZE: usize = 10;
+pub const BUFFER_SIZE: usize = 60;
 
 
 pub const LEFT_HELD: u32 = 2048;
@@ -197,10 +197,15 @@ impl Default for NewMatchExpression {
 #[derive(Debug, Serialize, Deserialize, Default, FromReflect, Reflect, Clone)]
 pub struct NewCommandInput {
     list: Vec<Vec<NewMatchExpression>>,
+    #[serde(default = "NewCommandInput::window_default")]
     window: u16,
 }
 
 impl NewCommandInput {
+    pub fn window_default() -> u16 {
+        1
+    }
+
     pub fn compare(&self, input: &Buffer, facing: Direction) -> bool {
         let mut input_iter = input.iter();
         let mut index = 0;
