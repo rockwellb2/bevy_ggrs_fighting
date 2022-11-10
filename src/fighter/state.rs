@@ -1,28 +1,26 @@
 use std::fmt::Debug;
 
 use bevy::ecs::reflect;
-use bevy::prelude::{Entity, AnimationClip, Handle};
-use bevy::reflect::{FromReflect, TypeUuid, Reflect};
+use bevy::prelude::{AnimationClip, Entity, Handle, Mesh, StandardMaterial};
+use bevy::reflect::{FromReflect, Reflect, TypeUuid};
 use bevy::utils;
 use bevy::utils::hashbrown::{HashMap, HashSet};
 use bevy::{
-    ecs::reflect::ReflectComponent,
-    math::Vec3,
-    prelude::{Component},
-    reflect::{ReflectDeserialize},
+    ecs::reflect::ReflectComponent, math::Vec3, prelude::Component, reflect::ReflectDeserialize,
 };
 use bevy_editor_pls::default_windows::inspector::label_button;
-use bevy_inspector_egui::{Inspectable, egui};
+use bevy_inspector_egui::{egui, Inspectable};
 use serde::de::Visitor;
-use serde::{Deserialize, Serialize, de, Deserializer};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use serde_json::from_value;
+
+
 
 //use bevy_editor_pls::default_windows::inspector::InspectorWindow;
 
 use crate::input::{NewCommandInput, NewMatchExpression};
 
 use super::modifiers::StateModifier;
-
 
 #[derive(Default, Debug, Serialize, Deserialize, Component, Reflect)]
 #[reflect(Component)]
@@ -46,7 +44,6 @@ impl StateMap {
     }
 }
 
-
 #[derive(Default, Debug, Component, Reflect)]
 #[reflect(Component)]
 pub struct State {
@@ -55,7 +52,8 @@ pub struct State {
     pub hitboxes: Option<HashMap<u16, Vec<HitboxData>>>,
     pub hurtboxes: Option<HashMap<u16, HashSet<Entity>>>,
     pub transitions: Vec<Entity>,
-    pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>)
+    pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>),
+    pub height: StateHeight
 }
 
 impl State {
@@ -66,7 +64,8 @@ impl State {
             hitboxes: None,
             hurtboxes: None,
             transitions: Vec::new(),
-            triggers: serialized.triggers
+            triggers: serialized.triggers,
+            height: serialized.height
         }
     }
 
@@ -91,9 +90,15 @@ pub enum Conditions {
     Frame(Option<u16>, Option<u16>),
     // if the fighter just touched the ground
     ReachGround,
-    // hitbox id (optional), frame range cancel 
+    // hitbox id (optional), frame range cancel
     //OnHit(Option<usize>, u16)
+}
 
+#[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect, Default)]
+pub enum StateHeight {
+    #[default]
+    Stand,
+    Crouch
 }
 
 #[derive(Default, Serialize, Debug, Clone)]
@@ -105,9 +110,9 @@ pub struct SerializedState {
     pub unsorted_hurtboxes: Option<Vec<HurtboxData>>,
     pub modifiers: Option<Vec<Box<dyn StateModifier>>>,
     pub transitions: Vec<u16>,
-    pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>)
+    pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>),
+    pub height: StateHeight
 }
-
 
 impl<'de> Deserialize<'de> for SerializedState {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -125,40 +130,42 @@ impl<'de> Deserialize<'de> for SerializedState {
         let mut modifiers: Option<Vec<Box<dyn StateModifier>>> = None;
         let mut transitions: Vec<u16> = vec![0];
         let mut triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>) = (None, Vec::new());
+        let mut height: StateHeight = StateHeight::Stand;
 
         for (key, value) in object.into_iter() {
             let key = key.as_str();
 
             if key == "id" {
                 id = value.as_u64().expect("u64") as u16;
-            }
-            else if key == "debug_name" {
+            } else if key == "debug_name" {
                 debug_name = Some(value.as_str().expect("str").to_string());
-            }
-            else if key == "duration" {
+            } else if key == "duration" {
                 duration = Some(value.as_u64().expect("u64") as u16);
-            }
-            else if key == "hitboxes" {
-                unsorted_hitboxes = Some(from_value(value.clone()).expect("Can't convert array to Vec<HitboxData>"));
-            }
-            else if key == "hurtboxes" {
-                unsorted_hurtboxes = Some(from_value(value.clone()).expect("Can't convert array to Vec<HurtboxData>"));
-            }
-
-            else if key == "modifiers" {
-                modifiers = Some(from_value(value.clone()).expect("Can't convert array to Vec<Box<dyn StateModifier>>"));
-            }
-
-            else if key == "transitions" {
+            } else if key == "hitboxes" {
+                unsorted_hitboxes = Some(
+                    from_value(value.clone()).expect("Can't convert array to Vec<HitboxData>"),
+                );
+            } else if key == "hurtboxes" {
+                unsorted_hurtboxes = Some(
+                    from_value(value.clone()).expect("Can't convert array to Vec<HurtboxData>"),
+                );
+            } else if key == "modifiers" {
+                modifiers = Some(
+                    from_value(value.clone())
+                        .expect("Can't convert array to Vec<Box<dyn StateModifier>>"),
+                );
+            } else if key == "transitions" {
                 transitions = from_value(value.clone()).expect("Can't convert array to Vec<u16>");
-            }
-
-            else if key == "triggerAll" {
-                triggers.0 = Some(from_value(value.clone()).expect("Can't convert array to Vec<Conditions>"));
-            }
-
-            else if key.contains("trigger") {
-                triggers.1.push(from_value(value.clone()).expect("Can't convert array to Vec<Conditions>"))
+            } else if key == "state_height" {
+                height = from_value(value.clone()).expect("Can't convert to StateHeight ")
+            } else if key == "triggerAll" {
+                triggers.0 = Some(
+                    from_value(value.clone()).expect("Can't convert array to Vec<Conditions>"),
+                );
+            } else if key.contains("trigger") {
+                triggers.1.push(
+                    from_value(value.clone()).expect("Can't convert array to Vec<Conditions>"),
+                )
             }
         }
 
@@ -171,11 +178,10 @@ impl<'de> Deserialize<'de> for SerializedState {
             modifiers,
             transitions,
             triggers,
+            height
         })
-
     }
 }
-
 
 #[derive(Serialize, Deserialize, TypeUuid, Clone)]
 #[uuid = "57ae9bea-139e-11ed-861d-0242ac120002"]
@@ -189,19 +195,34 @@ pub trait HBox: Component {
     fn set_id(&mut self, value: usize);
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable)]
+#[derive(
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
+)]
+pub enum HitLevel {
+    Low, 
+    Middle, 
+    #[default]
+    High
+}
+
+#[derive(
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
+)]
 #[reflect(Component)]
 pub struct HitboxData {
     #[serde(default)]
     pub priority: u8,
     #[serde(default)]
     pub id: Option<usize>,
+    #[serde(default)]
+    pub global_id: Option<u32>,
     pub bone: String,
     #[serde(default)]
     pub bone_entity: Option<Entity>,
     pub radius: f32,
     #[serde(alias = "halfHeight")]
     pub half_height: f32,
+    #[serde(default)]
     pub offset: Vec3,
     #[serde(default, deserialize_with = "deserialize_rotation")]
     pub rotation: (f32, f32),
@@ -213,12 +234,14 @@ pub struct HitboxData {
     #[serde(alias = "endFrame")]
     pub end_frame: u16,
     #[serde(default)]
-    rehit: Option<u16> // Number frames after hitting that hitbox can hit again
+    rehit: Option<u16>, // Number frames after hitting that hitbox can hit again,
+    #[serde(default)]
+    hit_level: HitLevel
 }
 
 fn deserialize_rotation<'de, D>(deserializer: D) -> Result<(f32, f32), D::Error>
 where
-    D: de::Deserializer<'de>, 
+    D: de::Deserializer<'de>,
 {
     struct RotVisitor;
 
@@ -230,8 +253,8 @@ where
         }
 
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: de::SeqAccess<'de>, 
+        where
+            A: de::SeqAccess<'de>,
         {
             let mut x: f32 = seq.next_element()?.expect("Couldn't convert to f32");
             let mut z: f32 = seq.next_element()?.expect("Couldn't convert to f32");
@@ -240,13 +263,21 @@ where
             z = z.to_radians();
 
             Ok((x, z))
-            
         }
     }
 
-
     deserializer.deserialize_seq(RotVisitor)
+}
 
+impl HitboxData {
+    pub fn mesh_default() -> Option<Handle<Mesh>> {
+        None
+    }
+
+    pub fn set_global_id(&mut self, global_id: u32) {
+        self.global_id = Some(global_id);
+
+    }
 }
 
 impl HBox for HitboxData {
@@ -261,14 +292,17 @@ impl HBox for HitboxData {
     fn set_id(&mut self, value: usize) {
         self.id = Some(value);
     }
-
-    
 }
 
 #[derive(Component)]
 pub struct BoneMap(pub HashMap<String, Entity>);
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable)]
+#[derive(Component, Reflect, Default)]
+pub struct ActiveHitboxes(pub Vec<Entity>);
+
+#[derive(
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+)]
 #[reflect(Component)]
 pub struct HurtboxData {
     #[serde(default)]
@@ -319,14 +353,14 @@ impl Hurtboxes {
     }
 }
 
-
-
-#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable)]
+#[derive(
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+)]
 #[reflect(Component)]
 pub struct ProjectileData {
     pub name: String,
     #[serde(alias = "startPosition", default)]
-    pub start_position: Vec3, 
+    pub start_position: Vec3,
     pub dimensions: Vec3,
     #[serde(alias = "velocity", default)]
     pub start_velocity: Vec3,
@@ -339,8 +373,7 @@ pub struct ProjectileData {
     #[serde(default)]
     pub damage: u16,
     #[serde(default = "ProjectileData::max_default")]
-    pub max: usize
-
+    pub max: usize,
 }
 
 impl ProjectileData {
@@ -349,7 +382,9 @@ impl ProjectileData {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable)]
+#[derive(
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+)]
 #[reflect(Component)]
 pub struct Velocity(pub Vec3);
 
@@ -360,12 +395,12 @@ pub struct ProjectileReference {
     pub projectile_ids: HashMap<String, Vec<(Entity, bool)>>,
     // projectile name, vec of projectiles entities
     //pub projectile_ids: HashMap<String, Vec<Entity>>
-    pub amount_in_use: HashMap<String, usize>
+    pub amount_in_use: HashMap<String, usize>,
 }
 
 // impl Inspectable for ProjectileReference {
 //     type Attributes = (
-//         <String as Inspectable>::Attributes, 
+//         <String as Inspectable>::Attributes,
 //         <Vec<(Option<Entity>, bool)> as Inspectable>::Attributes
 //     );
 
@@ -381,8 +416,6 @@ pub struct ProjectileReference {
 //                 let val: Vec<(Option<&mut Entity>, &mut bool)> = val.iter_mut().map(|(entity, b)| {
 //                     (Some(entity), b)
 //                 }).collect();
-                
-
 
 //                 ui.horizontal(|ui| {
 //                     if label_button(ui, "✖", egui::Color32::RED) {
@@ -397,54 +430,49 @@ pub struct ProjectileReference {
 //                     changed |= val.ui(ui, options.1.clone(), &mut context.with_id(i as u64));
 //                 });
 
-    //             if i != len - 1 {
-    //                 ui.separator();
-    //             }
-    //         }
+//             if i != len - 1 {
+//                 ui.separator();
+//             }
+//         }
 
-    //         ui.vertical_centered_justified(|ui| {
-    //             if ui.button("+").clicked() {
-    //                 self.projectile_ids.insert(String::default(), vec![(Entity::from_raw(0), false)]);
-    //                 changed = true;
-    //             }
-    //         });
+//         ui.vertical_centered_justified(|ui| {
+//             if ui.button("+").clicked() {
+//                 self.projectile_ids.insert(String::default(), vec![(Entity::from_raw(0), false)]);
+//                 changed = true;
+//             }
+//         });
 
-    //         for (old_key, new_key) in to_update.drain(..) {
-    //             if let Some(val) = self.projectile_ids.remove(&old_key) {
-    //                 self.projectile_ids.insert(new_key, val);
-    //                 changed = true;
-    //             }
-    //         }
+//         for (old_key, new_key) in to_update.drain(..) {
+//             if let Some(val) = self.projectile_ids.remove(&old_key) {
+//                 self.projectile_ids.insert(new_key, val);
+//                 changed = true;
+//             }
+//         }
 
-    //         if let Some(key) = to_delete {
-    //             if self.projectile_ids.remove(&key).is_some() {
-    //                 changed = true;
-    //             }
-    //         }
-    //     });
+//         if let Some(key) = to_delete {
+//             if self.projectile_ids.remove(&key).is_some() {
+//                 changed = true;
+//             }
+//         }
+//     });
 
-    //     changed
+//     changed
 
-    // }
+// }
 //}
-
-
 
 impl ProjectileReference {
     pub fn new() -> Self {
         Self {
             projectile_ids: HashMap::new(),
-            amount_in_use: HashMap::new()
+            amount_in_use: HashMap::new(),
         }
     }
 
     pub fn insert_ids(&mut self, name: String, ids: Vec<(Entity, bool)>) {
         self.projectile_ids.insert(name, ids);
     }
-
 }
-
-
 
 #[derive(Component, Reflect, Default)]
 pub struct Variables(HashMap<String, u32>);
@@ -464,20 +492,26 @@ impl Default for CurrentState {
 pub struct Active(pub HashSet<Entity>);
 // Ignored Entities
 
-
 #[derive(Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct StateFrame(pub u16);
 
-#[derive(Component, Inspectable, PartialEq)]
+#[derive(Component, Inspectable, PartialEq, Reflect)]
 pub struct Owner(pub Entity);
 
+impl Default for Owner {
+    fn default() -> Self {
+        Self(Entity::from_raw(u32::MAX))
+    }
+}
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable, Copy, PartialEq)]
+#[derive(
+    Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable, Copy, PartialEq,
+)]
 pub enum Direction {
-    Left, 
+    Left,
     #[default]
-    Right
+    Right,
 }
 
 impl Direction {
@@ -489,16 +523,13 @@ impl Direction {
     }
 }
 
-
 impl From<f32> for Direction {
     fn from(value: f32) -> Self {
         if value.is_sign_negative() {
             Direction::Left
-        }
-        else if value.is_sign_positive() {
+        } else if value.is_sign_positive() {
             Direction::Right
-        }
-        else {
+        } else {
             panic!()
         }
     }
@@ -516,13 +547,12 @@ pub struct Health(pub u16);
 #[reflect(Component)]
 pub struct InHitstun(pub u16);
 
-
 #[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
 #[reflect(Component)]
 pub struct PlayerAxis {
     pub opponent_pos: Vec3,
     pub x: Vec3,
-    pub z: Vec3
+    pub z: Vec3,
 }
 
 #[derive(Component)]
@@ -533,4 +563,3 @@ impl Animation {
         self.1
     }
 }
-

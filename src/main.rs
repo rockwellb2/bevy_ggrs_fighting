@@ -14,7 +14,7 @@ use bevy_scene_hook::HookPlugin;
 use fighter::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, SerializedStateVec,
-        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox, PlayerAxis, Animation, Hurtboxes, BoneMap,
+        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox, PlayerAxis, Animation, Hurtboxes, BoneMap, ActiveHitboxes,
     },
     systems::{
         adjust_facing_system, collision_system, hbox_position_system,
@@ -26,7 +26,7 @@ use fighter::{
 };
 use game::{
     ADD_HITBOX, ADD_HURTBOX, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
-    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, AXIS, not_if_paused, Paused, if_paused, on_debug, on_debug_and_game_paused, paused_advance_or_round, on_armature, 
+    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, AXIS, not_if_paused, Paused, if_paused, on_debug, on_debug_and_game_paused, paused_advance_or_round, on_armature, debug::state_text_system, 
 };
 use ggrs::{Config, PlayerType, SessionBuilder, UdpNonBlockingSocket, SyncTestSession};
 //use bevy_editor_pls::prelude::*;
@@ -148,6 +148,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .register_rollback_type::<ProjectileReference>()
         .register_rollback_type::<Velocity>()
         .register_rollback_type::<PlayerAxis>()
+        .register_rollback_type::<HitboxData>()
+        .register_rollback_type::<Collider>()
+        .register_rollback_type::<ActiveHitboxes>()
+        .register_rollback_type::<Owner>()
 
         .register_rollback_type::<RoundState>()
 
@@ -358,6 +362,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_run_criteria(on_round)
             .with_system(ui_lifebar_system)
             .with_system(camera_system)
+            .with_system(state_text_system)
             //.with_system(animation_system)
         )
 
@@ -414,7 +419,12 @@ fn populate_entities_with_states(
     let mut state_map = StateMap::new();
     let mut transition_list: Vec<(Entity, Vec<u16>)> = Vec::new();
 
+    let mut global_hitbox_id: u32 = 0;
+
     world.resource_scope(|world, mut rip: Mut<RollbackIdProvider>| {
+
+
+
         for mut state in deserialized {
             
 
@@ -453,6 +463,8 @@ fn populate_entities_with_states(
 
                 for (index, mut hitbox) in hitboxes.into_iter().enumerate() {
                     hitbox.set_id(index);
+                    hitbox.set_global_id(global_hitbox_id);
+                    global_hitbox_id += 1;
                     
                     //let capsule = Capsule::new_y(hitbox.half_height - hitbox.radius, hitbox.radius);
 
@@ -545,58 +557,37 @@ fn populate_entities_with_states(
     });
 }
 
+pub struct HitboxMap(pub HashMap<u32, (Handle<Mesh>, Collider)>);
+
 pub fn insert_meshes(
     mut commands: Commands, 
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
 
-    hitbox_query: Query<(Entity, &HitboxData)>,
-    hurtbox_query: Query<(Entity, &HurtboxData)>,
+    state_query: Query<&FightState>
 
-    armature_query: Query<With<AnimationPlayer>>
 ) {
-    let hitbox_material = materials.add(Color::rgba(1., 0., 0., 0.3).into());
-    let hurtbox_material = materials.add(Color::rgba(1., 1., 0., 0.3).into());
+    let mut hitbox_resource: HashMap<u32, (Handle<Mesh>, Collider)> = HashMap::new();
 
 
-    for (entity, hitbox) in hitbox_query.iter() {
-        let mut transform = Transform::default();
-        transform.rotate_x(hitbox.rotation.0);
-        transform.rotate_z(hitbox.rotation.1);
-        transform.scale = Vec3::splat(0.1);
+    for state in state_query.iter() {
+        if let Some(hitboxes) = &state.hitboxes {
+            for boxes in hitboxes.values() {
+                for hitbox in boxes {
+                    let mesh =  meshes.add(Mesh::from(shape::Capsule {
+                        radius: hitbox.radius,
+                        depth: hitbox.half_height * 2. - hitbox.radius * 2.,
+                        ..default()
+                    }));
 
-
-        commands.entity(entity)
-            .insert_bundle(PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Capsule {
-                    radius: hitbox.radius,
-                    depth: hitbox.half_height * 2. - hitbox.radius * 2.,
-                    ..default()
-                })),
-                material: hitbox_material.clone(),
-                visibility: Visibility { is_visible: false },
-                transform,
-                ..default()
-            });
+                    let capsule = Capsule::new_y(hitbox.half_height - hitbox.radius, hitbox.radius);
+                    let collider: Collider = capsule.into();
+                    hitbox_resource.insert(hitbox.global_id.expect("GlobalID doesn't exist"), (mesh, collider));
+                }
+            }
+        }
     }
 
-    for (entity, hurtbox) in hurtbox_query.iter() {
-        // commands.entity(entity)
-        //     .insert_bundle(PbrBundle {
-        //         mesh: meshes.add(Mesh::from(shape::Capsule {
-        //             radius: hurtbox.radius,
-        //             depth: hurtbox.half_height * 2.,
-        //             ..default()
-        //         })),
-        //         material: hurtbox_material.clone(),
-        //         visibility: Visibility { is_visible: false },
-        //         //transform: Transform::from_scale(hurtbox.dimensions),
-        //         ..default()
-        //     });
-    }
-
-    println!("Armature query length: {:?}", armature_query.iter().len());
-
+    commands.insert_resource(HitboxMap(hitbox_resource));
 }
 
 pub fn insert_animations(
@@ -647,11 +638,7 @@ pub fn armature_system(
     hurtbox_query: Query<(Entity, &HurtboxData)>,
     parent_query: Query<&Parent>,
     mut state: ResMut<RoundState>,
-    mut fighter_query: Query<&mut Hurtboxes>,
-
-    mut state_query: Query<(&mut FightState, &Parent)>,
-    mut bonemap_query: Query<&mut BoneMap>,
-    bone_name_query: Query<(&Name, Entity), With<Transform>>
+    mut fighter_query: Query<&mut Hurtboxes>
 ) {
 
     let hurt_iter = hurtbox_query.iter();
@@ -676,60 +663,6 @@ pub fn armature_system(
 
 
         }
-
-        // for (mut fight_state, parent) in state_query.iter_mut() {
-        //     if let Some(hitboxes) = &mut fight_state.hitboxes {
-        //         for boxes in hitboxes.values_mut() {
-        //             for hitbox in boxes {
-        //                 let bone_name = hitbox.bone.clone();
-
-        //                 if let Ok(mut bonemap) = bonemap_query.get_mut(parent.get()) {
-        //                     if let Some(bone_entity) = bonemap.0.get(&bone_name) {
-        //                         hitbox.bone_entity = Some(*bone_entity);
-        //                     }
-        //                     else {
-        //                         for (name, bone_entity) in bone_name_query.iter() {
-        //                             if &name.to_string() == &bone_name {
-        //                                 let mut ancestor = parent_query.get(bone_entity).expect("Bone doesn't have parent");
-        //                                 loop {
-        //                                     if let Ok(bone_parent) = parent_query.get(ancestor.get()) {
-        //                                         ancestor = bone_parent;
-        //                                     }
-        //                                     else {
-        //                                         break;
-        //                                     }
-        //                                 }
-
-        //                                 if parent.get() == ancestor.get() {
-        //                                     bonemap.0.insert(bone_name, bone_entity);
-        //                                     hitbox.bone_entity = Some(bone_entity);
-        //                                     println!("It somehow got here, doing bone things");
-        //                                     break;
-
-        //                                 }
-
-        
-                                        
-                                        
-
-
-        //                             }
-        //                         }
-
-        //                     }
-        //                 }
-
-
-                        
-
-        //             }
-        //         }
-
-
-        //     }
-
-        // }
-
 
         *state = RoundState::EnterRound;
     }

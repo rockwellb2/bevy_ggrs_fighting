@@ -12,8 +12,12 @@
             700,
             200,
             100,
+            102,
             141,
-            106
+            106,
+            4000,
+            4001,
+            4011
         ],
         "modifiers": [
             {
@@ -53,7 +57,7 @@
             { "in": [5, 6] }
         ],
         "trigger2": [
-            { "in": [100, 101, 141, 700, 200] },
+            { "in": [100, 101, 102, 105, 104, 170, 141, 700, 200, 29] },
             { "endDuration": null }
         ],
         "trigger3": [
@@ -68,12 +72,26 @@
                     "window": 1
                 }
             }
+        ],
+        "trigger4": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["mk", "None"]
+                        ]
+                    ],
+                    "window": 1
+                }
+            },
+            { "in": [ 4001 ]}
         ]
     },
     {
         "id": 1,
         "debug_name": "2",
         "transitions": [
+            102,
             0
         ],
         "hurtboxes": [
@@ -97,7 +115,7 @@
         "modifiers": [
             {
                 "Velo": {
-                    "start_velocity": [0, 0, 7.5]
+                    "start_velocity": [0.4, 0, 2]
                 }
             }
         ]
@@ -110,13 +128,14 @@
             1,
             6,
             0,
-            141
+            141,
+            105
             
         ],
         "modifiers": [
             {
                 "Velo": {
-                    "start_velocity": [8, 0, 0],
+                    "start_velocity": [4, 0, 0],
                     "acceleration": [0, 0, 0]
                 }
             },
@@ -163,13 +182,14 @@
             1,
             5,
             0,
-            141
+            141,
+            104
             
         ],
         "modifiers": [
             {
                 "Velo": {
-                    "start_velocity": [-5, 0, 0],
+                    "start_velocity": [-2, 0, 0],
                     "acceleration": [0, 0, 0]
                 }
             },
@@ -209,6 +229,49 @@
         ]
     },
     {
+        "id": 20,
+        "debug_name": "Crouch",
+        "transitions": [
+            4011,
+            29
+        ],
+        "trigger1": [
+            { "in": [4011]},
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["mk", "None"]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+    },
+    {
+        "id": 29,
+        "debug_name": "Crouch~Stand",
+        "duration": 20,
+        "transitions": [
+            170,
+            0
+        ],
+        "trigger3": [
+            { "in": [20]},
+            { 
+                "command": {
+                    "list": [
+                        [
+                            ["y", "None", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+    },
+    {
         "id": 30,
         "debug_name": "8",
         "transitions": [
@@ -229,7 +292,7 @@
         "modifiers": [
             {
                 "Velo": {
-                    "start_velocity": [0, 0, -7.5]
+                    "start_velocity": [0.4, 0, -2]
                 }
             }
         ]
@@ -291,7 +354,7 @@
     {
         "id": 100,
         "debug_name": "LP",
-        "duration": 25,
+        "duration": 40,
         "transitions": [
             700,
             0
@@ -299,15 +362,14 @@
         "hitboxes": [
             {
                 "bone": "arm left wrist",
-                "startFrame": 10,
-                "endFrame": 12,
+                "startFrame": 13,
+                "endFrame": 14,
                 "damage": 30,
                 "hitstun": 18,
                 "blockstun": 10,
                 "radius": 0.11,
                 "halfHeight": 0.19,
-                "offset": [0.7, 1.6, 0],
-                "rotation": [90, 0]
+                "offset": [0, 0.1, 0]
             }
         ],
         "hurtboxes": [
@@ -361,6 +423,115 @@
         ]
     },
     {
+        "id": 102,
+        "debug_name": "3LP",
+        "duration": 60,
+        "transitions": [
+            0
+        ],
+        "hitboxes": [
+            {
+                "bone": "arm right wrist",
+                "startFrame": 25,
+                "endFrame": 29,
+                "damage": 30,
+                "hitstun": 18,
+                "blockstun": 10,
+                "radius": 0.17,
+                "halfHeight": 0.3,
+                "offset": [0, 0, 0]
+            }
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"],
+                            ["x", "Positive", false],
+                            ["y", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+
+        
+    },
+    {
+        "id": 104,
+        "debug_name": "4LP",
+        "duration": 32,
+        "transitions": [
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"],
+                            ["x", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            },
+            { "in": [6]}
+        ],
+        "hitboxes": [
+            {
+                "bone": "arm left wrist",
+                "startFrame": 5,
+                "endFrame": 6,
+                "damage": 30,
+                "hitstun": 18,
+                "blockstun": 10,
+                "radius": 0.11,
+                "halfHeight": 0.19,
+                "offset": [0, 0.1, 0]
+            }
+        ]
+    },
+    {
+        "id": 105,
+        "debug_name": "6LP",
+        "duration": 64,
+        "transitions": [
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"],
+                            ["x", "Positive", false]
+                        ]
+                        
+                    ],
+                    "window": 1
+                }
+            },
+            { "in": [5] }
+        ],
+        "hitboxes": [
+            {
+                "bone": "arm right wrist",
+                "startFrame": 17,
+                "endFrame": 19,
+                "damage": 30,
+                "hitstun": 18,
+                "blockstun": 10,
+                "radius": 0.11,
+                "halfHeight": 0.19,
+                "offset": [0, 0.1, 0]
+            }
+        ]
+
+    },
+    {
         "id": 106,
         "debug_name": "a.LP",
         "transitions": [
@@ -386,9 +557,44 @@
                     "window": 1
                 }
             }
+            
         ]
     },
+    {
+        "id": 170,
+        "debug_name": "WhileRisingLP",
+        "transitions": [
+            0
+        ],
+        "duration": 38,
+        "hitboxes": [
+            {
+                "bone": "arm left elbow",
+                "startFrame": 13,
+                "endFrame": 18,
+                "damage": 30,
+                "hitstun": 18,
+                "blockstun": 10,
+                "radius": 0.21,
+                "halfHeight": 0.33,
+                "offset": [0, 0.1, 0]
+            }
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
 
+
+    },
     {
         "id": 200,
         "debug_name": "MP",
@@ -511,5 +717,86 @@
             },
             { "in": [200] }
         ]
+    },
+    {
+        "id": 4000,
+        "debug_name": "GuardStart",
+        "duration": 7,
+        "transitions": [
+            4001
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["mk", "Hold"]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+    },
+    {
+        "id": 4001,
+        "debug_name": "Guard",
+        "transitions": [
+            0,
+            4011
+        ],
+        "trigger1": [
+            { "in": [4000] },
+            { "endDuration": null }
+        ],
+        "trigger2": [
+            { "in": [4011] },
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["y", "None", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+    },
+    {
+        "id": 4011,
+        "debug_name": "CrouchGuard",
+        "transitions": [
+            20,
+            0,
+            4001
+        ],
+        "trigger1": [
+            { "in": [4001] },
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["y", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ],
+        "trigger2": [
+            { "in": [20] },
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["mk", "Hold"]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
     }
+
 ]

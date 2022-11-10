@@ -2,10 +2,11 @@ use std::any;
 
 use bevy::prelude::{Entity, Vec3};
 use bevy::reflect::utility::GenericTypeInfoCell;
-use bevy::reflect::{TypeUuid, Typed, TypeInfo, StructInfo, NamedField, Struct};
+use bevy::reflect::{TypeUuid, Typed, TypeInfo, StructInfo, NamedField, Struct, GetTypeRegistration, TypeRegistration, DynamicStruct, FieldIter};
 use bevy::{prelude::Component, reflect::Reflect};
 use bevy::ecs::reflect::ReflectComponent;
-use parry3d::shape::{Cuboid, Capsule};
+use bevy_inspector_egui::Inspectable;
+use parry3d::shape::{Cuboid, Capsule, Segment};
 use serde::{Deserialize, Serialize};
 
 use super::state::{HitboxData, HurtboxData};
@@ -23,115 +24,84 @@ pub struct FighterData {
     pub walk_back: f32
 }
 
-#[derive(Component)]
+#[derive(Component, Clone, Reflect, Inspectable)]
 pub struct Collider {
-    pub shape: Capsule
+    pub radius: f32,
+    pub segment: SegmentProxy
 }
 
-impl Reflect for Collider {
-    fn type_name(&self) -> &str {
-        any::type_name::<Self>()
-    }
-
-    fn get_type_info(&self) -> &'static bevy::reflect::TypeInfo {
-        <Self as Typed>::type_info()
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-       self
-    }
-
-    fn as_reflect(&self) -> &dyn Reflect {
-        self
-    }
-
-    fn as_reflect_mut(&mut self) -> &mut dyn Reflect {
-        self
-    }
-
-    fn apply(&mut self, value: &dyn Reflect) {
-        todo!()
-    }
-
-    fn set(&mut self, value: Box<dyn Reflect>) -> Result<(), Box<dyn Reflect>> {
-        *self = value.take()?;
-        Ok(())
-    }
-
-    fn reflect_ref(&self) -> bevy::reflect::ReflectRef {
-        //bevy::reflect::ReflectRef::Struct(self)
-        todo!()
-    }
-
-    fn reflect_mut(&mut self) -> bevy::reflect::ReflectMut {
-        todo!()
-    }
-
-    fn clone_value(&self) -> Box<dyn Reflect> {
-        todo!()
+impl Default for Collider {
+    fn default() -> Self {
+        let shape = Capsule::new_y(1., 1.);
+        shape.into()
     }
 }
 
-impl Typed for Collider {
-    fn type_info() -> &'static TypeInfo {
-        static CELL: GenericTypeInfoCell = GenericTypeInfoCell::new();
-        CELL.get_or_insert::<Self, _>(|| TypeInfo::Struct(
-            StructInfo::new::<Collider>(&[NamedField::new::<Collider, &str>("segment".into()), NamedField::new::<Collider, &str>("radius".into())])
-        ))
+impl Into<Capsule> for Collider {
+    fn into(self) -> Capsule {
+        let radius = self.radius.into();
+        let segment = self.segment.into();
+
+        Capsule {
+            segment,
+            radius,
+        }
+
     }
 }
 
-// impl Struct for Collider {
-//     fn field(&self, name: &str) -> Option<&dyn Reflect> {
-//         match name {
-//             "radius" => Some(&self.shape.radius),
-//             "segment" => Some({
-//                 let a: Vec3 = self.shape.segment.a.into();
-//                 let b: Vec3 = self.shape.segment.b.into();
+impl Into<Capsule> for &Collider {
+    fn into(self) -> Capsule {
+        let radius = self.radius.into();
+        let segment = self.segment.clone().into();
 
-//                 (a.clone(), b.clone())
-//             }),
-//             _ => None
-//         }
-//     }
+        Capsule {
+            segment,
+            radius,
+        }
+    }
+}
 
-//     fn field_mut(&mut self, name: &str) -> Option<&mut dyn Reflect> {
-//         todo!()
-//     }
+impl Into<Collider> for Capsule {
+    fn into(self) -> Collider {
+        let radius = self.radius.into();
+        let segment = self.segment.into();
 
-//     fn field_at(&self, index: usize) -> Option<&dyn Reflect> {
-//         todo!()
-//     }
+        Collider {
+            radius,
+            segment,
+        }
+    }
+}
 
-//     fn field_at_mut(&mut self, index: usize) -> Option<&mut dyn Reflect> {
-//         todo!()
-//     }
 
-//     fn name_at(&self, index: usize) -> Option<&str> {
-//         todo!()
-//     }
 
-//     fn field_len(&self) -> usize {
-//         todo!()
-//     }
+#[derive(Clone, Reflect, Inspectable)]
+pub struct SegmentProxy {
+    pub a: Vec3,
+    pub b: Vec3,
+}
 
-//     fn iter_fields(&self) -> bevy::reflect::FieldIter {
-//         todo!()
-//     }
+impl SegmentProxy {
+    pub fn from_segment(segment: Segment) -> SegmentProxy {
+        segment.into()
+    }
+}
 
-//     fn clone_dynamic(&self) -> bevy::reflect::DynamicStruct {
-//         todo!()
-//     }
-// }
 
+impl Into<SegmentProxy> for Segment {
+    fn into(self) -> SegmentProxy {
+        SegmentProxy { a: self.a.into(), b: self.b.into() }
+    }
+}
+
+impl Into<Segment> for SegmentProxy {
+    fn into(self) -> Segment {
+        Segment { a: self.a.into(), b: self.b.into() }
+    }
+}
+
+   
 
 pub struct CollisionData {
     pub attacker_box: HitboxData,

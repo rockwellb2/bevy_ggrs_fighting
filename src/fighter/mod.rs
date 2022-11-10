@@ -5,7 +5,7 @@ use bevy_inspector_egui::RegisterInspectable;
 
 
 use self::{
-    data::{FighterData, HitEvent}, 
+    data::{FighterData, HitEvent, Collider, SegmentProxy}, 
     state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference, PlayerAxis, Animation, HurtboxData}, 
     systems::InputBuffer, event::TransitionEvent,
     modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object, Velo, VectorType}
@@ -50,13 +50,16 @@ impl Plugin for FighterPlugin {
             .register_type::<StateMap>()
             .register_type::<Direction>()
             .register_inspectable::<Direction>()
-            .register_inspectable::<HitboxData>()
+            //.register_inspectable::<HitboxData>()
             .register_inspectable::<ProjectileData>()
             .register_inspectable::<Object>()
             .register_inspectable::<VectorType>()
             .register_inspectable::<Option<VectorType>>()
             .register_inspectable::<PlayerAxis>()
             .register_inspectable::<HurtboxData>()
+            //.register_inspectable::<HitboxData>()
+            .register_inspectable::<Collider>()
+            .register_inspectable::<SegmentProxy>()
             //.register_inspectable::<ProjectileReference>()
             .register_type::<ProjectileReference>()
             .register_type::<FighterData>();

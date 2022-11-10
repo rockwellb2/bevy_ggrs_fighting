@@ -1,3 +1,5 @@
+pub mod debug;
+
 use bevy::{reflect::Reflect, prelude::{Component, ResMut, Res}, ecs::schedule::ShouldRun};
 
 use crate::GameDebug;
