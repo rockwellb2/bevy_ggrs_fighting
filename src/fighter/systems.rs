@@ -3,11 +3,11 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use super::{
     data::{Collider, CollisionData, FighterData, HitEvent},
     event::TransitionEvent,
-    modifiers::{AdjustFacing, CreateObject, Movement, Object, VectorType, Velo},
+    modifiers::{AdjustFacing, CreateObject, Movement, Object, VectorType, Velo, OnExitSetPos},
     state::{
         Active, ActiveHitboxes, Animation, Conditions, CurrentState, Direction, Facing, HBox,
         Health, HitboxData, HurtboxData, Hurtboxes, InHitstun, Owner, PlayerAxis, ProjectileData,
-        ProjectileReference, State, StateFrame, StateMap, Velocity,
+        ProjectileReference, State, StateFrame, StateMap, Velocity, Exclude, BoneMap,
     },
     Fighter,
 };
@@ -57,7 +57,7 @@ pub fn buffer_insert_system(
 }
 
 pub fn movement_system(
-    query: Query<(&Parent, &Velo)>,
+    query: Query<&Velo>,
     mut fighter_query: Query<(
         &StateMap,
         &CurrentState,
@@ -73,7 +73,7 @@ pub fn movement_system(
     {
         let s = map.get(&current.0).expect("State doesn't exist");
 
-        if let Ok((_parent, velo)) = query.get(*s) {
+        if let Ok(velo) = query.get(*s) {
             if frame.0 == 1 {
                 if let Some(start) = &velo.start_velocity {
                     let mut start: Vec3 = match start {
@@ -313,21 +313,42 @@ pub fn transition_system(
             &StateMap,
             &mut StateFrame,
             &InputBuffer,
+            &BoneMap
         ),
         With<Fighter>,
     >,
     state_query: Query<&State>,
+    set_pos_query: Query<&OnExitSetPos>,
 
-    mut box_set: ParamSet<(
-        Query<&mut Visibility, With<HurtboxData>>,
-        Query<(Entity, &Owner, &mut Visibility), (With<Active>, With<HitboxData>)>,
+    mut transform_set: ParamSet<(
+        Query<&GlobalTransform>,
+        Query<&mut Transform>,
     )>,
 ) {
     for event in trans_reader.iter() {
-        if let Ok((fighter, mut current, map, mut frame, _buffer)) =
+        if let Ok((fighter, mut current, map, mut frame, _buffer, bone_map)) =
             fighter_query.get_mut(event.fighter)
         {
             println!("Transition {} to {}", current.0, event.to_id);
+
+            let state = map.get(&current.0).expect("State doesn't exist");
+
+            if let Ok(set_pos) = set_pos_query.get(*state) {
+                let bone = bone_map.0.get(&set_pos.bone).expect("Bone doesn't exist");
+                let query_global = transform_set.p0();
+                let global = query_global.get(*bone).expect("Bone doesn't have global transform");
+                let pos = global.translation();
+
+                let mut query_trans = transform_set.p1();
+                let mut tf = query_trans.get_mut(fighter).expect("Fighter doesn't have transform component");
+
+                tf.translation.x = pos.x;
+                tf.translation.z = pos.z;
+
+
+
+
+            }
 
             current.0 = event.to_id;
             frame.0 = 1;
@@ -401,6 +422,7 @@ pub fn hitbox_component_system(
                                     .insert(Rollback::new(rip.next_id()))
                                     .insert(hit_collider.1.clone())
                                     .insert(Owner(entity))
+                                    .insert(Exclude(HashSet::new()))
                                     .id()
                             });
 
@@ -723,7 +745,7 @@ pub fn hbox_position_system<T: HBox>(
 }
 
 pub fn collision_system(
-    hitbox_query: Query<(Entity, &Owner), With<HitboxData>>,
+    hitbox_query: Query<(Entity, &Owner, &Exclude), With<HitboxData>>,
     hurtbox_query: Query<(Entity, &Owner, &Name), With<HurtboxData>>,
 
     hit_query: Query<(Entity, &HitboxData, &Collider, &GlobalTransform)>,
@@ -743,11 +765,12 @@ pub fn collision_system(
     let mut hitboxes_1: Vec<Entity> = Vec::new();
     let mut hitboxes_2: Vec<Entity> = Vec::new();
 
-    for (hit_entity, owner) in hitbox_query.iter() {
-        if owner.0 == players.get(1) {
+    for (hit_entity, owner, exclude) in hitbox_query.iter() {
+        
+        if owner.0 == players.get(1) && !exclude.0.contains(&players.get(2)) {
             hitboxes_1.push(hit_entity);
         }
-        else {
+        else if owner.0 == players.get(2) && !exclude.0.contains(&players.get(1)) {
             hitboxes_2.push(hit_entity);
         }
 
@@ -888,7 +911,7 @@ pub fn hit_event_system(
         (Entity, &mut Health, &mut StateFrame, &mut CurrentState),
         With<Fighter>,
     >,
-    mut hitbox_query: Query<(&mut Active, &HitboxData, &Owner)>,
+    mut hitbox_query: Query<(&mut Exclude, &HitboxData, &Owner)>,
 ) {
     for hit_event in hit_reader.iter() {
         if let Ok((fighter, mut health, mut frame, mut current)) =
@@ -903,9 +926,9 @@ pub fn hit_event_system(
             current.0 = 3000;
         }
 
-        for (mut active, _data, owner) in hitbox_query.iter_mut() {
+        for (mut exclude, _data, owner) in hitbox_query.iter_mut() {
             if owner.0 == hit_event.0.attacker {
-                active.0.insert(hit_event.0.recipient);
+                exclude.0.insert(hit_event.0.recipient);
             }
         }
     }

@@ -138,7 +138,7 @@
         "modifiers": [
             {
                 "Velo": {
-                    "start_velocity": [4, 0, 0],
+                    "startVelocity": [4, 0, 0],
                     "acceleration": [0, 0, 0]
                 }
             },
@@ -415,6 +415,20 @@
             20
         ],
         "duration": 63,
+        "hitboxes": [
+            {
+                "bone": "arm right wrist",
+                "startFrame": 24,
+                "endFrame": 26,
+                "damage": 30,
+                "hitLevel": "Low",
+                "hitstun": 18,
+                "blockstun": 10,
+                "radius": 0.17,
+                "halfHeight": 0.3,
+                "offset": [0, 0.1, 0.05]
+            }
+        ],
         "triggerAll": [
             {
                 "command": {

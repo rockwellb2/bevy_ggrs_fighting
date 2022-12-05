@@ -44,6 +44,9 @@ use structopt::StructOpt;
 
 use std::{env, net::SocketAddr, default, f32::consts::FRAC_PI_2};
 
+use aws_sdk_gamelift as gamelift;
+use aws_sdk_cognitoidentity as cognito;
+
 use crate::{
     battle::{PlayerEntities, PlayerHandleAccess},
     fighter::{
@@ -51,6 +54,7 @@ use crate::{
         state::{Owner, SerializedState, State as FightState, StateMap},
     },
 };
+
 
 mod battle;
 mod fighter;
@@ -96,8 +100,24 @@ struct Opt {
     debug_mode: bool
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env::set_var("RUST_BACKTRACE", "1");
+
+    // let config = aws_config::from_env().region(gamelift::Region::new("us-east-1")).load().await;
+    // let client = cognito::Client::new(&config);
+    // if let Ok(_x) = client
+    //     .get_id()
+    //     .set_identity_pool_id(Some("us-east-1:a049d9ef-a70c-428c-a06b-7b95b6409934".into()))
+    //     .send().await {
+    //         println!("Did this do something?")
+
+    //     }
+    //     else {
+    //         println!("it did not do something")
+    //     }
+    
+
 
     let opt = Opt::from_args();
     let num_players: usize = 2;
@@ -346,8 +366,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     app.add_plugins(DefaultPlugins)
         .add_plugin(ShapePlugin)
-        .add_plugin(JsonAssetPlugin::<SerializedStateVec>::new(&["sl.json"]))
-        .add_plugin(JsonAssetPlugin::<FighterData>::new(&["json"]))
+        .add_plugin(JsonAssetPlugin::<SerializedStateVec>::new(&["sl.json", "states"]))
+        .add_plugin(JsonAssetPlugin::<FighterData>::new(&["json", "data"]))
         
         .insert_resource(RoundState::EnterLoading)
         .add_plugin(InputManagerPlugin::<Action>::default())
@@ -402,8 +422,8 @@ fn startup(world: &mut World) {
         let deserialized = state_lists.remove(&access.0.state_list).unwrap().0;
         let deserialized2 = deserialized.clone();
 
-        populate_entities_with_states(world, player1, deserialized);
-        populate_entities_with_states(world, player2, deserialized2);
+        populate_entities_with_states(world, player1, 1, deserialized);
+        populate_entities_with_states(world, player2, 2, deserialized2);
     });
 
 
@@ -414,6 +434,7 @@ fn startup(world: &mut World) {
 fn populate_entities_with_states(
     world: &mut World,
     player: Entity,
+    player_num: u8,
     deserialized: Vec<SerializedState>,
 ) {
     let mut state_map = StateMap::new();
@@ -435,17 +456,20 @@ fn populate_entities_with_states(
                 .as_ref()
                 .unwrap_or(&"State".to_string())
                 .clone();
+            
+            let name = format!("({}) {}", player_num, name);
             let entity = world
                 .spawn()
                 .insert(Name::new(name.clone()))
                 .insert_bundle(VisibilityBundle::default())
                 .insert(Rollback::new(rip.next_id()))
+                .insert(Owner(player))
                 .id();
 
 
-            {
-                world.entity_mut(player).push_children(&[entity]);
-            }
+            
+            //world.entity_mut(player).push_children(&[entity]);
+            
 
             state_map.add_state(state.id, entity);
             let hbox_serialized = state.unsorted_hitboxes.take();
@@ -606,7 +630,7 @@ pub fn insert_animations(
         let gltf = assets_gltf.get(&handle).expect("GLTF handle doesn't exist");
         let animations = &gltf.named_animations;
         for (entity, name) in query.iter_many(map.map.values()) {
-            if let Some(animation) = animations.get(&name.to_string()) {
+            if let Some(animation) = animations.get(name.to_string().rsplit(") ").next().expect("Split didn't work")) {
                 let length = animation_clips
                     .get(&animation)
                     .expect("AnimationClip doesn't exist")

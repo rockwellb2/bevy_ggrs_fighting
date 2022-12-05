@@ -235,7 +235,7 @@ pub struct HitboxData {
     pub end_frame: u16,
     #[serde(default)]
     rehit: Option<u16>, // Number frames after hitting that hitbox can hit again,
-    #[serde(default)]
+    #[serde(alias = "hitLevel", default)]
     hit_level: HitLevel
 }
 
@@ -496,8 +496,18 @@ pub struct Active(pub HashSet<Entity>);
 #[reflect(Component)]
 pub struct StateFrame(pub u16);
 
+#[derive(Default, Component, Reflect)]
+#[reflect(Component)]
+pub struct Exclude(pub HashSet<Entity>);
+
 #[derive(Component, Inspectable, PartialEq, Reflect)]
 pub struct Owner(pub Entity);
+
+impl Owner {
+    pub fn get(&self) -> Entity {
+        self.0
+    }
+}
 
 impl Default for Owner {
     fn default() -> Self {

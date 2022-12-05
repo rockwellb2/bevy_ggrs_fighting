@@ -6,9 +6,9 @@ use bevy_inspector_egui::RegisterInspectable;
 
 use self::{
     data::{FighterData, HitEvent, Collider, SegmentProxy}, 
-    state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference, PlayerAxis, Animation, HurtboxData}, 
+    state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference, PlayerAxis, Animation, HurtboxData, Exclude}, 
     systems::InputBuffer, event::TransitionEvent,
-    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object, Velo, VectorType}
+    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object, Velo, VectorType, OnExitSetPos}
 };
 
 pub(crate) mod state;
@@ -35,12 +35,14 @@ impl Plugin for FighterPlugin {
             .register_type::<AdjustFacing>()
             .register_type::<CreateObject>()
             .register_type::<Velo>()
+            .register_type::<OnExitSetPos>()
 
 
             .register_type::<Facing>()
             .register_type::<Health>()
             .register_type::<InputBuffer>()
             .register_type::<ProjectileReference>()
+            .register_type::<Exclude>()
 
             // These registers below are purely for the inspector
             .register_type::<CurrentState>()

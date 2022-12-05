@@ -37,7 +37,7 @@ use parry3d::shape::{Capsule, Cuboid};
 use crate::{
     fighter::{
         data::{Collider, FighterData},
-        modifiers::{CreateObject, Object},
+        modifiers::{CreateObject, Object, OnExitSetPos},
         state::{
             ActiveHitboxes, BoneMap, CurrentState, Direction, Facing, Health, HurtboxData,
             Hurtboxes, Owner, PlayerAxis, ProjectileReference, SerializedStateVec,
@@ -115,10 +115,12 @@ pub fn load_fighters(
     // mut loading: ResMut<AssetsLoading>,
 ) {
     let state_list: Handle<SerializedStateVec> =
-        asset_server.load("data/fighters/tahu/states.sl.json");
+        //asset_server.load("data/fighters/tahu/states.sl.json");
+        asset_server.load("data/fighters/ryo/ryo.states");
     let fighter_data: Handle<FighterData> =
         asset_server.load("data/fighters/tahu/fighter_data.json");
-    let model: Handle<Gltf> = asset_server.load("models/sfv_ryu.glb");
+    //let model: Handle<Gltf> = asset_server.load("models/sfv_ryu.glb");
+    let model: Handle<Gltf> = asset_server.load("models/ryo.glb");
 
     let f2: Handle<FighterData> = asset_server.load("data/fighters/abe/fighter_data.json");
 
@@ -350,7 +352,9 @@ pub fn extra_setup_system(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 
-    mut state_query: Query<(&mut FightState, &Parent)>,
+    exit_set_pos_query: Query<(&OnExitSetPos, &Owner)>,
+
+    mut state_query: Query<(&mut FightState, &Owner)>,
     mut bonemap_query: Query<&mut BoneMap>,
     bone_name_query: Query<(&Name, Entity), With<Transform>>,
 
@@ -426,6 +430,45 @@ pub fn extra_setup_system(
             }
             Object::None => panic!(),
         }
+    }
+
+    for (set_pos, owner) in exit_set_pos_query.iter() {
+        let bone_name = &set_pos.bone;
+
+        if let Ok(mut bonemap) = bonemap_query.get_mut(owner.get()) {
+            if let Some(_bone_entity) = bonemap.0.get(bone_name) {
+                //hitbox.bone_entity = Some(*bone_entity);
+            } else {
+                for (name, bone_entity) in bone_name_query.iter() {
+                    if &name.to_string() == bone_name {
+                        let mut ancestor = bone_parent_query
+                            .get(bone_entity)
+                            .expect("Bone doesn't have parent");
+                        loop {
+                            if let Ok(bone_parent) =
+                                bone_parent_query.get(ancestor.get())
+                            {
+                                ancestor = bone_parent;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        if owner.get() == ancestor.get() {
+                            bonemap.0.insert(bone_name.to_string(), bone_entity);
+                            //hitbox.bone_entity = Some(bone_entity);
+                            println!("It somehow got here, doing bone things");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        
+
+
     }
 
     for (mut fight_state, parent) in state_query.iter_mut() {

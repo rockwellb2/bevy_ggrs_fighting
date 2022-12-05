@@ -19,6 +19,11 @@ bevy = {version = "0.8", features = ["serialize", "trace"]}
 bevy_ggrs = { git = "https://github.com/gschup/bevy_ggrs"}
 ggrs = { git = "https://github.com/gschup/ggrs", features=["sync-send"]}
 
+aws-sdk-gamelift = "0.21.0"
+aws-config = "0.51.0"
+aws-sdk-cognitoidentity = "0.21.0"
+tokio = { version = "1", features = ["full"] }
+
 
 bitflags = "1.3"
 ux = "0.1.4"

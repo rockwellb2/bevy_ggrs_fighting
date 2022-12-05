@@ -54,6 +54,20 @@ impl StateModifier for AdjustFacing {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
+#[reflect(Component, Deserialize, StateModifier)]
+pub struct OnExitSetPos {
+    // Bone to use as reference
+    pub bone: String,
+}
+
+#[typetag::serde]
+impl StateModifier for OnExitSetPos {
+    fn dyn_clone(&self) -> Box<dyn StateModifier> {
+        Box::new(self.clone())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone, Inspectable)]
 pub enum Object {
     Projectile(ProjectileData),
@@ -75,7 +89,7 @@ impl StateModifier for CreateObject {
 #[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
 #[reflect(Component, Deserialize, StateModifier)]
 pub struct Velo {
-    #[serde(default)]
+    #[serde(alias = "startVelocity", default)]
     pub start_velocity: Option<VectorType>,
     #[serde(default)]
     pub acceleration: Option<VectorType>,
