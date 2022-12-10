@@ -3,25 +3,27 @@
         "id": 0,
         "debug_name": "Idle",
         "transitions": [
-            1,
-            5,
-            6,
-            32,
-            31,
-            30,
             350,
             300,
             210,
             230,
+            220,
             250,
             260,
             200,
             150,
             160,
+            120,
             100,
             4000,
             4001,
-            4011
+            4011,
+            1,
+            5,
+            6,
+            32,
+            31,
+            30
         ],
         "modifiers": [
             {
@@ -42,7 +44,7 @@
             { "in": [5, 6] }
         ],
         "trigger2": [
-            { "in": [100, 150, 160, 200, 210, 230, 235, 250, 260, 300, 350] },
+            { "in": [100, 120, 150, 160, 200, 210, 220, 230, 235, 250, 260, 300, 350] },
             { "endDuration": null }
         ],
         "trigger3": [
@@ -78,6 +80,8 @@
         "transitions": [
             210,
             230,
+            220,
+            120,
             33,
             0
         ],
@@ -394,6 +398,27 @@
         ]
     },
     {
+        "id": 120,
+        "debug_name": "2A",
+        "duration": 50,
+        "transitions": [
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"],
+                            ["y", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+    },
+    {
         "id": 160,
         "debug_name": "6A",
         "duration": 51,
@@ -500,6 +525,27 @@
                         [
                             ["lk", "Press"],
                             ["x", "Negative", false],
+                            ["y", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+    },
+    {
+        "id": 220,
+        "debug_name": "2B",
+        "duration": 45,
+        "transitions": [
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lk", "Press"],
                             ["y", "Negative", false]
                         ]
                     ],
