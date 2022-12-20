@@ -8,7 +8,7 @@ use self::{
     data::{FighterData, HitEvent, Collider, SegmentProxy}, 
     state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference, PlayerAxis, Animation, HurtboxData, Exclude}, 
     systems::InputBuffer, event::TransitionEvent,
-    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object, Velo, VectorType, OnExitSetPos}
+    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object, Velo, VectorType, OnExitSetPos, InputWindowCheck}
 };
 
 pub(crate) mod state;
@@ -36,6 +36,7 @@ impl Plugin for FighterPlugin {
             .register_type::<CreateObject>()
             .register_type::<Velo>()
             .register_type::<OnExitSetPos>()
+            .register_type::<InputWindowCheck>()
 
 
             .register_type::<Facing>()

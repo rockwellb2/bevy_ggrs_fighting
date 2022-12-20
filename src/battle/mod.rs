@@ -37,7 +37,7 @@ use parry3d::shape::{Capsule, Cuboid};
 use crate::{
     fighter::{
         data::{Collider, FighterData},
-        modifiers::{CreateObject, Object, OnExitSetPos},
+        modifiers::{CreateObject, Object, OnExitSetPos, InputWindowCheck, InputMet},
         state::{
             ActiveHitboxes, BoneMap, CurrentState, Direction, Facing, Health, HurtboxData,
             Hurtboxes, Owner, PlayerAxis, ProjectileReference, SerializedStateVec,
@@ -358,6 +358,8 @@ pub fn extra_setup_system(
     mut bonemap_query: Query<&mut BoneMap>,
     bone_name_query: Query<(&Name, Entity), With<Transform>>,
 
+    window_check_query: Query<Entity, (With<FightState>, With<InputWindowCheck>)>,
+
     bone_parent_query: Query<&Parent>,
 ) {
     let projectile_material = materials.add(Color::rgba(0., 1., 0., 0.5).into());
@@ -510,6 +512,14 @@ pub fn extra_setup_system(
             }
         }
     }
+
+
+    for check_input_state in window_check_query.iter() {
+        commands.entity(check_input_state)
+            .insert(InputMet(false));
+    }
+
+
 
     *round_state = RoundState::Round;
 }

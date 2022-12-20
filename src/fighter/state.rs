@@ -92,6 +92,7 @@ pub enum Conditions {
     ReachGround,
     // hitbox id (optional), frame range cancel
     //OnHit(Option<usize>, u16)
+    InputWindowCon
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect, Default)]

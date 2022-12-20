@@ -3,11 +3,11 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use super::{
     data::{Collider, CollisionData, FighterData, HitEvent},
     event::TransitionEvent,
-    modifiers::{AdjustFacing, CreateObject, Movement, Object, VectorType, Velo, OnExitSetPos},
+    modifiers::{AdjustFacing, CreateObject, Movement, Object, OnExitSetPos, VectorType, Velo},
     state::{
-        Active, ActiveHitboxes, Animation, Conditions, CurrentState, Direction, Facing, HBox,
-        Health, HitboxData, HurtboxData, Hurtboxes, InHitstun, Owner, PlayerAxis, ProjectileData,
-        ProjectileReference, State, StateFrame, StateMap, Velocity, Exclude, BoneMap,
+        Active, ActiveHitboxes, Animation, BoneMap, Conditions, CurrentState, Direction, Exclude,
+        Facing, HBox, Health, HitboxData, HurtboxData, Hurtboxes, InHitstun, Owner, PlayerAxis,
+        ProjectileData, ProjectileReference, State, StateFrame, StateMap, Velocity,
     },
     Fighter,
 };
@@ -220,6 +220,7 @@ pub fn process_input_system(
                                     break 'all;
                                 }
                             }
+                            Conditions::InputWindowCon => todo!(),
                             // Conditions::OnHit(id, range) => {
                             //     if let Some(id) = id {
                             //         todo!()
@@ -285,7 +286,8 @@ pub fn process_input_system(
                                     met = false;
                                     break 'conditions;
                                 }
-                            } // Conditions::OnHit(_, _) => todo!(),
+                            }
+                            Conditions::InputWindowCon => todo!(), // Conditions::OnHit(_, _) => todo!(),
                         }
                     }
                     if met {
@@ -313,17 +315,14 @@ pub fn transition_system(
             &StateMap,
             &mut StateFrame,
             &InputBuffer,
-            &BoneMap
+            &BoneMap,
         ),
         With<Fighter>,
     >,
     state_query: Query<&State>,
     set_pos_query: Query<&OnExitSetPos>,
 
-    mut transform_set: ParamSet<(
-        Query<&GlobalTransform>,
-        Query<&mut Transform>,
-    )>,
+    mut transform_set: ParamSet<(Query<&GlobalTransform>, Query<&mut Transform>)>,
 ) {
     for event in trans_reader.iter() {
         if let Ok((fighter, mut current, map, mut frame, _buffer, bone_map)) =
@@ -336,18 +335,18 @@ pub fn transition_system(
             if let Ok(set_pos) = set_pos_query.get(*state) {
                 let bone = bone_map.0.get(&set_pos.bone).expect("Bone doesn't exist");
                 let query_global = transform_set.p0();
-                let global = query_global.get(*bone).expect("Bone doesn't have global transform");
+                let global = query_global
+                    .get(*bone)
+                    .expect("Bone doesn't have global transform");
                 let pos = global.translation();
 
                 let mut query_trans = transform_set.p1();
-                let mut tf = query_trans.get_mut(fighter).expect("Fighter doesn't have transform component");
+                let mut tf = query_trans
+                    .get_mut(fighter)
+                    .expect("Fighter doesn't have transform component");
 
                 tf.translation.x = pos.x;
                 tf.translation.z = pos.z;
-
-
-
-
             }
 
             current.0 = event.to_id;
@@ -439,7 +438,6 @@ pub fn hitbox_removal_system(
     query: Query<(Entity, &HitboxData, &Owner)>,
     fighter_query: Query<&StateFrame, With<Fighter>>,
 ) {
-
     for (entity, data, owner) in query.iter() {
         let frame = fighter_query.get(owner.0).expect("Owner doesn't exist");
 
@@ -766,20 +764,14 @@ pub fn collision_system(
     let mut hitboxes_2: Vec<Entity> = Vec::new();
 
     for (hit_entity, owner, exclude) in hitbox_query.iter() {
-        
         if owner.0 == players.get(1) && !exclude.0.contains(&players.get(2)) {
             hitboxes_1.push(hit_entity);
-        }
-        else if owner.0 == players.get(2) && !exclude.0.contains(&players.get(1)) {
+        } else if owner.0 == players.get(2) && !exclude.0.contains(&players.get(1)) {
             hitboxes_2.push(hit_entity);
         }
-
     }
 
-
-
-    if let Ok([hurtboxes1, hurtboxes2]) = fighter_query.get_many(players.as_ref().into())
-    {
+    if let Ok([hurtboxes1, hurtboxes2]) = fighter_query.get_many(players.as_ref().into()) {
         if hitboxes_1.len() > 0 {
             let mut hurt_grouping: Vec<(Isometry3<f32>, Capsule, HurtboxData)> = Vec::new();
             let mut hurt_points: Vec<Point<f32>> = Vec::new();
@@ -798,8 +790,7 @@ pub fn collision_system(
 
             let comp_aabb = AABB::from_points(&hurt_points);
 
-            'hitbox_loop: for (hit_ent, hitbox1, collider1, tf1) in
-                hit_query.iter_many(&hitboxes_1)
+            'hitbox_loop: for (hit_ent, hitbox1, collider1, tf1) in hit_query.iter_many(&hitboxes_1)
             {
                 let capsule: Capsule = collider1.into();
                 let transform: Transform = tf1.compute_transform();

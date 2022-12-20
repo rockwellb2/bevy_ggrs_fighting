@@ -68,6 +68,33 @@ impl StateModifier for OnExitSetPos {
     }
 }
 
+// The below modifer sets this component
+#[derive(Component, Serialize, Deserialize, Reflect, Default)]
+pub struct InputMet(pub bool);
+
+// Command Input and frame window for checking that input
+// will attach component to state entity that has a bool whether to transition or not
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
+#[reflect(Component, Deserialize, StateModifier)]
+pub struct InputWindowCheck {
+    pub window_start: u16,
+    pub window_end: u16,
+    pub command_input: NewCommandInput
+
+}
+
+#[typetag::serde]
+impl StateModifier for InputWindowCheck {
+    fn dyn_clone(&self) -> Box<dyn StateModifier> {
+        Box::new(self.clone())
+    }
+}
+
+
+
+
+
+
 #[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone, Inspectable)]
 pub enum Object {
     Projectile(ProjectileData),
