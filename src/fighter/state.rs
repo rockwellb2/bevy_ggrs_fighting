@@ -9,6 +9,7 @@ use bevy::{
     ecs::reflect::ReflectComponent, math::Vec3, prelude::Component, reflect::ReflectDeserialize,
 };
 use bevy_editor_pls::default_windows::inspector::label_button;
+
 use bevy_inspector_egui::{egui, Inspectable};
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -21,6 +22,8 @@ use serde_json::from_value;
 use crate::input::{NewCommandInput, NewMatchExpression};
 
 use super::modifiers::StateModifier;
+
+type Frame = u16;
 
 #[derive(Default, Debug, Serialize, Deserialize, Component, Reflect)]
 #[reflect(Component)]
@@ -92,7 +95,7 @@ pub enum Conditions {
     ReachGround,
     // hitbox id (optional), frame range cancel
     //OnHit(Option<usize>, u16)
-    InputWindowCon
+    InputWindowCon(u16)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect, Default)]
@@ -572,5 +575,43 @@ pub struct Animation(pub Handle<AnimationClip>, pub f32);
 impl Animation {
     pub fn length(&self) -> f32 {
         self.1
+    }
+}
+
+
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
+pub struct FrameWindow {
+    #[serde(default)]
+    start: Option<Frame>,
+    #[serde(default)]
+    end: Option<Frame>
+}
+
+impl FrameWindow {
+    pub fn from_end(end: Frame) -> FrameWindow {
+        FrameWindow {
+            start: None,
+            end: Some(end)
+        }
+    }
+
+    pub fn from_start(start: Frame) -> FrameWindow {
+        FrameWindow {
+            start: Some(start),
+            end: None
+        }
+    }
+
+    pub fn new(start: Frame, end: Frame) -> FrameWindow {
+        FrameWindow {
+            start: Some(start),
+            end: Some(end)
+        }
+    }
+}
+
+impl From<[Frame; 2]> for FrameWindow {
+    fn from(values: [Frame; 2]) -> Self {
+        FrameWindow { start: Some(values[0]), end: Some(values[1]) }
     }
 }

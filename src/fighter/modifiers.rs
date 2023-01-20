@@ -77,8 +77,11 @@ pub struct InputMet(pub bool);
 #[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
 #[reflect(Component, Deserialize, StateModifier)]
 pub struct InputWindowCheck {
+    #[serde(alias = "windowStart", default)]
     pub window_start: u16,
+    #[serde(alias = "windowEnd", default)]
     pub window_end: u16,
+    #[serde(alias = "commandInput", default)]
     pub command_input: NewCommandInput
 
 }

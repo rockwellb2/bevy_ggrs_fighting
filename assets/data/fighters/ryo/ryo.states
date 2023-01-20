@@ -9,6 +9,7 @@
             230,
             220,
             250,
+            251,
             260,
             200,
             150,
@@ -18,6 +19,7 @@
             4000,
             4001,
             4011,
+            34,
             1,
             5,
             6,
@@ -44,11 +46,11 @@
             { "in": [5, 6] }
         ],
         "trigger2": [
-            { "in": [100, 120, 150, 160, 200, 210, 220, 230, 235, 250, 260, 300, 350] },
+            { "in": [29, 100, 120, 150, 160, 200, 210, 220, 230, 235, 250, 251, 260, 300, 350, 410,     280] },
             { "endDuration": null }
         ],
         "trigger3": [
-            { "in": [1, 30, 31, 32, 33]},
+            { "in": [1, 30, 31, 32, 33, 34]},
             { 
                 "command": {
                     "list": [
@@ -78,10 +80,12 @@
         "id": 1,
         "debug_name": "2",
         "transitions": [
+            410,
             210,
             230,
             220,
             120,
+            34,
             33,
             0
         ],
@@ -116,6 +120,7 @@
         "id": 5,
         "debug_name": "Forward Walk",
         "transitions": [
+            410,
             350,
             250,
             260,
@@ -168,6 +173,7 @@
         "id": 6,
         "debug_name": "Back Walk",
         "transitions": [
+            34,
             32,
             1,
             5,
@@ -190,7 +196,8 @@
                 "command": {
                     "list": [
                         [
-                            ["x", "Negative", false]
+                            ["x", "Negative", false],
+                            ["y", "None", false]
                         ]
                     ],
                     "window": 1
@@ -202,7 +209,8 @@
                 "command": {
                     "list": [
                         [
-                            ["x", "Negative", true]
+                            ["x", "Negative", true],
+                            ["y", "None", false]
                         ]
                     ],
                     "window": 1
@@ -256,7 +264,9 @@
         "id": 30,
         "debug_name": "8",
         "transitions": [
+            280,
             31,
+            32,
             0
         ],
         "triggerAll": [
@@ -264,7 +274,9 @@
                 "command": {
                     "list": [
                         [
-                            ["y", "Positive", false]
+                            ["y", "Positive", false],
+                            ["x", "None", false]
+
                         ]
                     ],
                     "window": 1
@@ -283,7 +295,9 @@
         "id": 31,
         "debug_name": "9",
         "transitions": [
+            280,
             235,
+            30,
             0
         ],
         "triggerAll": [
@@ -311,6 +325,8 @@
         "id": 32,
         "debug_name": "7",
         "transitions": [
+            280,
+            30,
             0
         ],
         "triggerAll": [
@@ -338,6 +354,7 @@
         "id": 33,
         "debug_name": "3",
         "transitions": [
+            410,
             235,
             230,
             1,
@@ -363,6 +380,39 @@
                 }
             }
         ]
+    },
+    {
+        "id": 34,
+        "debug_name": "1",
+        "transitions": [
+            210,
+            6,
+            1,
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["y", "Negative", false],
+                            ["x", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ],
+        "modifiers": [
+            {
+                "Velo": {
+                    "start_velocity": [-1, 0, 1]
+                }
+            }
+        ]
+
+
+
     },
     {
         "id": 100,
@@ -607,6 +657,7 @@
         "debug_name": "66B",
         "duration": 49,
         "transitions": [
+            251,
             0
         ],
         "triggerAll": [
@@ -632,7 +683,40 @@
                 "OnExitSetPos": {
                     "bone": "root hips"
                 }
+            },
+            {
+                "InputWindowCheck": {
+                    "windowStart": 2,
+                    "windowEnd": 18,
+                    "commandInput": {
+                        "list": [
+                            [
+                                ["lk", "Press"]
+                            ]
+                        ],
+                        "window": 1
+                    }
+                }
             }
+        ]
+    },
+    {
+        "id": 251,
+        "debug_name": "66BB",
+        "duration": 54,
+        "transitions": [
+            0
+        ],
+        "modifiers": [
+            {
+                "OnExitSetPos": {
+                    "bone": "root hips"
+                }
+            }
+        ],
+        "triggerAll": [
+            { "in": [250] },
+            { "inputWindowCon": 18 }
         ]
     },
     {
@@ -654,6 +738,27 @@
                     "window": 1
                 }
             }
+        ]
+    },
+    {
+        "id": 280,
+        "debug_name": "8A",
+        "duration": 52,
+        "transitions": [
+            0
+        ],
+        "trigger1": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"]
+                        ]
+                    ]
+                }
+            },
+            { "frame": [null, 9] },
+            { "in": [30, 31, 32] }
         ]
     },
     {
@@ -711,6 +816,42 @@
                         ]
                     ],
                     "window": 15
+                }
+            }
+        ]
+    },
+    {
+        "id": 410,
+        "debug_name": "623A",
+        "duration": 75,
+        "transitions": [0],
+        "modifiers": [
+            {
+                "OnExitSetPos": {
+                    "bone": "root hips"
+                }
+            }
+
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lp", "Press"],
+                            ["x", "Positive", false],
+                            ["y", "Negative", false]
+                        ],
+                        [
+                            ["y", "Negative", true],
+                            ["x", "None", false]
+                        ],
+                        [
+                            ["x", "Positive", true],
+                            ["y", "None", false]
+                        ]
+                    ],
+                    "window": 18
                 }
             }
         ]

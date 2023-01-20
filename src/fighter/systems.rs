@@ -1,9 +1,9 @@
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::{f32::consts::{FRAC_PI_2, PI}, ops::Deref};
 
 use super::{
     data::{Collider, CollisionData, FighterData, HitEvent},
     event::TransitionEvent,
-    modifiers::{AdjustFacing, CreateObject, Movement, Object, OnExitSetPos, VectorType, Velo},
+    modifiers::{AdjustFacing, CreateObject, Movement, Object, OnExitSetPos, VectorType, Velo, InputMet, InputWindowCheck},
     state::{
         Active, ActiveHitboxes, Animation, BoneMap, Conditions, CurrentState, Direction, Exclude,
         Facing, HBox, Health, HitboxData, HurtboxData, Hurtboxes, InHitstun, Owner, PlayerAxis,
@@ -39,7 +39,7 @@ use bevy::input::Input;
 use crate::{
     battle::{HitboxMaterial, Lifebar, MatchCamera, PlayerEntities},
     game::{Paused, RoundState, FRAME},
-    input::{Input as FightInput, LEFT, LEFT_HELD, RIGHT, RIGHT_HELD},
+    input::{Input as FightInput, LEFT, LEFT_HELD, RIGHT, RIGHT_HELD, StateInput},
     util::Buffer,
     AnimEntity, GameDebug, HitboxMap, Player, FPS,
 };
@@ -163,14 +163,24 @@ pub fn process_input_system(
         ),
         (With<Fighter>, With<Player>),
     >,
-    state_query: Query<&State>,
+    state_query: Query<(Entity, &State)>,
     mut trans_writer: EventWriter<TransitionEvent>,
+
+
+    input_met_mod_query: Query<&InputMet>
+
+
 ) {
     'fighter: for (fighter, current, map, buffer, frame, player, facing, tf) in query.iter() {
         let state: &Entity = map.get(&current.0).expect("State doesn't exist");
 
-        if let Ok(s) = state_query.get(*state) {
-            'transitions: for to_state in state_query.iter_many(&s.transitions) {
+        // if current.0 == 250 {
+        //     let q: StateInput = buffer.0.get(0).unwrap().into();
+        //     println!("250 Input: {:?}", q);
+        // }
+
+        if let Ok((_, s)) = state_query.get(*state) {
+            'transitions: for (to_state_entity, to_state) in state_query.iter_many(&s.transitions) {
                 if let Some(all) = &to_state.triggers.0 {
                     let mut meets_conditions = true;
                     'all: for condition in all.iter() {
@@ -220,7 +230,14 @@ pub fn process_input_system(
                                     break 'all;
                                 }
                             }
-                            Conditions::InputWindowCon => todo!(),
+                            Conditions::InputWindowCon(enact_frame) => {
+                                let met_mod = input_met_mod_query.get(*state).expect("State entity doesn't have InputMet component");
+
+                                if !met_mod.0 || *enact_frame != frame.0 {
+                                    meets_conditions = false;
+                                    break 'all;
+                                }
+                            },
                             // Conditions::OnHit(id, range) => {
                             //     if let Some(id) = id {
                             //         todo!()
@@ -287,7 +304,15 @@ pub fn process_input_system(
                                     break 'conditions;
                                 }
                             }
-                            Conditions::InputWindowCon => todo!(), // Conditions::OnHit(_, _) => todo!(),
+                            Conditions::InputWindowCon(enact_frame) => {
+                                let met_mod = input_met_mod_query.get(*state).expect("State entity doesn't have InputMet component");
+
+                                if !met_mod.0 || *enact_frame != frame.0 {
+                                    met = false;
+                                    break 'conditions;
+                                }
+
+                            }, // Conditions::OnHit(_, _) => todo!(),
                         }
                     }
                     if met {
@@ -321,6 +346,7 @@ pub fn transition_system(
     >,
     state_query: Query<&State>,
     set_pos_query: Query<&OnExitSetPos>,
+    mut input_met_query: Query<&mut InputMet>,
 
     mut transform_set: ParamSet<(Query<&GlobalTransform>, Query<&mut Transform>)>,
 ) {
@@ -332,6 +358,7 @@ pub fn transition_system(
 
             let state = map.get(&current.0).expect("State doesn't exist");
 
+            // OnExitSetPos transition
             if let Ok(set_pos) = set_pos_query.get(*state) {
                 let bone = bone_map.0.get(&set_pos.bone).expect("Bone doesn't exist");
                 let query_global = transform_set.p0();
@@ -347,6 +374,12 @@ pub fn transition_system(
 
                 tf.translation.x = pos.x;
                 tf.translation.z = pos.z;
+            }
+
+
+            // InputMet reset
+            if let Ok(mut met) = input_met_query.get_mut(*state) {
+                met.0 = false;
             }
 
             current.0 = event.to_id;
@@ -1079,4 +1112,50 @@ pub fn last_debug_system(paused: Res<Paused>, mut state: ResMut<RoundState>) {
     if paused.0 {
         *state = RoundState::Paused;
     }
+}
+
+
+pub fn modifier_input_check(
+    mut query: Query<(&Owner, &State, &mut InputMet, &InputWindowCheck)>,
+    fighter_query: Query<(&InputBuffer, &Facing, &StateFrame, &CurrentState, &StateMap)>
+
+) {
+    // TODO: Check and Met need to be on separate entities
+    for (buffer, facing, frame, current, map) in fighter_query.iter() {
+        let s: &Entity = map.get(&current.0).expect("State doesn't exist");
+
+        if let Ok((_, state, mut met, check)) = query.get_mut(*s) {
+            if !met.0 && frame.0 >= check.window_start && frame.0 <= check.window_end && check.command_input.compare(&buffer.0, facing.0) {
+                met.0 = true;
+            }
+
+        }
+
+    }
+
+
+
+
+    // for (owner, state, mut met, check) in query.iter_mut() {
+    //     let (buffer, facing, frame, _, _) = fighter_query.get(owner.get()).expect("Fighter doesn't have InputBuffer or Facing component");
+
+    //     if !met.0 && frame.0 >= check.window_start && frame.0 <= check.window_end && check.command_input.compare(&buffer.0, facing.0)  
+    //     {
+    //         println!("Met at frame {}", frame.0);
+
+
+    //         met.0 = true;
+
+    //         for (index, i) in buffer.0.iter().enumerate() {
+    //             let i: StateInput = i.into();
+    //             println!("{}: {:?}", index, i)
+    //         }
+
+
+
+            
+
+    //     }
+    // }
+
 }

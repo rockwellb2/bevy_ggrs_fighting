@@ -20,13 +20,13 @@ use fighter::{
         adjust_facing_system, collision_system, hbox_position_system,
         hit_event_system, hitbox_component_system, hitbox_removal_system, hitstun_system,
         hurtbox_component_system, hurtbox_removal_system, increment_frame_system, movement_system,
-        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, axis_system, camera_system, animation_system, add_animation_player_system, pause_system, last_debug_system,
+        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, axis_system, camera_system, animation_system, add_animation_player_system, pause_system, last_debug_system, modifier_input_check,
     },
     FighterPlugin, Fighter,
 };
 use game::{
     ADD_HITBOX, ADD_HURTBOX, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
-    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, AXIS, not_if_paused, Paused, if_paused, on_debug, on_debug_and_game_paused, paused_advance_or_round, on_armature, debug::state_text_system, 
+    MOVEMENT, PROCESS, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, GameState, on_round, RoundState, on_enter_loading, on_loading, on_exit_loading, on_enter_round, on_extra_setup, FACE, PROJECTILE, VELO, AXIS, not_if_paused, Paused, if_paused, on_debug, on_debug_and_game_paused, paused_advance_or_round, on_armature, debug::state_text_system, MOD_INPUT_CHECK, 
 };
 use ggrs::{Config, PlayerType, SessionBuilder, UdpNonBlockingSocket, SyncTestSession};
 //use bevy_editor_pls::prelude::*;
@@ -106,16 +106,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // let config = aws_config::from_env().region(gamelift::Region::new("us-east-1")).load().await;
     // let client = cognito::Client::new(&config);
-    // if let Ok(_x) = client
+    // let x = client
     //     .get_id()
     //     .set_identity_pool_id(Some("us-east-1:a049d9ef-a70c-428c-a06b-7b95b6409934".into()))
-    //     .send().await {
-    //         println!("Did this do something?")
+    //     .send().await;
+
+    // match x {
+    //     Ok(_a) => {
+
+    //     },
+    //     Err(b) => {
+    //         match b {
+    //             cognito::types::SdkError::ConstructionFailure(_) => todo!(),
+    //             cognito::types::SdkError::TimeoutError(_) => todo!(),
+    //             cognito::types::SdkError::DispatchFailure(_) => todo!(),
+    //             cognito::types::SdkError::ResponseError { err, raw } => todo!(),
+    //             cognito::types::SdkError::ServiceError { err, raw } => todo!(),
+    //         }
 
     //     }
-    //     else {
-    //         println!("it did not do something")
-    //     }
+        
+    // }
     
 
 
@@ -252,10 +263,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .after(HITSTUN),
                         )
                         .with_system(
+                            modifier_input_check
+                                .label(MOD_INPUT_CHECK)
+                                .after(FRAME_INCREMENT)
+
+                        )
+                        .with_system(
                             process_input_system
                                 //.run_in_state(GameState::Fight)
                                 .label(PROCESS)
-                                .after(FRAME_INCREMENT),
+                                .after(MOD_INPUT_CHECK),
                         )
                         .with_system(
                             transition_system
