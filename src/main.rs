@@ -5,11 +5,11 @@ use bevy::{
     prelude::*,
     reflect::{FromType, TypeRegistry, TypeRegistryInternal},
     utils::{HashMap, HashSet},
-    window::PresentMode, log::{LogPlugin, LogSettings, Level}, gltf::Gltf,
+    window::PresentMode, log::{LogPlugin, Level}, gltf::Gltf,
 };
-use bevy_editor_pls::EditorPlugin;
-use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider, SessionType};
-use bevy_inspector_egui::WorldInspectorPlugin;
+//use bevy_editor_pls::prelude::*;
+use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider, Session};
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_scene_hook::HookPlugin;
 use fighter::{
     state::{
@@ -88,6 +88,7 @@ pub struct Player(u8);
 
 // }
 
+#[derive(Resource)]
 pub struct GameDebug(pub bool);
 
 #[derive(StructOpt)]
@@ -168,23 +169,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     GGRSPlugin::<GGRSConfig>::new()
         .with_update_frequency(FPS)
         .with_input_system(input::input)
-        .register_rollback_type::<Transform>()
-        .register_rollback_type::<CurrentState>()
-        .register_rollback_type::<StateFrame>()
-        .register_rollback_type::<Health>()
-        .register_rollback_type::<Active>()
-        .register_rollback_type::<InputBuffer>()
-        .register_rollback_type::<Facing>()
-        .register_rollback_type::<InHitstun>()
-        .register_rollback_type::<ProjectileReference>()
-        .register_rollback_type::<Velocity>()
-        .register_rollback_type::<PlayerAxis>()
-        .register_rollback_type::<HitboxData>()
-        .register_rollback_type::<Collider>()
-        .register_rollback_type::<ActiveHitboxes>()
-        .register_rollback_type::<Owner>()
+        .register_rollback_component::<Transform>()
+        .register_rollback_component::<CurrentState>()
+        .register_rollback_component::<StateFrame>()
+        .register_rollback_component::<Health>()
+        .register_rollback_component::<Active>()
+        .register_rollback_component::<InputBuffer>()
+        .register_rollback_component::<Facing>()
+        .register_rollback_component::<InHitstun>()
+        .register_rollback_component::<ProjectileReference>()
+        .register_rollback_component::<Velocity>()
+        .register_rollback_component::<PlayerAxis>()
+        .register_rollback_component::<HitboxData>()
+        .register_rollback_component::<Collider>()
+        .register_rollback_component::<ActiveHitboxes>()
+        .register_rollback_component::<Owner>()
 
-        .register_rollback_type::<RoundState>()
+        .register_rollback_resource::<RoundState>()
 
         .with_rollback_schedule(
             Schedule::default()
@@ -226,7 +227,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "Enter Round Stage",
                     SystemStage::parallel()
                         .with_run_criteria(on_enter_round)
-                        .with_system(startup.exclusive_system().label("startup"))
+                        .with_system(startup.label("startup").at_start())
                         .with_system(insert_animations.label("insert_anim"))
                         .with_system(insert_meshes.after("insert_anim"))
                 )
@@ -390,7 +391,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_plugin(InputManagerPlugin::<Action>::default())
 
         // Inspector/Editor Plugins
-        .add_plugin(EditorPlugin)
+        .add_plugin(bevy_editor_pls::prelude::EditorPlugin)
         //.add_plugin(WorldInspectorPlugin::new())
         .add_plugin(FrameTimeDiagnosticsPlugin)
 
@@ -411,8 +412,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .insert_resource(GameDebug(opt.debug_mode))
 
         // Rollback resources
-        .insert_resource(sess)
-        .insert_resource(SessionType::SyncTestSession)
+        .insert_resource(Session::SyncTestSession(sess))
 
         // Custom Plugins
         .add_plugin(FighterPlugin)
@@ -476,9 +476,9 @@ fn populate_entities_with_states(
             
             let name = format!("({}) {}", player_num, name);
             let entity = world
-                .spawn()
+                .spawn(())
                 .insert(Name::new(name.clone()))
-                .insert_bundle(VisibilityBundle::default())
+                .insert(VisibilityBundle::default())
                 .insert(Rollback::new(rip.next_id()))
                 .insert(Owner(player))
                 .id();
@@ -570,7 +570,7 @@ fn populate_entities_with_states(
 
             // MODIFIERS
             if let Some(modifiers) = mods_serialized {
-                let type_registry = world.get_resource::<TypeRegistry>().unwrap().clone();
+                let type_registry = world.get_resource::<AppTypeRegistry>().unwrap().clone();
                 let type_registry = type_registry.read();
 
                 for modifier in modifiers {
@@ -598,6 +598,7 @@ fn populate_entities_with_states(
     });
 }
 
+#[derive(Resource)]
 pub struct HitboxMap(pub HashMap<u32, (Handle<Mesh>, Collider)>);
 
 pub fn insert_meshes(
@@ -667,7 +668,7 @@ pub fn increase_frame_system(mut frame_count: ResMut<FrameCount>) {
     frame_count.frame += 1;
 }
 
-#[derive(Default, Reflect, Hash, Component)]
+#[derive(Resource, Default, Reflect, Hash, Component)]
 #[reflect(Hash)]
 pub struct FrameCount {
     pub frame: u32,

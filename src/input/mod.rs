@@ -25,7 +25,7 @@ pub const RIGHT: u32 = 1536;
 
 
 #[repr(C)]
-#[derive(Default, Debug, Copy, Clone, PartialEq, Pod, Zeroable, Reflect, FromReflect)]
+#[derive(Resource, Default, Debug, Copy, Clone, PartialEq, Pod, Zeroable, Reflect, FromReflect)]
 pub struct Input(pub u32);
 
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
@@ -307,7 +307,7 @@ mod input_tests {
     }
 }
 
-#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, Reflect, FromReflect)]
 pub enum ButtonPress {
     #[default]
     None = 0,
@@ -338,7 +338,7 @@ impl From<u32> for ButtonPress {
     }
 }
 
-#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, Reflect, FromReflect)]
 pub enum DirectionalInput {
     #[default]
     None = 0,

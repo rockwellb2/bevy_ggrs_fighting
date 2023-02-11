@@ -1,12 +1,13 @@
 use bevy::{prelude::*};
-use bevy_inspector_egui::RegisterInspectable;
 
 
 
+
+use crate::game::RoundState;
 
 use self::{
     data::{FighterData, HitEvent, Collider, SegmentProxy}, 
-    state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference, PlayerAxis, Animation, HurtboxData, Exclude}, 
+    state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference, PlayerAxis, Animation, HurtboxData, Exclude, Owner, Active, Velocity, InHitstun}, 
     systems::InputBuffer, event::TransitionEvent,
     modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object, Velo, VectorType, OnExitSetPos, InputWindowCheck}
 };
@@ -45,6 +46,15 @@ impl Plugin for FighterPlugin {
             .register_type::<ProjectileReference>()
             .register_type::<Exclude>()
 
+
+
+            // I might need these
+            .register_type::<Owner>()
+            .register_type::<Active>()
+            .register_type::<Velocity>()
+            .register_type::<InHitstun>()
+            .register_type::<RoundState>()
+
             // These registers below are purely for the inspector
             .register_type::<CurrentState>()
             .register_type::<StateFrame>()
@@ -52,18 +62,15 @@ impl Plugin for FighterPlugin {
             .register_type::<HitboxData>()
             .register_type::<StateMap>()
             .register_type::<Direction>()
-            .register_inspectable::<Direction>()
-            //.register_inspectable::<HitboxData>()
-            .register_inspectable::<ProjectileData>()
-            .register_inspectable::<Object>()
-            .register_inspectable::<VectorType>()
-            .register_inspectable::<Option<VectorType>>()
-            .register_inspectable::<PlayerAxis>()
-            .register_inspectable::<HurtboxData>()
-            //.register_inspectable::<HitboxData>()
-            .register_inspectable::<Collider>()
-            .register_inspectable::<SegmentProxy>()
-            //.register_inspectable::<ProjectileReference>()
+            .register_type::<ProjectileData>()
+            .register_type::<Object>()
+            .register_type::<VectorType>()
+            .register_type::<Option<VectorType>>()
+            .register_type::<PlayerAxis>()
+            .register_type::<HurtboxData>()
+            .register_type::<Collider>()
+            .register_type::<SegmentProxy>()
+
             .register_type::<ProjectileReference>()
             .register_type::<FighterData>();
     }

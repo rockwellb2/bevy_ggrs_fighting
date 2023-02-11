@@ -1,13 +1,19 @@
-use std::{f32::consts::{FRAC_PI_2, PI}, ops::Deref};
+use std::{
+    f32::consts::{FRAC_PI_2, PI},
+    ops::Deref,
+};
 
 use super::{
     data::{Collider, CollisionData, FighterData, HitEvent},
     event::TransitionEvent,
-    modifiers::{AdjustFacing, CreateObject, Movement, Object, OnExitSetPos, VectorType, Velo, InputMet, InputWindowCheck},
+    modifiers::{
+        AdjustFacing, CreateObject, InputMet, InputWindowCheck, Movement, Object, OnExitSetPos,
+        VectorType, Velo,
+    },
     state::{
         Active, ActiveHitboxes, Animation, BoneMap, Conditions, CurrentState, Direction, Exclude,
         Facing, HBox, Health, HitboxData, HurtboxData, Hurtboxes, InHitstun, Owner, PlayerAxis,
-        ProjectileData, ProjectileReference, State, StateFrame, StateMap, Velocity,
+        ProjectileData, ProjectileReference, State, StateFrame, StateMap, Velocity, HitLevel, StateHeight,
     },
     Fighter,
 };
@@ -24,11 +30,11 @@ use bevy::{
     ui::{Style, Val},
     utils::{default, hashbrown::HashSet, HashMap},
 };
-use bevy_ggrs::{Rollback, RollbackIdProvider};
+use bevy_ggrs::{PlayerInputs, Rollback, RollbackIdProvider};
 use ggrs::InputStatus;
 use nalgebra::{Isometry3, UnitQuaternion, Vector3};
 use parry3d::{
-    bounding_volume::{BoundingVolume, AABB},
+    bounding_volume::{aabb::Aabb, BoundingVolume},
     math::Point,
     query::intersection_test,
     shape::{Capsule, Cuboid},
@@ -39,14 +45,15 @@ use bevy::input::Input;
 use crate::{
     battle::{HitboxMaterial, Lifebar, MatchCamera, PlayerEntities},
     game::{Paused, RoundState, FRAME},
-    input::{Input as FightInput, LEFT, LEFT_HELD, RIGHT, RIGHT_HELD, StateInput},
+    input::{Input as FightInput, StateInput, LEFT, LEFT_HELD, RIGHT, RIGHT_HELD},
     util::Buffer,
-    AnimEntity, GameDebug, HitboxMap, Player, FPS,
+    AnimEntity, GGRSConfig, GameDebug, HitboxMap, Player, FPS,
 };
 
 pub fn buffer_insert_system(
     mut query: Query<(&mut InputBuffer, &Player)>,
-    inputs: Res<Vec<(FightInput, InputStatus)>>,
+    //inputs: Res<Vec<(FightInput, InputStatus)>>,
+    inputs: Res<PlayerInputs<GGRSConfig>>,
 ) {
     for (mut buffer, player) in query.iter_mut() {
         if player.0 != 1 {
@@ -166,10 +173,7 @@ pub fn process_input_system(
     state_query: Query<(Entity, &State)>,
     mut trans_writer: EventWriter<TransitionEvent>,
 
-
-    input_met_mod_query: Query<&InputMet>
-
-
+    input_met_mod_query: Query<&InputMet>,
 ) {
     'fighter: for (fighter, current, map, buffer, frame, player, facing, tf) in query.iter() {
         let state: &Entity = map.get(&current.0).expect("State doesn't exist");
@@ -231,13 +235,15 @@ pub fn process_input_system(
                                 }
                             }
                             Conditions::InputWindowCon(enact_frame) => {
-                                let met_mod = input_met_mod_query.get(*state).expect("State entity doesn't have InputMet component");
+                                let met_mod = input_met_mod_query
+                                    .get(*state)
+                                    .expect("State entity doesn't have InputMet component");
 
                                 if !met_mod.0 || *enact_frame != frame.0 {
                                     meets_conditions = false;
                                     break 'all;
                                 }
-                            },
+                            }
                             // Conditions::OnHit(id, range) => {
                             //     if let Some(id) = id {
                             //         todo!()
@@ -305,14 +311,15 @@ pub fn process_input_system(
                                 }
                             }
                             Conditions::InputWindowCon(enact_frame) => {
-                                let met_mod = input_met_mod_query.get(*state).expect("State entity doesn't have InputMet component");
+                                let met_mod = input_met_mod_query
+                                    .get(*state)
+                                    .expect("State entity doesn't have InputMet component");
 
                                 if !met_mod.0 || *enact_frame != frame.0 {
                                     met = false;
                                     break 'conditions;
                                 }
-
-                            }, // Conditions::OnHit(_, _) => todo!(),
+                            } // Conditions::OnHit(_, _) => todo!(),
                         }
                     }
                     if met {
@@ -376,7 +383,6 @@ pub fn transition_system(
                 tf.translation.z = pos.z;
             }
 
-
             // InputMet reset
             if let Ok(mut met) = input_met_query.get_mut(*state) {
                 met.0 = false;
@@ -435,7 +441,7 @@ pub fn hitbox_component_system(
                             .entity(hitbox.bone_entity.expect("Bone entity doesn't exist"))
                             .add_children(|parent| {
                                 parent
-                                    .spawn_bundle(PbrBundle {
+                                    .spawn(PbrBundle {
                                         transform: Transform {
                                             translation: hitbox.offset,
                                             rotation: Quat::from_euler(
@@ -821,7 +827,7 @@ pub fn collision_system(
                 hurt_grouping.push((iso, capsule, hurt_data.clone()));
             }
 
-            let comp_aabb = AABB::from_points(&hurt_points);
+            let comp_aabb = Aabb::from_points(&hurt_points);
 
             'hitbox_loop: for (hit_ent, hitbox1, collider1, tf1) in hit_query.iter_many(&hitboxes_1)
             {
@@ -855,74 +861,6 @@ pub fn collision_system(
         }
     }
 
-    // for (hitbox, hit_owner, active) in hitbox_query.iter_mut() {
-    //     for (hurtbox, hurt_owner, hurt_name) in hurtbox_query.iter() {
-    //         //println!("Within hurtbox query");
-    //         if active.0.contains(&hurt_owner.0) {
-    //             break;
-    //         }
-    //         if hit_owner != hurt_owner {
-    //             let (hit_iso, hit_shape, hit_data) = if seen_hitboxes.contains_key(&hitbox) {
-    //                 seen_hitboxes.get(&hitbox).unwrap().to_owned()
-    //             } else {
-    //                 let (data, hit_collider, hit_tf) = hit_query.get(hitbox).unwrap();
-    //                 //let iso = Isometry3::from(hit_vec);
-    //                 let iso: Isometry3<f32> = (hit_tf.translation, hit_tf.rotation).into();
-    //                 let iso = iso;
-
-    //                 seen_hitboxes.insert(
-    //                     hitbox,
-    //                     (iso.clone(), hit_collider.clone().into(), data.clone()),
-    //                 );
-    //                 (iso, hit_collider.clone().into(), data.clone())
-    //             };
-
-    //             let (hurt_iso, hurt_shape, hurt_data) = if seen_hurtboxes.contains_key(&hurtbox) {
-    //                 seen_hurtboxes.get(&hurtbox).unwrap().to_owned()
-    //             } else {
-    //                 let (data, hurt_collider, hurt_tf) = hurt_query.get(hurtbox).unwrap();
-    //                 //let hurt_vec: Vector3<f32> = hurt_tf.translation.into();
-    //                 //let iso = Isometry3::from(hurt_vec);
-    //                 let hurt_tf = hurt_tf.compute_transform();
-    //                 let iso: Isometry3<f32> = (hurt_tf.translation, hurt_tf.rotation).into();
-
-    //                 seen_hurtboxes.insert(
-    //                     hurtbox,
-    //                     (iso.clone(), hurt_collider.clone().into(), data.clone()),
-    //                 );
-    //                 (iso, hurt_collider.clone().into(), data.clone())
-    //             };
-
-    //             if let Some(c) = collisions.get(&(hit_owner.0, hurt_owner.0)) {
-    //                 if hit_data.priority >= c.get_attacker_priority() {
-    //                     break;
-    //                 }
-    //             }
-
-    //             // let hit_shape = hit_shape.transform_by(&hit_iso);
-    //             // let hurt_shape = hurt_shape.transform_by(&hurt_iso);
-
-    //             if let Ok(intersect) =
-    //                 intersection_test(&hit_iso, &hit_shape, &hurt_iso, &hurt_shape)
-    //             {
-    //                 if intersect {
-    //                     collisions.insert(
-    //                         (hit_owner.0, hurt_owner.0),
-    //                         CollisionData {
-    //                             attacker_box: hit_data,
-    //                             attacker: hit_owner.0,
-    //                             recipient_box: hurt_data,
-    //                             recipient: hurt_owner.0,
-    //                         },
-    //                     );
-
-    //                     println!("Intersecting hurtbox name: {}", hurt_name.as_str());
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     for (_, collision) in collisions {
         hit_writer.send(HitEvent(collision));
     }
@@ -931,15 +869,52 @@ pub fn collision_system(
 pub fn hit_event_system(
     mut commands: Commands,
     mut hit_reader: EventReader<HitEvent>,
-    mut fighter_query: Query<
-        (Entity, &mut Health, &mut StateFrame, &mut CurrentState),
-        With<Fighter>,
-    >,
+
+    mut fighter_queries: ParamSet<(
+        Query<(Entity, &mut Health, &mut StateFrame, &mut CurrentState), With<Fighter>>,
+        Query<(&CurrentState, &StateMap)>,
+    )>,
     mut hitbox_query: Query<(&mut Exclude, &HitboxData, &Owner)>,
+
+    state_query: Query<&State>,
 ) {
     for hit_event in hit_reader.iter() {
+        let current_query = fighter_queries.p1();
+
+        let [(attacker_current, attacker_map), (recipient_current, recipient_map)] =
+            current_query
+                .get_many([hit_event.0.attacker, hit_event.0.recipient])
+                .expect("States of the attacker and recipient couldn't be found");
+
+        let attacker_ent = attacker_map.get(&attacker_current.0).expect("Attacker state entity doesn't exist");
+        let recipient_ent = recipient_map.get(&recipient_current.0).expect("Recipient state entity doesn't exist");
+        let [attacker_state, recipient_state] = state_query.get_many([*attacker_ent, *recipient_ent]).expect("State components couldn't be found");
+
+
+        match (hit_event.0.attacker_box.hit_level, recipient_state.height) {
+            (HitLevel::Low, StateHeight::Stand) => {
+
+            },
+            (HitLevel::Low, StateHeight::Crouch) => {
+
+            },
+            (HitLevel::Middle, StateHeight::Stand) => {
+
+            },
+            (HitLevel::Middle, StateHeight::Crouch) => {
+
+            },
+            (HitLevel::High, StateHeight::Stand) => {
+                
+            },
+            (HitLevel::High, StateHeight::Crouch) => {
+                
+            },
+        }
+
+
         if let Ok((fighter, mut health, mut frame, mut current)) =
-            fighter_query.get_mut(hit_event.0.recipient)
+            fighter_queries.p0().get_mut(hit_event.0.recipient)
         {
             health.0 = health.0.saturating_sub(hit_event.0.attacker_box.damage);
             commands
@@ -1114,35 +1089,31 @@ pub fn last_debug_system(paused: Res<Paused>, mut state: ResMut<RoundState>) {
     }
 }
 
-
 pub fn modifier_input_check(
     mut query: Query<(&Owner, &State, &mut InputMet, &InputWindowCheck)>,
-    fighter_query: Query<(&InputBuffer, &Facing, &StateFrame, &CurrentState, &StateMap)>
-
+    fighter_query: Query<(&InputBuffer, &Facing, &StateFrame, &CurrentState, &StateMap)>,
 ) {
     // TODO: Check and Met need to be on separate entities
     for (buffer, facing, frame, current, map) in fighter_query.iter() {
         let s: &Entity = map.get(&current.0).expect("State doesn't exist");
 
         if let Ok((_, state, mut met, check)) = query.get_mut(*s) {
-            if !met.0 && frame.0 >= check.window_start && frame.0 <= check.window_end && check.command_input.compare(&buffer.0, facing.0) {
+            if !met.0
+                && frame.0 >= check.window_start
+                && frame.0 <= check.window_end
+                && check.command_input.compare(&buffer.0, facing.0)
+            {
                 met.0 = true;
             }
-
         }
-
     }
-
-
-
 
     // for (owner, state, mut met, check) in query.iter_mut() {
     //     let (buffer, facing, frame, _, _) = fighter_query.get(owner.get()).expect("Fighter doesn't have InputBuffer or Facing component");
 
-    //     if !met.0 && frame.0 >= check.window_start && frame.0 <= check.window_end && check.command_input.compare(&buffer.0, facing.0)  
+    //     if !met.0 && frame.0 >= check.window_start && frame.0 <= check.window_end && check.command_input.compare(&buffer.0, facing.0)
     //     {
     //         println!("Met at frame {}", frame.0);
-
 
     //         met.0 = true;
 
@@ -1151,11 +1122,6 @@ pub fn modifier_input_check(
     //             println!("{}: {:?}", index, i)
     //         }
 
-
-
-            
-
     //     }
     // }
-
 }

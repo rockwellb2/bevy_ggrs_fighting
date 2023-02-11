@@ -1,15 +1,11 @@
-use std::any;
-
 use bevy::prelude::{Entity, Vec3};
-use bevy::reflect::utility::GenericTypeInfoCell;
 use bevy::reflect::{TypeUuid, Typed, TypeInfo, StructInfo, NamedField, Struct, GetTypeRegistration, TypeRegistration, DynamicStruct, FieldIter};
 use bevy::{prelude::Component, reflect::Reflect};
 use bevy::ecs::reflect::ReflectComponent;
-use bevy_inspector_egui::Inspectable;
 use parry3d::shape::{Cuboid, Capsule, Segment};
 use serde::{Deserialize, Serialize};
 
-use super::state::{HitboxData, HurtboxData};
+use super::state::{HitboxData, HurtboxData, State};
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, Component, Reflect, TypeUuid)]
 #[reflect(Component)]
@@ -24,7 +20,7 @@ pub struct FighterData {
     pub walk_back: f32
 }
 
-#[derive(Component, Clone, Reflect, Inspectable)]
+#[derive(Component, Clone, Reflect)]
 pub struct Collider {
     pub radius: f32,
     pub segment: SegmentProxy
@@ -76,7 +72,7 @@ impl Into<Collider> for Capsule {
 
 
 
-#[derive(Clone, Reflect, Inspectable)]
+#[derive(Clone, Reflect)]
 pub struct SegmentProxy {
     pub a: Vec3,
     pub b: Vec3,

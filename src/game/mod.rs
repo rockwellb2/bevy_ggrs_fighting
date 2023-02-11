@@ -1,6 +1,6 @@
 pub mod debug;
 
-use bevy::{reflect::Reflect, prelude::{Component, ResMut, Res}, ecs::schedule::ShouldRun};
+use bevy::{reflect::Reflect, prelude::{Component, ResMut, Res, Resource}, ecs::schedule::ShouldRun};
 
 use crate::GameDebug;
 
@@ -29,6 +29,7 @@ pub const HIT_EVENT: &str = "hit_event";
 pub const FRAME: f32 = 1. / 60.;
 
 
+#[derive(Resource)]
 pub struct Paused(pub bool);
 
 pub fn not_if_paused(paused: Res<Paused>) -> ShouldRun {
@@ -95,7 +96,7 @@ pub enum GameState {
 }
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect, Component, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect, Component, Resource, Default)]
 pub enum RoundState {
     #[default]
     EnterLoading,

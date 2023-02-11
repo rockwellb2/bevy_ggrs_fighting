@@ -8,7 +8,7 @@ use bevy::{
         Children, Color, Commands, Component, ComputedVisibility, DespawnRecursiveExt, Entity,
         Handle, KeyCode, Mesh, NodeBundle, OrthographicProjection, Parent, PbrBundle, PointLight,
         PointLightBundle, Query, Res, ResMut, SpatialBundle, StandardMaterial, State, TextBundle,
-        Transform, Vec3, Visibility, VisibilityBundle, With,
+        Transform, Vec3, Visibility, VisibilityBundle, With, Resource,
     },
     scene::{Scene, SceneBundle},
     sprite::{Sprite, SpriteBundle},
@@ -53,6 +53,7 @@ use crate::{
 };
 
 //#[derive(Default)]
+#[derive(Resource)]
 pub struct PlayerEntities(pub Entity, pub Entity);
 
 impl PlayerEntities {
@@ -92,7 +93,7 @@ impl PlayerHandles {
     }
 }
 
-#[derive(Debug)]
+#[derive(Resource, Debug)]
 pub struct PlayerHandleAccess(pub PlayerHandles, pub PlayerHandles);
 
 impl PlayerHandleAccess {
@@ -138,12 +139,12 @@ pub fn loading_wait(
     player_access: Res<PlayerHandleAccess>,
 ) {
     let handles = vec![
-        player_access.0.fighter_data.id,
-        player_access.0.state_list.id,
-        player_access.1.fighter_data.id,
-        player_access.1.state_list.id,
-        player_access.0.model.id,
-        player_access.1.model.id,
+        player_access.0.fighter_data.id(),
+        player_access.0.state_list.id(),
+        player_access.1.fighter_data.id(),
+        player_access.1.state_list.id(),
+        player_access.0.model.id(),
+        player_access.1.model.id(),
     ];
 
     println!("LOADING...");
@@ -154,6 +155,7 @@ pub fn loading_wait(
     }
 }
 
+#[derive(Resource)]
 pub struct HitboxMaterial(pub Handle<StandardMaterial>);
 
 pub fn spawn_fighters(
@@ -208,7 +210,7 @@ pub fn spawn_fighters(
     };
 
     let player1 = commands
-        .spawn_bundle(HookedSceneBundle {
+        .spawn(HookedSceneBundle {
             scene: SceneBundle {
                 scene: assets_gltf
                     .get(&handle_access.0.model)
@@ -244,7 +246,7 @@ pub fn spawn_fighters(
             x: Vec3::X,
             z: Vec3::Z,
         })
-        .insert_bundle(InputManagerBundle::<Action> {
+        .insert(InputManagerBundle::<Action> {
             action_state: ActionState::default(),
             input_map: InputMap::new([
                 (KeyCode::U, Action::Lp),
@@ -321,14 +323,14 @@ pub fn spawn_fighters(
     });
 
     commands
-        .spawn_bundle(Camera3dBundle {
+        .spawn(Camera3dBundle {
             transform: Transform::from_xyz(0.0, 0.8, 14.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         })
         .insert(MatchCamera);
 
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Plane { size: 100. })),
             material: materials.add(Color::WHITE.into()),
             ..default()
@@ -387,7 +389,7 @@ pub fn extra_setup_system(
                         //     DrawMode::Fill(FillMode::color(Color::rgba(1., 0., 0., 0.8))),
                         //     Transform::default()
                         // ))
-                        .spawn_bundle(PbrBundle {
+                        .spawn(PbrBundle {
                             mesh: meshes.add(Mesh::from(shape::Capsule {
                                 radius: projectile.dimensions.x,
                                 depth: 0.,
@@ -554,34 +556,34 @@ pub fn create_battle_ui(
     let font = asset_server.load("fonts/FiraSans-Bold.ttf");
 
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
                 size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
                 justify_content: JustifyContent::SpaceBetween,
                 ..default()
             },
-            color: Color::NONE.into(),
+            background_color: Color::NONE.into(),
             ..default()
         })
         .insert(Name::new("UI Parent"))
         .with_children(|parent| {
             // Player 1
             parent
-                .spawn_bundle(NodeBundle {
+                .spawn(NodeBundle {
                     style: Style {
-                        flex_direction: bevy::ui::FlexDirection::ColumnReverse,
+                        flex_direction: bevy::ui::FlexDirection::Column,
                         size: Size::new(Val::Percent(45.), Val::Percent(20.)),
-                        align_self: AlignSelf::FlexEnd,
+                        align_self: AlignSelf::FlexStart,
                         display: Display::Flex,
                         ..default()
                     },
-                    color: Color::NONE.into(),
+                    background_color: Color::NONE.into(),
                     ..default()
                 })
                 .insert(Name::new("Player 1 UI"))
                 .with_children(|parent| {
                     parent
-                        .spawn_bundle(NodeBundle {
+                        .spawn(NodeBundle {
                             style: Style {
                                 flex_direction: FlexDirection::RowReverse,
                                 size: Size::new(Val::Percent(85.), Val::Percent(20.)),
@@ -592,19 +594,19 @@ pub fn create_battle_ui(
                                 align_self: AlignSelf::FlexEnd,
                                 ..default()
                             },
-                            color: Color::BLACK.into(),
+                            background_color: Color::BLACK.into(),
                             ..default()
                         })
                         .insert(Name::new("Player 1 Lifebar"))
                         .with_children(|parent| {
                             parent
-                                .spawn_bundle(NodeBundle {
+                                .spawn(NodeBundle {
                                     style: Style {
                                         size: Size::new(Val::Percent(100.), Val::Percent(100.)),
                                         align_self: AlignSelf::FlexEnd,
                                         ..default()
                                     },
-                                    color: Color::GREEN.into(),
+                                    background_color: Color::GREEN.into(),
                                     ..default()
                                 })
                                 .insert(Player(1))
@@ -615,21 +617,21 @@ pub fn create_battle_ui(
 
             // Player 2
             parent
-                .spawn_bundle(NodeBundle {
+                .spawn(NodeBundle {
                     style: Style {
-                        flex_direction: bevy::ui::FlexDirection::ColumnReverse,
+                        flex_direction: bevy::ui::FlexDirection::Column,
                         size: Size::new(Val::Percent(45.), Val::Percent(20.)),
-                        align_self: AlignSelf::FlexEnd,
+                        align_self: AlignSelf::FlexStart,
                         display: Display::Flex,
                         ..default()
                     },
-                    color: Color::NONE.into(),
+                    background_color: Color::NONE.into(),
                     ..default()
                 })
                 .insert(Name::new("Player 2 UI"))
                 .with_children(|parent| {
                     parent
-                        .spawn_bundle(NodeBundle {
+                        .spawn(NodeBundle {
                             style: Style {
                                 flex_direction: FlexDirection::Row,
                                 size: Size::new(Val::Percent(85.), Val::Percent(20.)),
@@ -640,19 +642,19 @@ pub fn create_battle_ui(
                                 align_self: AlignSelf::FlexStart,
                                 ..default()
                             },
-                            color: Color::BLACK.into(),
+                            background_color: Color::BLACK.into(),
                             ..default()
                         })
                         .insert(Name::new("Player 2 Lifebar"))
                         .with_children(|parent| {
                             parent
-                                .spawn_bundle(NodeBundle {
+                                .spawn(NodeBundle {
                                     style: Style {
                                         size: Size::new(Val::Percent(100.), Val::Percent(100.)),
                                         align_self: AlignSelf::FlexEnd,
                                         ..default()
                                     },
-                                    color: Color::GREEN.into(),
+                                    background_color: Color::GREEN.into(),
                                     ..default()
                                 })
                                 .insert(Player(2))
@@ -663,7 +665,7 @@ pub fn create_battle_ui(
         });
 
     commands
-        .spawn_bundle(
+        .spawn(
             TextBundle::from_sections([
                 TextSection::new(
                     "State: ",

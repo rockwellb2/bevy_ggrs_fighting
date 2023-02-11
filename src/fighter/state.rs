@@ -10,7 +10,7 @@ use bevy::{
 };
 use bevy_editor_pls::default_windows::inspector::label_button;
 
-use bevy_inspector_egui::{egui, Inspectable};
+use bevy_inspector_egui::{egui};
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use serde_json::from_value;
@@ -98,7 +98,7 @@ pub enum Conditions {
     InputWindowCon(u16)
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect, Default)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, FromReflect, Reflect, Default)]
 pub enum StateHeight {
     #[default]
     Stand,
@@ -200,7 +200,7 @@ pub trait HBox: Component {
 }
 
 #[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
+    Default, Debug, Serialize, Deserialize, Clone, Copy, FromReflect, Reflect, Component,
 )]
 pub enum HitLevel {
     Low, 
@@ -214,33 +214,56 @@ pub enum HitLevel {
 )]
 #[reflect(Component)]
 pub struct HitboxData {
+    /// The priority of the hitbox with respect to others. The lower value wins.
     #[serde(default)]
     pub priority: u8,
+    /// 
     #[serde(default)]
     pub id: Option<usize>,
+    ///
     #[serde(default)]
     pub global_id: Option<u32>,
+    /// The name of the bone to attach this hitbox to.
     pub bone: String,
+    /// The entity of the bone that it is attached to. This must be None.
     #[serde(default)]
     pub bone_entity: Option<Entity>,
+    /// The radius of the hitbox.
     pub radius: f32,
+    /// The half height of the hitbox. 
     #[serde(alias = "halfHeight")]
     pub half_height: f32,
+    /// How many units the hitbox should be offset in local space relative to its bone.
     #[serde(default)]
     pub offset: Vec3,
+    ///
     #[serde(default, deserialize_with = "deserialize_rotation")]
     pub rotation: (f32, f32),
+    /// How much damage should be applied upon hit.
+    #[serde(default)]
     pub damage: u16,
+    /// How many frames of hitstun should be applied on hit.
     pub hitstun: u16,
+    /// How many frames of blockstun should be applied on block.
     pub blockstun: u16,
+    /// The first active frame of this hitbox.
     #[serde(alias = "startFrame")]
     pub start_frame: u16,
+    /// The last active frame of this hitbox.
     #[serde(alias = "endFrame")]
     pub end_frame: u16,
+    /// The number of frames after hitting that the hitbox can hit again, optionally.
     #[serde(default)]
-    rehit: Option<u16>, // Number frames after hitting that hitbox can hit again,
+    rehit: Option<u16>, 
+    /// Whether this hits low, mid, or high.
     #[serde(alias = "hitLevel", default)]
-    hit_level: HitLevel
+    pub hit_level: HitLevel,
+    /// The velocity to set the opponent to on hit.
+    #[serde(alias = "setVelocity", default)]
+    pub set_velocity: Vec3,
+    /// The acceleration to set the opponent to on hit.
+    #[serde(alias = "setAccel", default)]
+    pub set_accel: Vec3
 }
 
 fn deserialize_rotation<'de, D>(deserializer: D) -> Result<(f32, f32), D::Error>
@@ -305,7 +328,7 @@ pub struct BoneMap(pub HashMap<String, Entity>);
 pub struct ActiveHitboxes(pub Vec<Entity>);
 
 #[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
 )]
 #[reflect(Component)]
 pub struct HurtboxData {
@@ -358,7 +381,7 @@ impl Hurtboxes {
 }
 
 #[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
 )]
 #[reflect(Component)]
 pub struct ProjectileData {
@@ -387,7 +410,7 @@ impl ProjectileData {
 }
 
 #[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
 )]
 #[reflect(Component)]
 pub struct Velocity(pub Vec3);
@@ -504,7 +527,7 @@ pub struct StateFrame(pub u16);
 #[reflect(Component)]
 pub struct Exclude(pub HashSet<Entity>);
 
-#[derive(Component, Inspectable, PartialEq, Reflect)]
+#[derive(Component, PartialEq, Reflect)]
 pub struct Owner(pub Entity);
 
 impl Owner {
@@ -520,7 +543,7 @@ impl Default for Owner {
 }
 
 #[derive(
-    Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable, Copy, PartialEq,
+    Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Copy, PartialEq,
 )]
 pub enum Direction {
     Left,
@@ -549,19 +572,19 @@ impl From<f32> for Direction {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
 pub struct Facing(pub Direction);
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
 pub struct Health(pub u16);
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
 pub struct InHitstun(pub u16);
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
 pub struct PlayerAxis {
     pub opponent_pos: Vec3,
