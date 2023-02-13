@@ -6,9 +6,9 @@ use bevy_inspector_egui::RegisterInspectable;
 
 use self::{
     data::{FighterData, HitEvent, Collider, SegmentProxy}, 
-    state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference, PlayerAxis, Animation, HurtboxData, Exclude}, 
+    state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference, PlayerAxis, HurtboxData, Exclude}, 
     systems::InputBuffer, event::TransitionEvent,
-    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object, Velo, VectorType, OnExitSetPos, InputWindowCheck}
+    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object, Velo, VectorType, OnExitSetPos, InputWindowCheck, InputMet}
 };
 
 pub(crate) mod state;
@@ -16,6 +16,7 @@ pub(crate) mod systems;
 pub(crate) mod data;
 pub(crate) mod event;
 pub(crate) mod modifiers;
+pub(crate) mod animation;
 
 #[derive(Component)]
 pub struct Fighter;
@@ -52,6 +53,7 @@ impl Plugin for FighterPlugin {
             .register_type::<HitboxData>()
             .register_type::<StateMap>()
             .register_type::<Direction>()
+            .register_type::<InputMet>()
             .register_inspectable::<Direction>()
             //.register_inspectable::<HitboxData>()
             .register_inspectable::<ProjectileData>()
@@ -65,6 +67,7 @@ impl Plugin for FighterPlugin {
             .register_inspectable::<SegmentProxy>()
             //.register_inspectable::<ProjectileReference>()
             .register_type::<ProjectileReference>()
+
             .register_type::<FighterData>();
     }
 }

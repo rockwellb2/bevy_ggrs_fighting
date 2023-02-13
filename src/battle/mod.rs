@@ -190,6 +190,12 @@ pub fn spawn_fighters(
 
     let hook = move |entity: &EntityRef, cmds: &mut EntityCommands| {
         if let Some(extras) = entity.get::<GltfExtras>() {
+            if let Some(name) = entity.get::<Name>() {
+                if !name.contains("Hurt") {
+                    return;
+                }
+            }
+            
             let hurt: HurtboxData = serde_json::de::from_str(extras.value.as_str())
                 .expect("Could not deserialize as HurtboxData");
             let capsule = Capsule::new_y(hurt.half_height - hurt.radius, hurt.radius);

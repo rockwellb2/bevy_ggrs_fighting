@@ -569,15 +569,6 @@ pub struct PlayerAxis {
     pub z: Vec3,
 }
 
-#[derive(Component)]
-pub struct Animation(pub Handle<AnimationClip>, pub f32);
-
-impl Animation {
-    pub fn length(&self) -> f32 {
-        self.1
-    }
-}
-
 
 #[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 pub struct FrameWindow {

@@ -70,6 +70,7 @@ impl StateModifier for OnExitSetPos {
 
 // The below modifer sets this component
 #[derive(Component, Serialize, Deserialize, Reflect, Default)]
+#[reflect(Component)]
 pub struct InputMet(pub bool);
 
 // Command Input and frame window for checking that input

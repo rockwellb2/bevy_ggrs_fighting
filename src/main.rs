@@ -14,15 +14,15 @@ use bevy_scene_hook::HookPlugin;
 use fighter::{
     state::{
         Active, CurrentState, Direction, Facing, HitboxData, HurtboxData, SerializedStateVec,
-        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox, PlayerAxis, Animation, Hurtboxes, BoneMap, ActiveHitboxes,
+        StateFrame, Health, InHitstun, ProjectileReference, ProjectileData, Velocity, HBox, PlayerAxis, Hurtboxes, BoneMap, ActiveHitboxes,
     },
     systems::{
         adjust_facing_system, collision_system, hbox_position_system,
         hit_event_system, hitbox_component_system, hitbox_removal_system, hitstun_system,
         hurtbox_component_system, hurtbox_removal_system, increment_frame_system, movement_system,
-        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, axis_system, camera_system, animation_system, add_animation_player_system, pause_system, last_debug_system, modifier_input_check,
+        process_input_system, transition_system, ui_lifebar_system, InputBuffer, buffer_insert_system, object_system, projectile_system, axis_system, camera_system, pause_system, last_debug_system, modifier_input_check,
     },
-    FighterPlugin, Fighter,
+    FighterPlugin, Fighter
 };
 use game::{
     ADD_HITBOX, ADD_HURTBOX, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
@@ -219,7 +219,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "Armature Stage", 
                 SystemStage::parallel()
                     .with_run_criteria(on_armature)
-                    .with_system(armature_system)
+                    .with_system(fighter::animation::setup::armature_system)
             )
                 .with_stage_after(
                     "Armature Stage",
@@ -227,7 +227,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     SystemStage::parallel()
                         .with_run_criteria(on_enter_round)
                         .with_system(startup.exclusive_system().label("startup"))
-                        .with_system(insert_animations.label("insert_anim"))
+                        .with_system(fighter::animation::setup::insert_animations.label("insert_anim"))
                         .with_system(insert_meshes.after("insert_anim"))
                 )
                 .with_stage_after(
@@ -235,7 +235,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "Extra Setup Stage",
                     SystemStage::parallel()
                         .with_run_criteria(on_extra_setup)
-                        .with_system(add_animation_player_system.before("extra"))
+                        .with_system(fighter::animation::setup::add_animation_player_system.before("extra"))
                         .with_system(extra_setup_system.label("extra"))
                 )
                 
@@ -304,7 +304,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .after(AXIS)
                         )
                         .with_system(
-                            animation_system
+                            fighter::animation::rollback::animation_system
                             .after("object")
                         )
                 )
@@ -435,7 +435,9 @@ fn startup(world: &mut World) {
         let player1 = players.get(1);
         let player2 = players.get(2);
 
-        let access = world.get_resource::<PlayerHandleAccess>().unwrap().clone();
+        //let access = world.get_resource::<PlayerHandleAccess>().unwrap().clone();
+        let access = <&battle::PlayerHandleAccess>::clone(&world.get_resource::<PlayerHandleAccess>().unwrap());
+        
         let deserialized = state_lists.remove(&access.0.state_list).unwrap().0;
         let deserialized2 = deserialized.clone();
 
@@ -631,34 +633,7 @@ pub fn insert_meshes(
     commands.insert_resource(HitboxMap(hitbox_resource));
 }
 
-pub fn insert_animations(
-    mut commands: Commands,
-    assets_gltf: Res<Assets<Gltf>>,
-    handle_access: Res<PlayerHandleAccess>,
-    query: Query<(Entity, &Name)>,
-    fighter_query: Query<(&Player, &StateMap), With<Fighter>>,
 
-    animation_clips: Res<Assets<AnimationClip>>
-
-    //mut armature_query: Query<(&Name, &mut Transform)>
-) {
-    for (player, map) in fighter_query.iter() {
-        let handle = handle_access.get(player.0).model.clone();
-        let gltf = assets_gltf.get(&handle).expect("GLTF handle doesn't exist");
-        let animations = &gltf.named_animations;
-        for (entity, name) in query.iter_many(map.map.values()) {
-            if let Some(animation) = animations.get(name.to_string().rsplit(") ").next().expect("Split didn't work")) {
-                let length = animation_clips
-                    .get(&animation)
-                    .expect("AnimationClip doesn't exist")
-                    .duration();
-
-                commands.entity(entity)
-                    .insert(Animation(animation.clone(), length));
-            }
-        }
-    }
-}
 
 #[derive(Component)]
 pub struct AnimEntity(pub Entity);
@@ -673,41 +648,4 @@ pub struct FrameCount {
     pub frame: u32,
 }
 
-
-pub fn armature_system(
-    mut commands: Commands,
-    hurtbox_query: Query<(Entity, &HurtboxData)>,
-    parent_query: Query<&Parent>,
-    mut state: ResMut<RoundState>,
-    mut fighter_query: Query<&mut Hurtboxes>
-) {
-
-    let hurt_iter = hurtbox_query.iter();
-
-    if hurt_iter.len() > 0 {
-        for (hurt_ent, _hurtbox) in hurt_iter {
-            let mut ancestor = parent_query.get(hurt_ent).expect("Entity doesn't have Parent");
-            loop {
-                if let Ok(parent) = parent_query.get(ancestor.get()) {
-                    ancestor = parent;
-                }
-                else {
-                    break;
-                }
-            }
-
-            commands.entity(hurt_ent)
-                .insert(Owner(ancestor.get()));
-            
-            let mut hurtboxes = fighter_query.get_mut(ancestor.get()).expect("Does not have Hurtboxes component");
-            hurtboxes.add(hurt_ent);
-
-
-        }
-
-        *state = RoundState::EnterRound;
-    }
-
-    
-}
 

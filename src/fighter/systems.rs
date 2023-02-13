@@ -1,11 +1,17 @@
-use std::{f32::consts::{FRAC_PI_2, PI}, ops::Deref};
+use std::{
+    f32::consts::{FRAC_PI_2, PI},
+    ops::Deref,
+};
 
 use super::{
     data::{Collider, CollisionData, FighterData, HitEvent},
     event::TransitionEvent,
-    modifiers::{AdjustFacing, CreateObject, Movement, Object, OnExitSetPos, VectorType, Velo, InputMet, InputWindowCheck},
+    modifiers::{
+        AdjustFacing, CreateObject, InputMet, InputWindowCheck, Movement, Object, OnExitSetPos,
+        VectorType, Velo,
+    },
     state::{
-        Active, ActiveHitboxes, Animation, BoneMap, Conditions, CurrentState, Direction, Exclude,
+        Active, ActiveHitboxes, BoneMap, Conditions, CurrentState, Direction, Exclude,
         Facing, HBox, Health, HitboxData, HurtboxData, Hurtboxes, InHitstun, Owner, PlayerAxis,
         ProjectileData, ProjectileReference, State, StateFrame, StateMap, Velocity,
     },
@@ -39,7 +45,7 @@ use bevy::input::Input;
 use crate::{
     battle::{HitboxMaterial, Lifebar, MatchCamera, PlayerEntities},
     game::{Paused, RoundState, FRAME},
-    input::{Input as FightInput, LEFT, LEFT_HELD, RIGHT, RIGHT_HELD, StateInput},
+    input::{Input as FightInput, StateInput, LEFT, LEFT_HELD, RIGHT, RIGHT_HELD},
     util::Buffer,
     AnimEntity, GameDebug, HitboxMap, Player, FPS,
 };
@@ -166,10 +172,7 @@ pub fn process_input_system(
     state_query: Query<(Entity, &State)>,
     mut trans_writer: EventWriter<TransitionEvent>,
 
-
-    input_met_mod_query: Query<&InputMet>
-
-
+    input_met_mod_query: Query<&InputMet>,
 ) {
     'fighter: for (fighter, current, map, buffer, frame, player, facing, tf) in query.iter() {
         let state: &Entity = map.get(&current.0).expect("State doesn't exist");
@@ -231,13 +234,15 @@ pub fn process_input_system(
                                 }
                             }
                             Conditions::InputWindowCon(enact_frame) => {
-                                let met_mod = input_met_mod_query.get(*state).expect("State entity doesn't have InputMet component");
+                                let met_mod = input_met_mod_query
+                                    .get(*state)
+                                    .expect("State entity doesn't have InputMet component");
 
                                 if !met_mod.0 || *enact_frame != frame.0 {
                                     meets_conditions = false;
                                     break 'all;
                                 }
-                            },
+                            }
                             // Conditions::OnHit(id, range) => {
                             //     if let Some(id) = id {
                             //         todo!()
@@ -305,14 +310,15 @@ pub fn process_input_system(
                                 }
                             }
                             Conditions::InputWindowCon(enact_frame) => {
-                                let met_mod = input_met_mod_query.get(*state).expect("State entity doesn't have InputMet component");
+                                let met_mod = input_met_mod_query
+                                    .get(*state)
+                                    .expect("State entity doesn't have InputMet component");
 
                                 if !met_mod.0 || *enact_frame != frame.0 {
                                     met = false;
                                     break 'conditions;
                                 }
-
-                            }, // Conditions::OnHit(_, _) => todo!(),
+                            } // Conditions::OnHit(_, _) => todo!(),
                         }
                     }
                     if met {
@@ -375,7 +381,6 @@ pub fn transition_system(
                 tf.translation.x = pos.x;
                 tf.translation.z = pos.z;
             }
-
 
             // InputMet reset
             if let Ok(mut met) = input_met_query.get_mut(*state) {
@@ -1030,59 +1035,6 @@ pub fn camera_system(
     }
 }
 
-pub fn animation_system(
-    mut commands: Commands,
-    mut animation_play: Query<(Entity, &Parent, &mut AnimationPlayer)>,
-    fighter_query: Query<
-        (
-            Entity,
-            Option<&AnimEntity>,
-            &CurrentState,
-            &StateMap,
-            &StateFrame,
-        ),
-        With<Fighter>,
-    >,
-    parent_query: Query<&Parent>,
-    state_query: Query<&Animation, With<State>>,
-) {
-    for (entity, anim_entity, current, map, frame) in fighter_query.iter() {
-        if let Some(anim) = anim_entity {
-            for (_, _, mut player) in animation_play.get_mut(anim.0) {
-                let state = map.get(&current.0).expect("State doesn't exist");
-                if let Ok(animation) = state_query.get(*state) {
-                    player.play(animation.0.clone_weak());
-
-                    player.set_elapsed((frame.0 as f32 * FRAME) % animation.length());
-                    player.pause();
-                }
-            }
-        } else {
-            for (play_ent, parent, mut _play) in animation_play.iter_mut() {
-                for grandparent in parent_query.get(parent.get()) {
-                    if grandparent.get() == entity {
-                        commands.entity(entity).insert(AnimEntity(play_ent));
-                    }
-                }
-            }
-        }
-    }
-}
-
-pub fn add_animation_player_system(
-    mut commands: Commands,
-    anim_player_query: Query<(Entity, &AnimationPlayer)>,
-    parent_query: Query<&Parent>,
-) {
-    for (anim, _) in anim_player_query.iter() {
-        println!("What about here?");
-        for parent in parent_query.get(anim) {
-            for fighter in parent_query.get(parent.get()) {
-                commands.entity(fighter.get()).insert(AnimEntity(anim));
-            }
-        }
-    }
-}
 
 pub fn pause_system(
     input: Res<Input<KeyCode>>,
@@ -1114,35 +1066,31 @@ pub fn last_debug_system(paused: Res<Paused>, mut state: ResMut<RoundState>) {
     }
 }
 
-
 pub fn modifier_input_check(
     mut query: Query<(&Owner, &State, &mut InputMet, &InputWindowCheck)>,
-    fighter_query: Query<(&InputBuffer, &Facing, &StateFrame, &CurrentState, &StateMap)>
-
+    fighter_query: Query<(&InputBuffer, &Facing, &StateFrame, &CurrentState, &StateMap)>,
 ) {
     // TODO: Check and Met need to be on separate entities
     for (buffer, facing, frame, current, map) in fighter_query.iter() {
         let s: &Entity = map.get(&current.0).expect("State doesn't exist");
 
         if let Ok((_, state, mut met, check)) = query.get_mut(*s) {
-            if !met.0 && frame.0 >= check.window_start && frame.0 <= check.window_end && check.command_input.compare(&buffer.0, facing.0) {
+            if !met.0
+                && frame.0 >= check.window_start
+                && frame.0 <= check.window_end
+                && check.command_input.compare(&buffer.0, facing.0)
+            {
                 met.0 = true;
             }
-
         }
-
     }
-
-
-
 
     // for (owner, state, mut met, check) in query.iter_mut() {
     //     let (buffer, facing, frame, _, _) = fighter_query.get(owner.get()).expect("Fighter doesn't have InputBuffer or Facing component");
 
-    //     if !met.0 && frame.0 >= check.window_start && frame.0 <= check.window_end && check.command_input.compare(&buffer.0, facing.0)  
+    //     if !met.0 && frame.0 >= check.window_start && frame.0 <= check.window_end && check.command_input.compare(&buffer.0, facing.0)
     //     {
     //         println!("Met at frame {}", frame.0);
-
 
     //         met.0 = true;
 
@@ -1151,11 +1099,6 @@ pub fn modifier_input_check(
     //             println!("{}: {:?}", index, i)
     //         }
 
-
-
-            
-
     //     }
     // }
-
 }

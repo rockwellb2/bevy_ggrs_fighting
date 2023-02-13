@@ -119,6 +119,7 @@
     {
         "id": 5,
         "debug_name": "Forward Walk",
+        "duration": 61,
         "transitions": [
             410,
             350,
@@ -136,7 +137,7 @@
         "modifiers": [
             {
                 "Velo": {
-                    "startVelocity": [4, 0, 0],
+                    "startVelocity": [3, 0, 0],
                     "acceleration": [0, 0, 0]
                 }
             },
@@ -450,7 +451,7 @@
     {
         "id": 120,
         "debug_name": "2A",
-        "duration": 50,
+        "duration": 56,
         "transitions": [
             0
         ],
