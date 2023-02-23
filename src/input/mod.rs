@@ -164,11 +164,11 @@ where
         {
             let trimmed = v.trim().trim_start_matches("0b");
 
-            return if let Ok(bits) = u16::from_str_radix(trimmed, 2) {
+             if let Ok(bits) = u16::from_str_radix(trimmed, 2) {
                 Ok(bits)
             } else {
                 Err(E::custom("error deserializing bits from string"))
-            };
+            }
         }
     }
 
@@ -254,7 +254,7 @@ impl NewCommandInput {
             }
         }
 
-        return true;
+        true
     }
 }
 
@@ -307,7 +307,7 @@ mod input_tests {
     }
 }
 
-#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, Reflect, FromReflect)]
 pub enum ButtonPress {
     #[default]
     None = 0,
@@ -338,7 +338,7 @@ impl From<u32> for ButtonPress {
     }
 }
 
-#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, Reflect, FromReflect)]
 pub enum DirectionalInput {
     #[default]
     None = 0,
@@ -402,6 +402,7 @@ pub struct StateInput {
 }
 
 impl StateInput {
+    #![allow(clippy::too_many_arguments)]
     pub fn new(
         lp: ButtonPress,
         mp: ButtonPress,

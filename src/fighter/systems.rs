@@ -1,13 +1,10 @@
-use std::{
-    f32::consts::{FRAC_PI_2, PI},
-    ops::Deref,
-};
+
 
 use super::{
     data::{Collider, CollisionData, FighterData, HitEvent},
     event::TransitionEvent,
     modifiers::{
-        AdjustFacing, CreateObject, InputMet, InputWindowCheck, Movement, Object, OnExitSetPos,
+        AdjustFacing, CreateObject, InputMet, InputWindowCheck, Object, OnExitSetPos,
         VectorType, Velo,
     },
     state::{
@@ -21,38 +18,35 @@ use bevy::{
     ecs::reflect::ReflectComponent,
     math::Vec3Swizzles,
     prelude::{
-        AnimationPlayer, BuildChildren, Camera, ChangeTrackers, Changed, Commands, Component,
-        Entity, EulerRot, EventReader, EventWriter, GlobalTransform, KeyCode, Name, Or, ParamSet,
-        Parent, PbrBundle, Quat, Query, Res, ResMut, SpatialBundle, Transform, Vec3, Visibility,
+        BuildChildren, ChangeTrackers, Changed, Commands, Component,
+        Entity, EulerRot, EventReader, EventWriter, GlobalTransform, KeyCode, Name, Or, ParamSet, PbrBundle, Quat, Query, Res, ResMut, Transform, Vec3, Visibility,
         With, Without,
     },
     reflect::{FromReflect, Reflect, Struct},
     ui::{Style, Val},
     utils::{default, hashbrown::HashSet, HashMap},
 };
-use bevy_ggrs::{Rollback, RollbackIdProvider};
-use ggrs::InputStatus;
-use nalgebra::{Isometry3, UnitQuaternion, Vector3};
+use bevy_ggrs::{Rollback, RollbackIdProvider, PlayerInputs};
+
+use nalgebra::Isometry3;
 use parry3d::{
-    bounding_volume::{BoundingVolume, AABB},
+    bounding_volume::{BoundingVolume, Aabb},
     math::Point,
     query::intersection_test,
-    shape::{Capsule, Cuboid},
+    shape::Capsule,
 };
 
 use bevy::input::Input;
 
 use crate::{
     battle::{HitboxMaterial, Lifebar, MatchCamera, PlayerEntities},
-    game::{Paused, RoundState, FRAME},
-    input::{Input as FightInput, StateInput, LEFT, LEFT_HELD, RIGHT, RIGHT_HELD},
-    util::Buffer,
-    AnimEntity, GameDebug, HitboxMap, Player, FPS,
+    game::{Paused, RoundState},
+    util::Buffer, HitboxMap, Player, FPS, GGRSConfig,
 };
 
 pub fn buffer_insert_system(
     mut query: Query<(&mut InputBuffer, &Player)>,
-    inputs: Res<Vec<(FightInput, InputStatus)>>,
+    inputs: Res<PlayerInputs<GGRSConfig>>,
 ) {
     for (mut buffer, player) in query.iter_mut() {
         if player.0 != 1 {
@@ -60,6 +54,9 @@ pub fn buffer_insert_system(
         }
         buffer.0.insert(inputs[0].0 .0)
     }
+
+
+    
 }
 
 pub fn movement_system(
@@ -105,7 +102,7 @@ pub fn movement_system(
                         VectorType::Vec(vector) => *vector,
                         VectorType::Variable(var_name) => {
                             let raw = data
-                                .field(&var_name)
+                                .field(var_name)
                                 .expect("Couldn't get value for field of this name");
                             let variable = f32::from_reflect(raw)
                                 .expect("Couldn't create f32 from reflected value");
@@ -440,7 +437,7 @@ pub fn hitbox_component_system(
                             .entity(hitbox.bone_entity.expect("Bone entity doesn't exist"))
                             .add_children(|parent| {
                                 parent
-                                    .spawn_bundle(PbrBundle {
+                                    .spawn(PbrBundle {
                                         transform: Transform {
                                             translation: hitbox.offset,
                                             rotation: Quat::from_euler(
@@ -663,7 +660,7 @@ pub fn adjust_facing_system(
             };
         }
 
-        if let Ok(_) = state_query.get(*state2) {
+        if state_query.get(*state2).is_ok() {
             facing2.0 = if tf1.translation.x > tf2.translation.x {
                 Direction::Right
             } else {
@@ -810,7 +807,7 @@ pub fn collision_system(
     }
 
     if let Ok([hurtboxes1, hurtboxes2]) = fighter_query.get_many(players.as_ref().into()) {
-        if hitboxes_1.len() > 0 {
+        if !hitboxes_1.is_empty() {
             let mut hurt_grouping: Vec<(Isometry3<f32>, Capsule, HurtboxData)> = Vec::new();
             let mut hurt_points: Vec<Point<f32>> = Vec::new();
 
@@ -826,7 +823,7 @@ pub fn collision_system(
                 hurt_grouping.push((iso, capsule, hurt_data.clone()));
             }
 
-            let comp_aabb = AABB::from_points(&hurt_points);
+            let comp_aabb = Aabb::from_points(&hurt_points);
 
             'hitbox_loop: for (hit_ent, hitbox1, collider1, tf1) in hit_query.iter_many(&hitboxes_1)
             {

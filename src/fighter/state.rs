@@ -10,7 +10,7 @@ use bevy::{
 };
 use bevy_editor_pls::default_windows::inspector::label_button;
 
-use bevy_inspector_egui::{egui, Inspectable};
+
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use serde_json::from_value;
@@ -305,7 +305,7 @@ pub struct BoneMap(pub HashMap<String, Entity>);
 pub struct ActiveHitboxes(pub Vec<Entity>);
 
 #[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
 )]
 #[reflect(Component)]
 pub struct HurtboxData {
@@ -358,7 +358,7 @@ impl Hurtboxes {
 }
 
 #[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
 )]
 #[reflect(Component)]
 pub struct ProjectileData {
@@ -387,7 +387,7 @@ impl ProjectileData {
 }
 
 #[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
 )]
 #[reflect(Component)]
 pub struct Velocity(pub Vec3);
@@ -504,7 +504,7 @@ pub struct StateFrame(pub u16);
 #[reflect(Component)]
 pub struct Exclude(pub HashSet<Entity>);
 
-#[derive(Component, Inspectable, PartialEq, Reflect)]
+#[derive(Component, PartialEq, Reflect)]
 pub struct Owner(pub Entity);
 
 impl Owner {
@@ -520,7 +520,7 @@ impl Default for Owner {
 }
 
 #[derive(
-    Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable, Copy, PartialEq,
+    Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Copy, PartialEq,
 )]
 pub enum Direction {
     Left,
@@ -549,19 +549,19 @@ impl From<f32> for Direction {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
 pub struct Facing(pub Direction);
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
 pub struct Health(pub u16);
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
 pub struct InHitstun(pub u16);
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
 pub struct PlayerAxis {
     pub opponent_pos: Vec3,
