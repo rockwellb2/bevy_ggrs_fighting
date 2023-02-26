@@ -1,4 +1,4 @@
-
+#![allow(clippy::type_complexity)]
 
 use super::{
     data::{Collider, CollisionData, FighterData, HitEvent},
@@ -83,7 +83,7 @@ pub fn movement_system(
                         VectorType::Vec(vector) => *vector,
                         VectorType::Variable(var_name) => {
                             let raw = data
-                                .field(&var_name)
+                                .field(var_name)
                                 .expect("Couldn't get value for field of this name");
                             let variable = f32::from_reflect(raw)
                                 .expect("Couldn't create f32 from reflected value");
@@ -151,6 +151,7 @@ pub fn hitstun_system(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn process_input_system(
     //mut commands: Commands,
     query: Query<
@@ -209,16 +210,16 @@ pub fn process_input_system(
                                     break 'all;
                                 }
                             }
-                            Conditions::Frame(start_frame, end_frame) => {
-                                if let Some(start) = start_frame {
-                                    if frame.0 < *start {
+                            Conditions::Frame(window) => {
+                                if let Ok(start) = window.try_get_start_frame() {
+                                    if frame.0 < start {
                                         meets_conditions = false;
                                         break 'all;
                                     }
                                 }
 
-                                if let Some(end) = end_frame {
-                                    if frame.0 > *end {
+                                if let Ok(end) = window.try_get_end_frame() {
+                                    if frame.0 > end {
                                         meets_conditions = false;
                                         break 'all;
                                     }
@@ -285,16 +286,16 @@ pub fn process_input_system(
                                     break 'conditions;
                                 }
                             }
-                            Conditions::Frame(start_frame, end_frame) => {
-                                if let Some(start) = start_frame {
-                                    if frame.0 < *start {
+                            Conditions::Frame(window) => {
+                                if let Ok(start) = window.try_get_start_frame() {
+                                    if frame.0 < start {
                                         met = false;
                                         break 'conditions;
                                     }
                                 }
 
-                                if let Some(end) = end_frame {
-                                    if frame.0 > *end {
+                                if let Ok(end) = window.try_get_end_frame() {
+                                    if frame.0 > end {
                                         met = false;
                                         break 'conditions;
                                     }
@@ -333,6 +334,7 @@ pub fn process_input_system(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn transition_system(
     mut commands: Commands,
     mut trans_reader: EventReader<TransitionEvent>,
@@ -396,6 +398,7 @@ pub fn transition_system(
 #[reflect(Component)]
 pub struct InputBuffer(pub Buffer);
 
+#[allow(clippy::type_complexity)]
 pub fn hitbox_component_system(
     mut commands: Commands,
     mut fighter_query: Query<
@@ -476,12 +479,13 @@ pub fn hitbox_removal_system(
     for (entity, data, owner) in query.iter() {
         let frame = fighter_query.get(owner.0).expect("Owner doesn't exist");
 
-        if frame.0 > data.end_frame {
+        if frame.0 > data.get_end_frame() {
             commands.entity(entity).despawn();
         }
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn hurtbox_component_system(
     mut commands: Commands,
     mut fighter_query: Query<
@@ -577,6 +581,7 @@ pub fn hurtbox_removal_system(
 }
 
 // Isn't removed until after stage is over, may be a problem?
+#[allow(clippy::type_complexity)]
 pub fn projectile_system(
     mut commands: Commands,
     mut query: Query<
@@ -652,7 +657,7 @@ pub fn adjust_facing_system(
         let state1 = map1.get(&current1.0).unwrap();
         let state2 = map2.get(&current2.0).unwrap();
 
-        if let Ok(_) = state_query.get(*state1) {
+        if state_query.get(*state1).is_ok() {
             facing1.0 = if tf1.translation.x > tf2.translation.x {
                 Direction::Left
             } else {
@@ -670,6 +675,7 @@ pub fn adjust_facing_system(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn object_system(
     mut commands: Commands,
 
@@ -750,6 +756,7 @@ pub fn object_system(
     });
 }
 
+#[allow(clippy::type_complexity)]
 pub fn hbox_position_system<T: HBox>(
     mut set: ParamSet<(
         Query<(&T, &Owner, &mut Transform), With<Active>>, // Hbox Query
@@ -857,74 +864,6 @@ pub fn collision_system(
         }
     }
 
-    // for (hitbox, hit_owner, active) in hitbox_query.iter_mut() {
-    //     for (hurtbox, hurt_owner, hurt_name) in hurtbox_query.iter() {
-    //         //println!("Within hurtbox query");
-    //         if active.0.contains(&hurt_owner.0) {
-    //             break;
-    //         }
-    //         if hit_owner != hurt_owner {
-    //             let (hit_iso, hit_shape, hit_data) = if seen_hitboxes.contains_key(&hitbox) {
-    //                 seen_hitboxes.get(&hitbox).unwrap().to_owned()
-    //             } else {
-    //                 let (data, hit_collider, hit_tf) = hit_query.get(hitbox).unwrap();
-    //                 //let iso = Isometry3::from(hit_vec);
-    //                 let iso: Isometry3<f32> = (hit_tf.translation, hit_tf.rotation).into();
-    //                 let iso = iso;
-
-    //                 seen_hitboxes.insert(
-    //                     hitbox,
-    //                     (iso.clone(), hit_collider.clone().into(), data.clone()),
-    //                 );
-    //                 (iso, hit_collider.clone().into(), data.clone())
-    //             };
-
-    //             let (hurt_iso, hurt_shape, hurt_data) = if seen_hurtboxes.contains_key(&hurtbox) {
-    //                 seen_hurtboxes.get(&hurtbox).unwrap().to_owned()
-    //             } else {
-    //                 let (data, hurt_collider, hurt_tf) = hurt_query.get(hurtbox).unwrap();
-    //                 //let hurt_vec: Vector3<f32> = hurt_tf.translation.into();
-    //                 //let iso = Isometry3::from(hurt_vec);
-    //                 let hurt_tf = hurt_tf.compute_transform();
-    //                 let iso: Isometry3<f32> = (hurt_tf.translation, hurt_tf.rotation).into();
-
-    //                 seen_hurtboxes.insert(
-    //                     hurtbox,
-    //                     (iso.clone(), hurt_collider.clone().into(), data.clone()),
-    //                 );
-    //                 (iso, hurt_collider.clone().into(), data.clone())
-    //             };
-
-    //             if let Some(c) = collisions.get(&(hit_owner.0, hurt_owner.0)) {
-    //                 if hit_data.priority >= c.get_attacker_priority() {
-    //                     break;
-    //                 }
-    //             }
-
-    //             // let hit_shape = hit_shape.transform_by(&hit_iso);
-    //             // let hurt_shape = hurt_shape.transform_by(&hurt_iso);
-
-    //             if let Ok(intersect) =
-    //                 intersection_test(&hit_iso, &hit_shape, &hurt_iso, &hurt_shape)
-    //             {
-    //                 if intersect {
-    //                     collisions.insert(
-    //                         (hit_owner.0, hurt_owner.0),
-    //                         CollisionData {
-    //                             attacker_box: hit_data,
-    //                             attacker: hit_owner.0,
-    //                             recipient_box: hurt_data,
-    //                             recipient: hurt_owner.0,
-    //                         },
-    //                     );
-
-    //                     println!("Intersecting hurtbox name: {}", hurt_name.as_str());
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     for (_, collision) in collisions {
         hit_writer.send(HitEvent(collision));
     }
@@ -1003,6 +942,7 @@ pub fn ui_lifebar_system(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn camera_system(
     mut set: ParamSet<(
         Query<&mut Transform, With<MatchCamera>>,
@@ -1073,9 +1013,9 @@ pub fn modifier_input_check(
 
         if let Ok((_, state, mut met, check)) = query.get_mut(*s) {
             if !met.0
-                && frame.0 >= check.window_start
-                && frame.0 <= check.window_end
-                && check.command_input.compare(&buffer.0, facing.0)
+            && frame.0 >= check.window.get_start_frame()
+            && frame.0 <= check.window.get_end_frame()
+            && check.command_input.compare(&buffer.0, facing.0)
             {
                 met.0 = true;
             }

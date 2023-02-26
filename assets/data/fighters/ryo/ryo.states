@@ -429,8 +429,7 @@
         "hitboxes": [
             {
                 "bone": "arm left wrist",
-                "startFrame": 5,
-                "endFrame": 10,
+                "window": [5, 10],
                 "damage": 30,
                 "hitstun": 18,
                 "blockstun": 10,
@@ -504,8 +503,10 @@
         "hitboxes": [
             {
                 "bone": "arm right wrist",
-                "startFrame": 12,
-                "endFrame": 13,
+                "window": {
+                    "start": 12,
+                    "end": 13
+                },
                 "damage": 30,
                 "hitstun": 18,
                 "blockstun": 10,
@@ -543,8 +544,10 @@
         "hitboxes": [
             {
                 "bone": "leg left ankle",
-                "startFrame": 7,
-                "endFrame": 11,
+                "window": {
+                    "start": 7,
+                    "end": 11
+                },
                 "damage": 30,
                 "hitstun": 18,
                 "blockstun": 10,
@@ -654,7 +657,7 @@
                 }
             },
             { "in": [31, 33]},
-            { "frame": [10, null]}
+            { "frame": { "start": 10 }}
         ]
     },
     {
@@ -700,7 +703,7 @@
                             ["x", "Positive", true]
                         ]
                     ],
-                    "window": 15
+                    "window": 20
                 }
             }
         ],
@@ -712,8 +715,7 @@
             },
             {
                 "InputWindowCheck": {
-                    "windowStart": 2,
-                    "windowEnd": 18,
+                    "window": [1, 18],
                     "commandInput": {
                         "list": [
                             [
@@ -740,9 +742,23 @@
                 }
             }
         ],
-        "triggerAll": [
+        "trigger1": [
             { "in": [250] },
             { "inputWindowCon": 18 }
+        ],
+        "trigger2": [
+            { "frame": { "end": 18 } },
+            { "in": [250] },
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lk", "Press"]
+                        ]
+                    ],
+                    "window": 18
+                }
+            }
         ]
     },
     {
@@ -797,8 +813,10 @@
         "hitboxes": [
             {
                 "bone": "arm right wrist",
-                "startFrame": 8,
-                "endFrame": 12,
+                "window": {
+                    "start": 8,
+                    "end": 12
+                },
                 "damage": 30,
                 "hitstun": 18,
                 "blockstun": 10,

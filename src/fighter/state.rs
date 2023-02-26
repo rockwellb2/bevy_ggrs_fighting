@@ -1,19 +1,19 @@
 use std::fmt::Debug;
 
 use bevy::ecs::reflect;
-use bevy::prelude::{AnimationClip, Entity, Handle, Mesh, StandardMaterial};
+use bevy::prelude::{Entity, Handle, Mesh};
 use bevy::reflect::{FromReflect, Reflect, TypeUuid};
 use bevy::utils;
 use bevy::utils::hashbrown::{HashMap, HashSet};
 use bevy::{
     ecs::reflect::ReflectComponent, math::Vec3, prelude::Component, reflect::ReflectDeserialize,
 };
-use bevy_editor_pls::default_windows::inspector::label_button;
+
 
 
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use serde_json::from_value;
+use serde_json::{from_value, Number};
 
 
 
@@ -23,7 +23,7 @@ use crate::input::{NewCommandInput, NewMatchExpression};
 
 use super::modifiers::StateModifier;
 
-type Frame = u16;
+pub type Frame = u16;
 
 #[derive(Default, Debug, Serialize, Deserialize, Component, Reflect)]
 #[reflect(Component)]
@@ -84,18 +84,52 @@ impl State {
 #[serde(rename_all = "camelCase")]
 pub enum Conditions {
     // used for the current state
-    In(Vec<u16>),
+    In(StateList),
     NotIn(u16),
     Command(NewCommandInput),
     // when current state is at the end of its duration
     EndDuration,
     // current frame of the stat
-    Frame(Option<u16>, Option<u16>),
+    Frame(FrameWindow),
     // if the fighter just touched the ground
     ReachGround,
     // hitbox id (optional), frame range cancel
     //OnHit(Option<usize>, u16)
     InputWindowCon(u16)
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect)]
+pub struct StateList(Vec<u16>);
+
+impl StateList {
+    pub fn contains(&self, value: &u16) -> bool {
+        self.0.contains(value)
+    }
+
+}
+
+impl From<u16> for StateList {
+    fn from(value: u16) -> Self {
+        Self(vec![value])
+    }
+}
+
+impl From<Number> for StateList {
+    fn from(value: Number) -> Self {
+        Self(vec![value.as_u64().unwrap() as u16])
+    }
+}
+
+impl From<f64> for StateList {
+    fn from(value: f64) -> Self {
+        Self(vec![value as u16])
+    }
+}
+
+impl From<Vec<u16>> for StateList {
+    fn from(value: Vec<u16>) -> Self {
+        Self(value)
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect, Default)]
@@ -233,14 +267,21 @@ pub struct HitboxData {
     pub damage: u16,
     pub hitstun: u16,
     pub blockstun: u16,
-    #[serde(alias = "startFrame")]
-    pub start_frame: u16,
-    #[serde(alias = "endFrame")]
-    pub end_frame: u16,
+    window: FrameWindow,
     #[serde(default)]
     rehit: Option<u16>, // Number frames after hitting that hitbox can hit again,
     #[serde(alias = "hitLevel", default)]
     hit_level: HitLevel
+}
+
+impl HitboxData {
+    pub fn get_end_frame(&self) -> Frame {
+        self.window.end.expect("End frame does not exist in HitboxData")
+    }
+
+    pub fn get_start_frame(&self) -> Frame {
+        self.window.start.expect("End frame does not exist in HitboxData")
+    }
 }
 
 fn deserialize_rotation<'de, D>(deserializer: D) -> Result<(f32, f32), D::Error>
@@ -570,7 +611,7 @@ pub struct PlayerAxis {
 }
 
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, FromReflect)]
 pub struct FrameWindow {
     #[serde(default)]
     start: Option<Frame>,
@@ -579,6 +620,26 @@ pub struct FrameWindow {
 }
 
 impl FrameWindow {
+    pub fn get_start_frame(&self) -> Frame {
+        self.start.expect("Start frame doesn't exist in FrameWindow")
+    }
+
+    pub fn get_end_frame(&self) -> Frame {
+        self.end.expect("End frame doesn't exist in FrameWindow")
+    }
+
+    pub fn try_get_start_frame(&self) -> Result<Frame, ()> {
+        self.start.ok_or(())
+    }
+
+    pub fn try_get_end_frame(&self) -> Result<Frame, ()> {
+        self.end.ok_or(())
+    }
+
+
+
+
+
     pub fn from_end(end: Frame) -> FrameWindow {
         FrameWindow {
             start: None,

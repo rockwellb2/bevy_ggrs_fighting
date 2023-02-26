@@ -225,6 +225,7 @@ pub(crate) mod rollback {
     /// # Panics
     ///
     /// Panics if .
+    #[allow(clippy::type_complexity)]
     pub fn animation_system(
         mut commands: Commands,
         mut animation_play: Query<(Entity, &Parent, &mut AnimationPlayer)>,

@@ -457,7 +457,7 @@ fn populate_entities_with_states(
 
                     //let capsule = Capsule::new_y(hitbox.half_height - hitbox.radius, hitbox.radius);
 
-                    let start_frame = hitbox.start_frame;
+                    let start_frame = hitbox.get_start_frame();
 
                     if ordered.contains_key(&start_frame) {
                         let set = ordered.get_mut(&start_frame).unwrap();

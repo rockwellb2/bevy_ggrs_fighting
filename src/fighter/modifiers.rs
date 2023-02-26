@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use bevy::reflect::{reflect_trait, ReflectDeserialize, FromReflect};
 use bevy::ecs::reflect::ReflectComponent;
 
-use super::state::ProjectileData;
+use super::state::{ProjectileData, FrameWindow, Frame};
 
 #[typetag::serde]
 #[reflect_trait]
@@ -77,10 +77,7 @@ pub struct InputMet(pub bool);
 #[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
 #[reflect(Component, Deserialize, StateModifier)]
 pub struct InputWindowCheck {
-    #[serde(alias = "windowStart", default)]
-    pub window_start: u16,
-    #[serde(alias = "windowEnd", default)]
-    pub window_end: u16,
+    pub window: FrameWindow,
     #[serde(alias = "commandInput", default)]
     pub command_input: NewCommandInput
 

@@ -40,7 +40,7 @@ impl Default for Collider {
 impl From<Capsule> for Collider {
     fn from(value: Capsule) -> Self {
         let radius = value.radius;
-        let segment = value.segment.clone().into();
+        let segment = value.segment.into();
 
         Collider { segment, radius }
     }

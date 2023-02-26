@@ -153,6 +153,7 @@ pub struct HitboxMaterial(pub Handle<StandardMaterial>);
 #[derive(Resource)]
 pub struct HurtboxMaterial(pub Handle<StandardMaterial>);
 
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_fighters(
     mut commands: Commands,
     mut rip: ResMut<RollbackIdProvider>,
@@ -316,6 +317,7 @@ pub fn spawn_fighters(
 #[derive(Component)]
 pub struct MatchCamera;
 
+#[allow(clippy::too_many_arguments)]
 pub fn extra_setup_system(
     object_query: Query<(&CreateObject, &Parent)>,
     mut parent_query: Query<(&Transform, Option<&mut ProjectileReference>)>,
@@ -454,7 +456,7 @@ pub fn extra_setup_system(
                             hitbox.bone_entity = Some(*bone_entity);
                         } else {
                             for (name, bone_entity) in bone_name_query.iter() {
-                                if &name.to_string() == &bone_name {
+                                if name.to_string() == bone_name {
                                     let mut ancestor = bone_parent_query
                                         .get(bone_entity)
                                         .expect("Bone doesn't have parent");
@@ -493,7 +495,7 @@ pub fn extra_setup_system(
     //         .insert(Rollback::new(rip.next_id()));
     // }
 
-    let mut sess_build = SessionBuilder::<GGRSConfig>::new()
+    let sess_build = SessionBuilder::<GGRSConfig>::new()
         //.with_max_prediction_window(8)
         .with_check_distance(2)
         .with_input_delay(2)
