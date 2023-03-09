@@ -6,9 +6,9 @@ use bevy::{prelude::*};
 
 use self::{
     data::{FighterData, HitEvent}, 
-    state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileReference, Exclude}, 
+    state::{StateMap, CurrentState, State as FightState, StateFrame, Facing, Health, Direction, ProjectileReference, Exclude, Velocity}, 
     systems::InputBuffer, event::TransitionEvent,
-    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Velo, OnExitSetPos, InputWindowCheck, InputMet}
+    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Velo, OnExitSetPos, InputWindowCheck, InputMet, OnExitZeroVelo}, hit::components::HitboxData
 };
 
 pub(crate) mod state;
@@ -17,6 +17,7 @@ pub(crate) mod data;
 pub(crate) mod event;
 pub(crate) mod modifiers;
 pub(crate) mod animation;
+pub(crate) mod hit;
 
 #[derive(Component)]
 pub struct Fighter;
@@ -37,6 +38,7 @@ impl Plugin for FighterPlugin {
             .register_type::<CreateObject>()
             .register_type::<Velo>()
             .register_type::<OnExitSetPos>()
+            .register_type::<OnExitZeroVelo>()
             .register_type::<InputWindowCheck>()
 
 
@@ -54,6 +56,8 @@ impl Plugin for FighterPlugin {
             .register_type::<StateMap>()
             .register_type::<Direction>()
             .register_type::<InputMet>()
+            .register_type::<Velocity>()
+
         
             .register_type::<ProjectileReference>()
 

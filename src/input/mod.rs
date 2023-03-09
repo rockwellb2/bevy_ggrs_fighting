@@ -9,7 +9,7 @@ use packed_struct::types::bits::Bits;
 use packed_struct::types::ReservedZero;
 use serde::{de, Deserialize, Serialize};
 
-use crate::fighter::state::{Facing, Direction};
+use crate::fighter::state::{Facing, Direction, Frame};
 use crate::fighter::systems::InputBuffer;
 use crate::util::Buffer;
 
@@ -198,11 +198,13 @@ impl Default for NewMatchExpression {
 pub struct NewCommandInput {
     list: Vec<Vec<NewMatchExpression>>,
     #[serde(default = "NewCommandInput::window_default")]
-    window: u16,
+    window: Frame,
+    #[serde(default, alias = "bufferTime")]
+    buffer_time: Frame
 }
 
 impl NewCommandInput {
-    pub fn window_default() -> u16 {
+    pub fn window_default() -> Frame {
         1
     }
 
@@ -210,9 +212,13 @@ impl NewCommandInput {
         let mut input_iter = input.iter();
         let mut index = 0;
 
+        let mut buffer_time = 0;
+
+        // iterate over each match expression
         for command in &self.list {
             
             loop {
+
                 index += 1;
                 if index > self.window {
                     return false;
@@ -234,12 +240,18 @@ impl NewCommandInput {
                     }
 
 
-                    let mut command_iter = command.iter();
+                    //let mut command_iter = command.iter();
                     let mut same = true;
-                    while let Some(expression) = command_iter.next() {
+                    for expression in command {
                         if !next.compare_command(expression.clone()) {
                             if index == 1 {
-                                return false;
+                                if self.buffer_time > buffer_time {
+                                    index = 0;
+                                    buffer_time += 1;
+                                }
+                                else {
+                                    return false;
+                                }
                             }
                             same = false;
                         }
@@ -251,6 +263,11 @@ impl NewCommandInput {
                 } else {
                     return false;
                 }
+                
+                // if self.buffer_time > buffer_time {
+                //     index = 0;
+                //     buffer_time += 1;
+                // }
             }
         }
 

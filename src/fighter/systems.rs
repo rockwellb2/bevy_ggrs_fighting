@@ -3,14 +3,15 @@
 use super::{
     data::{Collider, CollisionData, FighterData, HitEvent},
     event::TransitionEvent,
+    hit::components::{OnHit, AirborneHitstun},
     modifiers::{
-        AdjustFacing, CreateObject, InputMet, InputWindowCheck, Object, OnExitSetPos,
-        VectorType, Velo,
+        AdjustFacing, CreateObject, InputMet, InputWindowCheck, Object, OnExitSetPos, VectorType,
+        Velo, OnExitZeroVelo,
     },
     state::{
-        Active, ActiveHitboxes, BoneMap, Conditions, CurrentState, Direction, Exclude,
-        Facing, HBox, Health, HitboxData, HurtboxData, Hurtboxes, InHitstun, Owner, PlayerAxis,
-        ProjectileData, ProjectileReference, State, StateFrame, StateMap, Velocity,
+        Active, ActiveHitboxes, BoneMap, Conditions, CurrentState, Direction, Exclude, Facing,
+        GroundedHitstun, HBox, Health, HurtboxData, Hurtboxes, Owner, PlayerAxis, ProjectileData,
+        ProjectileReference, State, StateFrame, StateMap, Velocity, AIR_HITSTUN, GRND_HITSTUN_KB,
     },
     Fighter,
 };
@@ -18,19 +19,19 @@ use bevy::{
     ecs::reflect::ReflectComponent,
     math::Vec3Swizzles,
     prelude::{
-        BuildChildren, ChangeTrackers, Changed, Commands, Component,
-        Entity, EulerRot, EventReader, EventWriter, GlobalTransform, KeyCode, Name, Or, ParamSet, PbrBundle, Quat, Query, Res, ResMut, Transform, Vec3, Visibility,
-        With, Without,
+        BuildChildren, ChangeTrackers, Changed, Commands, Component, Entity, EulerRot, EventReader,
+        EventWriter, GlobalTransform, KeyCode, Name, Or, ParamSet, PbrBundle, Quat, Query, Res,
+        ResMut, Transform, Vec3, Visibility, With, Without,
     },
     reflect::{FromReflect, Reflect, Struct},
     ui::{Style, Val},
     utils::{default, hashbrown::HashSet, HashMap},
 };
-use bevy_ggrs::{Rollback, RollbackIdProvider, PlayerInputs};
+use bevy_ggrs::{PlayerInputs, Rollback, RollbackIdProvider};
 
 use nalgebra::Isometry3;
 use parry3d::{
-    bounding_volume::{BoundingVolume, Aabb},
+    bounding_volume::{Aabb, BoundingVolume},
     math::Point,
     query::intersection_test,
     shape::Capsule,
@@ -40,8 +41,10 @@ use bevy::input::Input;
 
 use crate::{
     battle::{HitboxMaterial, Lifebar, MatchCamera, PlayerEntities},
+    fighter::hit::components::HitboxData,
     game::{Paused, RoundState},
-    util::Buffer, HitboxMap, Player, FPS, GGRSConfig,
+    util::Buffer,
+    GGRSConfig, HitboxMap, Player, FPS,
 };
 
 pub fn buffer_insert_system(
@@ -54,9 +57,6 @@ pub fn buffer_insert_system(
         }
         buffer.0.insert(inputs[0].0 .0)
     }
-
-
-    
 }
 
 pub fn movement_system(
@@ -71,6 +71,8 @@ pub fn movement_system(
         &Facing,
         &PlayerAxis,
     )>,
+
+    facing_query: Query<&AdjustFacing>
 ) {
     for (map, current, mut tf, mut velocity, frame, data, facing, axis) in fighter_query.iter_mut()
     {
@@ -98,7 +100,7 @@ pub fn movement_system(
                 }
             } else {
                 if let Some(accel) = &velo.acceleration {
-                    let accel: Vec3 = match accel {
+                    let mut accel: Vec3 = match accel {
                         VectorType::Vec(vector) => *vector,
                         VectorType::Variable(var_name) => {
                             let raw = data
@@ -111,22 +113,37 @@ pub fn movement_system(
                         }
                         VectorType::Warning => panic!(),
                     };
-
+                    accel.x *= facing.0.sign();
                     velocity.0 += accel;
                 }
             }
 
-            tf.translation += (velocity.0.x / FPS as f32) * axis.x;
-            tf.translation.y += velocity.0.y / FPS as f32;
-            tf.translation += (velocity.0.z / FPS as f32) * axis.z;
+            // tf.translation += (velocity.0.x / FPS as f32) * axis.x;
+            // tf.translation.y += velocity.0.y / FPS as f32;
+            // tf.translation += (velocity.0.z / FPS as f32) * axis.z;
 
-            //tf.translation += velocity.0 / FPS as f32;
+            // //tf.translation += velocity.0 / FPS as f32;
 
-            tf.translation.y = tf.translation.y.max(0.);
+            // tf.translation.y = tf.translation.y.max(0.);
 
-            tf.look_at(axis.opponent_pos, Vec3::Y);
-            //tf.rotate_axis(Vec3::Y, FRAC_PI_2);
+            // tf.look_at(axis.opponent_pos, Vec3::Y);
+            // //tf.rotate_axis(Vec3::Y, FRAC_PI_2);
         }
+
+        tf.translation += (velocity.0.x / FPS as f32) * axis.x;
+        tf.translation.y += velocity.0.y / FPS as f32;
+        tf.translation += (velocity.0.z / FPS as f32) * axis.z;
+
+        //tf.translation += velocity.0 / FPS as f32;
+
+        tf.translation.y = tf.translation.y.max(0.);
+        
+        if facing_query.get(*s).is_ok() {
+            let mut opp_pos = axis.opponent_pos;
+            opp_pos.y = tf.translation.y;
+            tf.look_at(opp_pos, Vec3::Y);
+        }
+        //tf.rotate_axis(Vec3::Y, FRAC_PI_2);
     }
 }
 
@@ -140,15 +157,31 @@ pub fn increment_frame_system(
 
 pub fn hitstun_system(
     mut commands: Commands,
-    mut query: Query<(Entity, &mut CurrentState, &mut StateFrame, &InHitstun), With<Fighter>>,
+    mut query: Query<(Entity, &mut CurrentState, &mut StateFrame, &mut Velocity, Option<&GroundedHitstun>, Option<&AirborneHitstun>, &mut Transform), With<Fighter>>,
 ) {
-    for (fighter, mut current, mut frame, hitstun) in query.iter_mut() {
-        if frame.0 > hitstun.0 {
-            frame.0 = 1;
-            current.0 = 0;
-            commands.entity(fighter).remove::<InHitstun>();
+    for (fighter, mut current, mut frame, mut velo, hitstun, airborne, mut tf ) in query.iter_mut() {
+        if let Some(hitstun) = hitstun {
+            if frame.0 > hitstun.0 {
+                frame.0 = 1;
+                current.0 = 0;
+                velo.0 = Vec3::ZERO;
+                commands.entity(fighter).remove::<GroundedHitstun>();
+            }
         }
+
+        if airborne.is_some() {
+            if tf.translation.y <= 0. && frame.0 != 1 {
+                frame.0 = 1;
+                tf.translation.y = 0.;
+                current.0 = 0;
+                velo.0 = Vec3::ZERO;
+                commands.entity(fighter).remove::<AirborneHitstun>();
+            }
+        }
+        
     }
+
+    
 }
 
 #[allow(clippy::type_complexity)]
@@ -346,17 +379,19 @@ pub fn transition_system(
             &mut StateFrame,
             &InputBuffer,
             &BoneMap,
+            &mut Velocity
         ),
         With<Fighter>,
     >,
     state_query: Query<&State>,
     set_pos_query: Query<&OnExitSetPos>,
+    zero_velo_query: Query<&OnExitZeroVelo>,
     mut input_met_query: Query<&mut InputMet>,
 
     mut transform_set: ParamSet<(Query<&GlobalTransform>, Query<&mut Transform>)>,
 ) {
     for event in trans_reader.iter() {
-        if let Ok((fighter, mut current, map, mut frame, _buffer, bone_map)) =
+        if let Ok((fighter, mut current, map, mut frame, _buffer, bone_map, mut velo)) =
             fighter_query.get_mut(event.fighter)
         {
             println!("Transition {} to {}", current.0, event.to_id);
@@ -379,6 +414,11 @@ pub fn transition_system(
 
                 tf.translation.x = pos.x;
                 tf.translation.z = pos.z;
+            }
+
+            // OnExitZeroVelo 
+            if zero_velo_query.get(*state).is_ok() {
+                velo.0 = Vec3::ZERO;
             }
 
             // InputMet reset
@@ -413,7 +453,7 @@ pub fn hitbox_component_system(
             &PlayerAxis,
             &mut ActiveHitboxes,
         ),
-        (With<Fighter>, Without<InHitstun>),
+        (With<Fighter>, Without<GroundedHitstun>),
     >,
     state_query: Query<&State>,
     hitbox_query: Query<&HitboxData>,
@@ -534,33 +574,6 @@ pub fn hurtbox_component_system(
     //                     }
     //                 }
     //             }
-
-    //             if let Some(set) = hurtboxes.get(&frame.0) {
-    //                 for h in set {
-    //                     let hurtbox = hurtbox_query.get(*h).expect("Hurtbox entity does not exist");
-    //                     let offset = hurtbox.offset;
-
-    //                         let mut transform = Transform::from_translation(tf.translation);
-    //                         transform.rotate_x(hurtbox.rotation.0);
-    //                         transform.rotate_z(hurtbox.rotation.1);
-    //                         transform.rotate(tf.rotation);
-    //                         transform.translation.y = 0.;
-    //                         transform.translation += offset.x * axis.x;
-    //                         transform.translation += offset.z * axis.z;
-    //                         transform.translation.y += offset.y;
-
-    //                     commands
-    //                         .entity(*h)
-    //                         .insert(Active(HashSet::new()))
-    //                         .insert_bundle(SpatialBundle {
-    //                             transform,
-    //                             ..default()
-    //                         });
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 }
 
 pub fn hurtbox_removal_system(
@@ -732,8 +745,14 @@ pub fn object_system(
                         };
 
                         let id = *id.expect("All IDs are in use!");
-                        let new_pos =
-                            tf.translation + (facing.0.sign() * projectile.start_position);
+
+                        let mut new_pos = tf.translation;
+                        new_pos += projectile.start_position.x * axis.x;
+                        new_pos.y = projectile.start_position.y;
+                        new_pos += projectile.start_position.z * axis.z;
+
+
+
                         changes.push((id, new_pos));
 
                         commands
@@ -873,22 +892,62 @@ pub fn hit_event_system(
     mut commands: Commands,
     mut hit_reader: EventReader<HitEvent>,
     mut fighter_query: Query<
-        (Entity, &mut Health, &mut StateFrame, &mut CurrentState),
+        (
+            Entity,
+            &mut Health,
+            &mut StateFrame,
+            &mut CurrentState,
+            &mut Velocity,
+            &Facing,
+        ),
         With<Fighter>,
     >,
     mut hitbox_query: Query<(&mut Exclude, &HitboxData, &Owner)>,
 ) {
     for hit_event in hit_reader.iter() {
-        if let Ok((fighter, mut health, mut frame, mut current)) =
+        if let Ok((fighter, mut health, mut frame, mut current, mut velo, facing)) =
             fighter_query.get_mut(hit_event.0.recipient)
         {
             health.0 = health.0.saturating_sub(hit_event.0.attacker_box.damage);
-            commands
-                .entity(fighter)
-                .insert(InHitstun(hit_event.0.attacker_box.hitstun));
 
-            frame.0 = 1;
-            current.0 = 3000;
+            match hit_event.0.attacker_box.on_hit {
+                OnHit::Launch(kb) => {
+                    commands
+                        .entity(fighter)
+                        .insert(AirborneHitstun);
+                
+                    
+                    frame.0 = 1;
+                    current.0 = AIR_HITSTUN;
+
+                    let mut knockback = kb;
+                    knockback.x *= facing.0.sign();
+                    velo.0 = knockback;
+
+                    assert!(knockback.y > 0.);
+
+                },
+                OnHit::Grounded { kb, hitstun } => {
+                    commands
+                        .entity(fighter)
+                        .insert(GroundedHitstun(hitstun));
+
+                    frame.0 = 1;
+                    current.0 = GRND_HITSTUN_KB;
+
+                    let mut knockback = kb;
+                    knockback.x *= facing.0.sign();
+                    velo.0 = knockback;
+                },
+                OnHit::Stun(stun) => {
+
+                }
+            }
+
+            // let mut knockback = hit_event.0.attacker_box.knockback;
+            // knockback.x *= facing.0.sign();
+
+            // velo.0 = knockback;
         }
 
         for (mut exclude, _data, owner) in hitbox_query.iter_mut() {
@@ -972,7 +1031,6 @@ pub fn camera_system(
     }
 }
 
-
 pub fn pause_system(
     input: Res<Input<KeyCode>>,
     mut paused: ResMut<Paused>,
@@ -1013,9 +1071,9 @@ pub fn modifier_input_check(
 
         if let Ok((_, state, mut met, check)) = query.get_mut(*s) {
             if !met.0
-            && frame.0 >= check.window.get_start_frame()
-            && frame.0 <= check.window.get_end_frame()
-            && check.command_input.compare(&buffer.0, facing.0)
+                && frame.0 >= check.window.get_start_frame()
+                && frame.0 <= check.window.get_end_frame()
+                && check.command_input.compare(&buffer.0, facing.0)
             {
                 met.0 = true;
             }

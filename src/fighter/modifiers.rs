@@ -67,6 +67,17 @@ impl StateModifier for OnExitSetPos {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
+#[reflect(Component, Deserialize, StateModifier)]
+pub struct OnExitZeroVelo;
+
+#[typetag::serde]
+impl StateModifier for OnExitZeroVelo {
+    fn dyn_clone(&self) -> Box<dyn StateModifier> {
+        Box::new(self.clone())
+    }
+}
+
 // The below modifer sets this component
 #[derive(Component, Serialize, Deserialize, Reflect, Default)]
 #[reflect(Component)]

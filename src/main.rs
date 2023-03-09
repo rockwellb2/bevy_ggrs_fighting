@@ -9,8 +9,8 @@ use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider, Session};
 use bevy_scene_hook::HookPlugin;
 use fighter::{
     state::{
-        Active, ActiveHitboxes, CurrentState, Facing, HBox, Health, HitboxData,
-        HurtboxData, InHitstun, PlayerAxis, ProjectileReference,
+        Active, ActiveHitboxes, CurrentState, Facing, HBox, Health,
+        HurtboxData, GroundedHitstun, PlayerAxis, ProjectileReference,
         SerializedStateVec, StateFrame, Velocity,
     },
     systems::{
@@ -19,7 +19,7 @@ use fighter::{
         hitstun_system, hurtbox_component_system, hurtbox_removal_system, increment_frame_system, modifier_input_check, movement_system, object_system, pause_system,
         process_input_system, projectile_system, transition_system, ui_lifebar_system, InputBuffer,
     },
-    Fighter, FighterPlugin,
+    Fighter, FighterPlugin, hit::components::{HitboxData, AirborneHitstun},
 };
 use game::{
     debug::state_text_system, not_if_paused, on_armature, on_enter_loading, on_enter_round, on_exit_loading, on_extra_setup,
@@ -168,7 +168,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .register_rollback_component::<Active>()
         .register_rollback_component::<InputBuffer>()
         .register_rollback_component::<Facing>()
-        .register_rollback_component::<InHitstun>()
+        .register_rollback_component::<GroundedHitstun>()
+        .register_rollback_component::<AirborneHitstun>()
         .register_rollback_component::<ProjectileReference>()
         .register_rollback_component::<Velocity>()
         .register_rollback_component::<PlayerAxis>()

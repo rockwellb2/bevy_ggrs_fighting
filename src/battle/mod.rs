@@ -319,7 +319,7 @@ pub struct MatchCamera;
 
 #[allow(clippy::too_many_arguments)]
 pub fn extra_setup_system(
-    object_query: Query<(&CreateObject, &Parent)>,
+    object_query: Query<(&CreateObject, &Owner)>,
     mut parent_query: Query<(&Transform, Option<&mut ProjectileReference>)>,
 
     mut commands: Commands,
@@ -342,8 +342,10 @@ pub fn extra_setup_system(
     player_query: Query<Entity, (With<Player>, With<Fighter>)>,
 ) {
     let projectile_material = materials.add(Color::rgba(0., 1., 0., 0.5).into());
+    println!("Start of projectile system");
 
-    for (create_object, parent) in object_query.iter() {
+    for (create_object, owner) in object_query.iter() {
+        println!("Does this happen in the projectile system?");
         match &create_object.0 {
             Object::Projectile(projectile) => {
                 // let shape = shapes::Rectangle {
@@ -386,13 +388,13 @@ pub fn extra_setup_system(
                         .insert(Velocity(projectile.start_velocity))
                         .insert(Rollback::new(rip.next_id()))
                         .insert(StateFrame(0))
-                        .insert(Owner(parent.get()))
+                        .insert(Owner(owner.get()))
                         .id();
 
                     ids.push((entity, false))
                 }
 
-                if let Ok((_tf, projectile_ref)) = parent_query.get_mut(parent.get()) {
+                if let Ok((_tf, projectile_ref)) = parent_query.get_mut(owner.get()) {
                     if let Some(mut projectile_ref) = projectile_ref {
                         projectile_ref.insert_ids(projectile.name.clone(), ids);
                         projectile_ref
@@ -405,7 +407,7 @@ pub fn extra_setup_system(
                             .amount_in_use
                             .insert(projectile.name.clone(), 0);
 
-                        commands.entity(parent.get()).insert(projectile_ref);
+                        commands.entity(owner.get()).insert(projectile_ref);
                     }
                 }
             }

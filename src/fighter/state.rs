@@ -20,10 +20,15 @@ use serde_json::{from_value, Number};
 //use bevy_editor_pls::default_windows::inspector::InspectorWindow;
 
 use crate::input::{NewCommandInput, NewMatchExpression};
+use crate::fighter::hit::components::HitboxData;
 
 use super::modifiers::StateModifier;
 
 pub type Frame = u16;
+
+pub const GRND_HITSTUN_KB: u16 = 3000;
+pub const GRND_HITSTUN: u16 = 3001;
+pub const AIR_HITSTUN: u16 = 3002;
 
 #[derive(Default, Debug, Serialize, Deserialize, Component, Reflect)]
 #[reflect(Component)]
@@ -175,7 +180,7 @@ impl<'de> Deserialize<'de> for SerializedState {
 
             if key == "id" {
                 id = value.as_u64().expect("u64") as u16;
-            } else if key == "debug_name" {
+            } else if key == "debug_name" || key == "name" {
                 debug_name = Some(value.as_str().expect("str").to_string());
             } else if key == "duration" {
                 duration = Some(value.as_u64().expect("u64") as u16);
@@ -243,101 +248,37 @@ pub enum HitLevel {
     High
 }
 
-#[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
-)]
-#[reflect(Component)]
-pub struct HitboxData {
-    #[serde(default)]
-    pub priority: u8,
-    #[serde(default)]
-    pub id: Option<usize>,
-    #[serde(default)]
-    pub global_id: Option<u32>,
-    pub bone: String,
-    #[serde(default)]
-    pub bone_entity: Option<Entity>,
-    pub radius: f32,
-    #[serde(alias = "halfHeight")]
-    pub half_height: f32,
-    #[serde(default)]
-    pub offset: Vec3,
-    #[serde(default, deserialize_with = "deserialize_rotation")]
-    pub rotation: (f32, f32),
-    pub damage: u16,
-    pub hitstun: u16,
-    pub blockstun: u16,
-    window: FrameWindow,
-    #[serde(default)]
-    rehit: Option<u16>, // Number frames after hitting that hitbox can hit again,
-    #[serde(alias = "hitLevel", default)]
-    hit_level: HitLevel
-}
 
-impl HitboxData {
-    pub fn get_end_frame(&self) -> Frame {
-        self.window.end.expect("End frame does not exist in HitboxData")
-    }
+pub fn deserialize_rotation<'de, D>(deserializer: D) -> Result<(f32, f32), D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct RotVisitor;
 
-    pub fn get_start_frame(&self) -> Frame {
-        self.window.start.expect("End frame does not exist in HitboxData")
-    }
-}
+        impl<'de> Visitor<'de> for RotVisitor {
+            type Value = (f32, f32);
 
-fn deserialize_rotation<'de, D>(deserializer: D) -> Result<(f32, f32), D::Error>
-where
-    D: de::Deserializer<'de>,
-{
-    struct RotVisitor;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a tuple containing a the x and z rotations in radians")
+            }
 
-    impl<'de> Visitor<'de> for RotVisitor {
-        type Value = (f32, f32);
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let mut x: f32 = seq.next_element()?.expect("Couldn't convert to f32");
+                let mut z: f32 = seq.next_element()?.expect("Couldn't convert to f32");
 
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a tuple containing a the x and z rotations in radians")
+                x = x.to_radians();
+                z = z.to_radians();
+
+                Ok((x, z))
+            }
         }
 
-        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: de::SeqAccess<'de>,
-        {
-            let mut x: f32 = seq.next_element()?.expect("Couldn't convert to f32");
-            let mut z: f32 = seq.next_element()?.expect("Couldn't convert to f32");
-
-            x = x.to_radians();
-            z = z.to_radians();
-
-            Ok((x, z))
-        }
+        deserializer.deserialize_seq(RotVisitor)
     }
 
-    deserializer.deserialize_seq(RotVisitor)
-}
-
-impl HitboxData {
-    pub fn mesh_default() -> Option<Handle<Mesh>> {
-        None
-    }
-
-    pub fn set_global_id(&mut self, global_id: u32) {
-        self.global_id = Some(global_id);
-
-    }
-}
-
-impl HBox for HitboxData {
-    fn get_priority(&self) -> u8 {
-        self.priority
-    }
-
-    fn get_offset(&self) -> Vec3 {
-        self.offset
-    }
-
-    fn set_id(&mut self, value: usize) {
-        self.id = Some(value);
-    }
-}
 
 #[derive(Component)]
 pub struct BoneMap(pub HashMap<String, Entity>);
@@ -600,7 +541,7 @@ pub struct Health(pub u16);
 
 #[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
-pub struct InHitstun(pub u16);
+pub struct GroundedHitstun(pub Frame);
 
 #[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
@@ -614,9 +555,9 @@ pub struct PlayerAxis {
 #[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, FromReflect)]
 pub struct FrameWindow {
     #[serde(default)]
-    start: Option<Frame>,
+    pub start: Option<Frame>,
     #[serde(default)]
-    end: Option<Frame>
+    pub end: Option<Frame>
 }
 
 impl FrameWindow {

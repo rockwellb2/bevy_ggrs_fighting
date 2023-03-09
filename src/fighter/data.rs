@@ -9,7 +9,8 @@ use bevy::ecs::reflect::ReflectComponent;
 use parry3d::shape::{Capsule, Segment};
 use serde::{Deserialize, Serialize};
 
-use super::state::{HitboxData, HurtboxData};
+use super::hit::components::HitboxData;
+use super::state::HurtboxData;
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, Component, Reflect, TypeUuid)]
 #[reflect(Component)]
