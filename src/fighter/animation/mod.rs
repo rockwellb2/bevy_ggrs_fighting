@@ -2,6 +2,7 @@ pub mod setup {
     use crate::battle::HurtboxMaterial;
     use crate::fighter::data::Collider;
     use crate::AnimEntity;
+    use crate::fighter::state::FighterPosition;
 
     use bevy::gltf::GltfExtras;
     use bevy::prelude::AnimationPlayer;
@@ -120,6 +121,11 @@ pub mod setup {
                             }
                         }
                     }
+                
+                    if extras.value.contains("fighterPosition") {
+                        commands.entity(descendent).insert(FighterPosition);
+                    }
+                
                 }
             }
         }

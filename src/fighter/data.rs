@@ -5,6 +5,7 @@ use bevy::prelude::{Entity, Vec3};
 use bevy::reflect::{TypeUuid, Struct};
 use bevy::{prelude::Component, reflect::Reflect};
 use bevy::ecs::reflect::ReflectComponent;
+use bevy::utils::HashMap;
 
 use parry3d::shape::{Capsule, Segment};
 use serde::{Deserialize, Serialize};
@@ -17,12 +18,17 @@ use super::state::HurtboxData;
 #[uuid = "d99f5e90-13a4-11ed-861d-0242ac120002"]
 pub struct FighterData {
     pub name: String,
+    #[serde(default)]
+    pub states: Vec<String>,
     #[serde(alias = "walkSpeed")]
     pub walk_speed: f32,
     #[serde(alias = "walkForward", default)]
     pub walk_forward: f32,
     #[serde(alias = "walkBack", default)]
-    pub walk_back: f32
+    pub walk_back: f32,
+
+    #[serde(flatten)]
+    pub extra: HashMap<String, u8>
 }
 
 #[derive(Component, Clone, Reflect)]

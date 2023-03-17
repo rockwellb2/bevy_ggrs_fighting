@@ -79,7 +79,7 @@
                     "window": 1
                 }
             },
-            { "in": [ 4001 ]}
+            { "in": 4001 }
         ]
     },
     {
@@ -346,7 +346,7 @@
             { "AdjustFacing": null },
             {
                 "Velo": {
-                    "start_velocity": [1, 0, -1]
+                    "startVelocity": [1, 0, -1]
                 }
             },
             { "OnExitZeroVelo": null }
@@ -478,7 +478,7 @@
                 "command": {
                     "list": [
                         [
-                            ["lp", "Press"]
+                            ["a", "Press"]
                         ]
                     ],
                     "window": 1
@@ -499,7 +499,7 @@
                 "command": {
                     "list": [
                         [
-                            ["lp", "Press"],
+                            ["a", "Press"],
                             ["y", "Negative", false]
                         ]
                     ],
@@ -520,7 +520,7 @@
                 "command": {
                     "list": [
                         [
-                            ["lp", "Press"],
+                            ["a", "Press"],
                             ["x", "Positive", false]
                         ]
                     ],
@@ -556,7 +556,7 @@
                 "command": {
                     "list": [
                         [
-                            ["lp", "Press"]
+                            ["a", "Press"]
                         ],
                         [
                             ["x", "Positive", true]
@@ -673,7 +673,7 @@
         ],
         "trigger1": [
             { "in": [33]},
-            { "frame": [null, 9]}
+            { "frame": { "end": 9 }}
         ]
     },
     {
@@ -764,20 +764,8 @@
                 "OnExitSetPos": {
                     "bone": "root hips"
                 }
-            },
-            {
-                "InputWindowCheck": {
-                    "window": [1, 18],
-                    "commandInput": {
-                        "list": [
-                            [
-                                ["lk", "Press"]
-                            ]
-                        ],
-                        "window": 1
-                    }
-                }
             }
+            
         ]
     },
     {
@@ -794,12 +782,8 @@
                 }
             }
         ],
-        "trigger1": [
-            { "in": [250] },
-            { "inputWindowCon": 18 }
-        ],
         "trigger2": [
-            { "frame": [18, 18] },
+            { "frame": 18 },
             { "in": [250] },
             {
                 "command": {
@@ -847,12 +831,12 @@
                 "command": {
                     "list": [
                         [
-                            ["lp", "Press"]
+                            ["a", "Press"]
                         ]
                     ]
                 }
             },
-            { "frame": [null, 9] },
+            { "frame": {"end": 9 } },
             { "in": [30, 31, 32] }
         ]
     },
@@ -866,10 +850,7 @@
         "hitboxes": [
             {
                 "bone": "arm right wrist",
-                "window": {
-                    "start": 8,
-                    "end": 12
-                },
+                "window":[8, 12],
                 "damage": 30,
                 "hitstun": 18,
                 "blockstun": 10,
@@ -884,7 +865,7 @@
                 "command": {
                     "list": [
                         [
-                            ["mp", "Press"]
+                            ["b", "Press"]
                         ]
                     ],
                     "window": 1
@@ -904,14 +885,14 @@
                 "command": {
                     "list": [
                         [
-                            ["mp", "Press"]
+                            ["b", "Press"]
                         ]
                     ],
                     "window": 1
                 }
             },
             { "in": [31, 33]},
-            { "frame": [10, null]}
+            { "frame": { "start": 10 }}
         ]
     },
     {
@@ -926,7 +907,7 @@
                 "command": {
                     "list": [
                         [
-                            ["mp", "Press"]
+                            ["b", "Press"]
                         ],
                         [
                             ["x", "Positive", true]
@@ -958,7 +939,7 @@
                 "command": {
                     "list": [
                         [
-                            ["lp", "Press"],
+                            ["a", "Press"],
                             ["x", "Positive", false],
                             ["y", "Negative", false]
                         ],
@@ -986,7 +967,7 @@
                 "command": {
                     "list": [
                         [
-                            ["lp", "Press"]
+                            ["a", "Press"]
                         ],
                         [
                             ["x", "Positive", true]
@@ -1031,7 +1012,7 @@
                 "command": {
                     "list": [
                         [
-                            ["lp", "Press"],
+                            ["a", "Press"],
                             ["x", "Positive", false],
                             ["y", "None", false]
                         ],

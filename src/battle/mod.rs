@@ -111,9 +111,10 @@ pub fn load_fighters(
         //asset_server.load("data/fighters/tahu/states.sl.json");
         asset_server.load("data/fighters/ryo/ryo.states");
     let fighter_data: Handle<FighterData> =
-        asset_server.load("data/fighters/tahu/fighter_data.json");
+        asset_server.load("data/fighters/ryo/ryo.fighter");
     //let model: Handle<Gltf> = asset_server.load("models/sfv_ryu.glb");
     let model: Handle<Gltf> = asset_server.load("models/ryo_maybe_messed_up.glb");
+    //let model: Handle<Gltf> = asset_server.load("models/Akira.glb");
 
     let f2: Handle<FighterData> = asset_server.load("data/fighters/abe/fighter_data.json");
 
@@ -196,7 +197,6 @@ pub fn spawn_fighters(
                 .clone(),
             transform: Transform {
                 translation: (-2., 0., 0.).into(),
-                //scale: Vec3::splat(3.),
                 ..default()
             }
             .looking_at((2., 0., 0.).into(), Vec3::Y),
@@ -224,12 +224,12 @@ pub fn spawn_fighters(
         .insert(InputManagerBundle::<Action> {
             action_state: ActionState::default(),
             input_map: InputMap::new([
-                (KeyCode::U, Action::Lp),
-                (KeyCode::I, Action::Mp),
-                (KeyCode::O, Action::Hp),
-                (KeyCode::J, Action::Lk),
-                (KeyCode::K, Action::Mk),
-                (KeyCode::L, Action::Hk),
+                (KeyCode::U, Action::A),
+                (KeyCode::I, Action::B),
+                (KeyCode::O, Action::C),
+                (KeyCode::J, Action::J),
+                (KeyCode::K, Action::K),
+                (KeyCode::L, Action::L),
                 (KeyCode::A, Action::Left),
                 (KeyCode::D, Action::Right),
                 (KeyCode::W, Action::Up),
@@ -247,7 +247,6 @@ pub fn spawn_fighters(
                 .clone(),
             transform: Transform {
                 translation: (2., 0., 0.).into(),
-                //scale: Vec3::splat(3.),
                 ..default()
             }
             .looking_at((-2., 0., 0.).into(), Vec3::Y),
@@ -311,7 +310,6 @@ pub fn spawn_fighters(
         .insert(Name::new("Ground"));
 
     *state = RoundState::Armature
-    //*state = RoundState::SomethingElseEntirely;
 }
 
 #[derive(Component)]
@@ -499,7 +497,7 @@ pub fn extra_setup_system(
 
     let sess_build = SessionBuilder::<GGRSConfig>::new()
         //.with_max_prediction_window(8)
-        .with_check_distance(2)
+        .with_check_distance(0)
         .with_input_delay(2)
         .with_num_players(2)
         .add_player(ggrs::PlayerType::Local, 0)

@@ -303,7 +303,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_plugin(JsonAssetPlugin::<SerializedStateVec>::new(&[
             "sl.json", "states",
         ]))
-        .add_plugin(JsonAssetPlugin::<FighterData>::new(&["json", "data"]))
+        .add_plugin(JsonAssetPlugin::<FighterData>::new(&["json", "fighter"]))
         .insert_resource(RoundState::EnterLoading)
         .add_plugin(InputManagerPlugin::<Action>::default())
         // Inspector/Editor Plugins

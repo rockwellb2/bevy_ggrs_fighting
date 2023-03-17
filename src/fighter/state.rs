@@ -104,6 +104,7 @@ pub enum Conditions {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect)]
+#[serde(from = "StateListHelper")]
 pub struct StateList(Vec<u16>);
 
 impl StateList {
@@ -119,21 +120,25 @@ impl From<u16> for StateList {
     }
 }
 
-impl From<Number> for StateList {
-    fn from(value: Number) -> Self {
-        Self(vec![value.as_u64().unwrap() as u16])
-    }
-}
-
-impl From<f64> for StateList {
-    fn from(value: f64) -> Self {
-        Self(vec![value as u16])
-    }
-}
-
 impl From<Vec<u16>> for StateList {
     fn from(value: Vec<u16>) -> Self {
         Self(value)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum StateListHelper {
+    Unsigned(u16),
+    Seq(Vec<u16>)
+}
+
+impl From<StateListHelper> for StateList {
+    fn from(value: StateListHelper) -> Self {
+        match value {
+            StateListHelper::Unsigned(value) => value.into(),
+            StateListHelper::Seq(vec) => vec.into(),
+        }
     }
 }
 
@@ -553,6 +558,8 @@ pub struct PlayerAxis {
 
 
 #[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, FromReflect)]
+#[serde(from = "FrameWindowHelper")]
+
 pub struct FrameWindow {
     #[serde(default)]
     pub start: Option<Frame>,
@@ -608,3 +615,37 @@ impl From<[Frame; 2]> for FrameWindow {
         FrameWindow { start: Some(values[0]), end: Some(values[1]) }
     }
 }
+
+impl From<Frame> for FrameWindow {
+    fn from(value: Frame) -> Self {
+        FrameWindow { start: Some(value), end: Some(value) }
+    }
+}
+
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum FrameWindowHelper {
+    Seq([Frame; 2]),
+    //Seq(Vec<Frame>),
+    Map(HashMap<String, Frame>),
+    Unsigned(Frame)
+}
+
+impl From<FrameWindowHelper> for FrameWindow {
+    fn from(value: FrameWindowHelper) -> Self {
+        match value {
+            FrameWindowHelper::Seq(array) => array.into(),
+            FrameWindowHelper::Map(map) => {
+                let start = map.get("start").copied();
+                let end = map.get("end").copied();
+                FrameWindow {start, end }
+            },
+            FrameWindowHelper::Unsigned(value) => value.into(),
+
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
+pub struct FighterPosition;
