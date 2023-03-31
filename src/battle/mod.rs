@@ -5,7 +5,7 @@ use bevy::{
         default, shape, AssetServer, Assets, BuildChildren, Camera3dBundle, Color, Commands, Component, Entity,
         Handle, KeyCode, Mesh, NodeBundle, Parent, PbrBundle, PointLight,
         PointLightBundle, Query, Res, ResMut, Resource, StandardMaterial,
-        TextBundle, Transform, Vec3, Visibility, With,
+        TextBundle, Transform, Vec3, Visibility, With, SpatialBundle, Quat,
     },
     scene::{SceneBundle},
     text::{TextSection, TextStyle},
@@ -113,7 +113,7 @@ pub fn load_fighters(
     let fighter_data: Handle<FighterData> =
         asset_server.load("data/fighters/ryo/ryo.fighter");
     //let model: Handle<Gltf> = asset_server.load("models/sfv_ryu.glb");
-    let model: Handle<Gltf> = asset_server.load("models/ryo_maybe_messed_up.glb");
+    let model: Handle<Gltf> = asset_server.load("models/ryo_PROBLEM.glb");
     //let model: Handle<Gltf> = asset_server.load("models/Akira.glb");
 
     let f2: Handle<FighterData> = asset_server.load("data/fighters/abe/fighter_data.json");
@@ -294,12 +294,35 @@ pub fn spawn_fighters(
         ..default()
     });
 
+    // commands
+    //     .spawn(Camera3dBundle {
+    //         transform: Transform::from_xyz(0.0, 0.8, 14.0).looking_at(Vec3::ZERO, Vec3::Y),
+    //         ..default()
+    //     })
+    //     .insert(MatchCamera);
+
     commands
-        .spawn(Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 0.8, 14.0).looking_at(Vec3::ZERO, Vec3::Y),
-            ..default()
-        })
-        .insert(MatchCamera);
+        .spawn((
+            Name::new("Match Camera Root"),
+            SpatialBundle::default(),
+            MatchCameraRoot
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Name::new("Match Camera"),
+                Camera3dBundle {
+                    //transform: Transform::from_translation(Vec3::new(0., 1.5, 5.)).looking_at(Vec3::ZERO, Vec3::Y),
+                    transform: Transform {
+                        translation: Vec3::new(0., 2., 4.),
+                        rotation: Quat::from_rotation_x(-0.2),
+                        ..default()
+                    },
+                    ..default()
+                },
+                MatchCamera
+            ));
+
+        });
 
     commands
         .spawn(PbrBundle {
@@ -314,6 +337,9 @@ pub fn spawn_fighters(
 
 #[derive(Component)]
 pub struct MatchCamera;
+
+#[derive(Component)]
+pub struct MatchCameraRoot;
 
 #[allow(clippy::too_many_arguments)]
 pub fn extra_setup_system(

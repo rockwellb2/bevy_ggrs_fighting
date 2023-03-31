@@ -40,7 +40,7 @@ use parry3d::{
 use bevy::input::Input;
 
 use crate::{
-    battle::{HitboxMaterial, Lifebar, MatchCamera, PlayerEntities},
+    battle::{HitboxMaterial, Lifebar, MatchCamera, PlayerEntities, MatchCameraRoot},
     fighter::hit::components::HitboxData,
     game::{Paused, RoundState},
     util::Buffer,
@@ -1004,8 +1004,10 @@ pub fn ui_lifebar_system(
 #[allow(clippy::type_complexity)]
 pub fn camera_system(
     mut set: ParamSet<(
-        Query<&mut Transform, With<MatchCamera>>,
+        //Query<&mut Transform, With<MatchCamera>>,
+        Query<&mut Transform, With<MatchCameraRoot>>,
         Query<(&Transform, ChangeTrackers<Transform>)>,
+        Query<&mut Transform, With<MatchCamera>>
     )>,
 
     players: Res<PlayerEntities>,
@@ -1014,20 +1016,44 @@ pub fn camera_system(
     let [(tf1, change1), (tf2, change2)] = player_query.many(players.as_ref().into());
 
     if change1.is_changed() || change2.is_changed() {
-        let mut mid = tf1.translation.lerp(tf2.translation, 0.5);
-        let direction = (tf1.translation - tf2.translation).xz();
+        let d1 = tf1.translation;
+        let d2 = tf2.translation;
+        
+        let distance = d1.distance(d2);
+
+        let mid = d1.lerp(d2, 0.5);
+        let direction = (d1 - d2).xz();
         let direction: Vec3 = (direction.x, 0., direction.y).into();
         let perp = direction.cross(Vec3::Y);
 
-        // let tf1 = tf1.translation.clone();
-        // let tf2 = tf2.translation.clone();
-
         if let Ok(mut cam_tf) = set.p0().get_single_mut() {
-            cam_tf.translation = mid + perp * -2.;
-            mid.y = 1.2;
-            cam_tf.translation.y = 1.2;
-            cam_tf.look_at(mid, Vec3::Y);
+            cam_tf.translation = mid;
+            cam_tf.look_at(mid + perp, Vec3::Y);
         }
+
+        if distance > 3.5 {
+            if let Ok(mut c) = set.p2().get_single_mut() {
+                c.translation.z = distance;
+            }
+        }
+        
+
+
+
+        // let mut mid = d1.lerp(d2, 0.5);
+        // let direction = (d1 - d2).xz();
+        // let direction: Vec3 = (direction.x, 0., direction.y).into();
+        // let perp = direction.cross(Vec3::Y);
+
+        // // let tf1 = tf1.translation.clone();
+        // // let tf2 = tf2.translation.clone();
+
+        // if let Ok(mut cam_tf) = set.p0().get_single_mut() {
+        //     cam_tf.translation = mid + perp * -2.;
+        //     mid.y = 1.2;
+        //     cam_tf.translation.y = 1.2;
+        //     cam_tf.look_at(mid, Vec3::Y);
+        // }
     }
 }
 
