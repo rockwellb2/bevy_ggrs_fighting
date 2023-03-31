@@ -9,7 +9,7 @@ use packed_struct::types::bits::Bits;
 use packed_struct::types::ReservedZero;
 use serde::{de, Deserialize, Serialize};
 
-use crate::fighter::state::{Facing, Direction};
+use crate::fighter::state::{Facing, Direction, Frame};
 use crate::fighter::systems::InputBuffer;
 use crate::util::Buffer;
 
@@ -30,12 +30,12 @@ pub struct Input(pub u32);
 
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum Action {
-    Lp,
-    Mp,
-    Hp,
-    Lk,
-    Mk,
-    Hk,
+    A,
+    B,
+    C,
+    J,
+    K,
+    L,
     Left,
     Right,
     Up,
@@ -105,12 +105,12 @@ pub fn input(
 
         };
 
-        let lp = button_check(Action::Lp);
-        let mp = button_check(Action::Mp);
-        let hp = button_check(Action::Hp);
-        let lk = button_check(Action::Lk);
-        let mk = button_check(Action::Mk);
-        let hk = button_check(Action::Hk);
+        let lp = button_check(Action::A);
+        let mp = button_check(Action::B);
+        let hp = button_check(Action::C);
+        let lk = button_check(Action::J);
+        let mk = button_check(Action::K);
+        let hk = button_check(Action::L);
 
         let (x, just_pressed_x) = directional_check(Action::Right, Action::Left);
         let (y, just_pressed_y) = directional_check(Action::Up, Action::Down);
@@ -136,50 +136,6 @@ pub fn input(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, FromReflect, Reflect, Clone)]
-pub struct MatchExpression {
-    #[serde(deserialize_with = "deserialize_bits")]
-    with: u16,
-    #[serde(deserialize_with = "deserialize_bits")]
-    #[serde(default)]
-    without: u16,
-}
-
-fn deserialize_bits<'de, D>(deserializer: D) -> Result<u16, D::Error>
-where
-    D: de::Deserializer<'de>,
-{
-    struct BitVisitor;
-
-    impl<'de> de::Visitor<'de> for BitVisitor {
-        type Value = u16;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a string containing a 16-bit value")
-        }
-
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            let trimmed = v.trim().trim_start_matches("0b");
-
-            return if let Ok(bits) = u16::from_str_radix(trimmed, 2) {
-                Ok(bits)
-            } else {
-                Err(E::custom("error deserializing bits from string"))
-            };
-        }
-    }
-
-    deserializer.deserialize_any(BitVisitor)
-}
-
-#[derive(Debug, Serialize, Deserialize, Default, FromReflect, Reflect, Clone)]
-pub struct CommandInput {
-    list: Vec<MatchExpression>,
-    window: u16,
-}
 
 #[derive(Debug, Serialize, Deserialize, FromReflect, Reflect, Clone)]
 #[serde(untagged)]
@@ -190,7 +146,7 @@ pub enum NewMatchExpression {
 
 impl Default for NewMatchExpression {
     fn default() -> Self {
-        Self::Button("lp".to_string(), ButtonPress::None)
+        Self::Button("a".to_string(), ButtonPress::None)
     }
 }
 
@@ -198,11 +154,13 @@ impl Default for NewMatchExpression {
 pub struct NewCommandInput {
     list: Vec<Vec<NewMatchExpression>>,
     #[serde(default = "NewCommandInput::window_default")]
-    window: u16,
+    window: Frame,
+    #[serde(default, alias = "bufferTime")]
+    buffer_time: Frame
 }
 
 impl NewCommandInput {
-    pub fn window_default() -> u16 {
+    pub fn window_default() -> Frame {
         1
     }
 
@@ -210,9 +168,13 @@ impl NewCommandInput {
         let mut input_iter = input.iter();
         let mut index = 0;
 
+        let mut buffer_time = 0;
+
+        // iterate over each match expression
         for command in &self.list {
             
             loop {
+
                 index += 1;
                 if index > self.window {
                     return false;
@@ -234,12 +196,18 @@ impl NewCommandInput {
                     }
 
 
-                    let mut command_iter = command.iter();
+                    //let mut command_iter = command.iter();
                     let mut same = true;
-                    while let Some(expression) = command_iter.next() {
+                    for expression in command {
                         if !next.compare_command(expression.clone()) {
                             if index == 1 {
-                                return false;
+                                if self.buffer_time > buffer_time {
+                                    index = 0;
+                                    buffer_time += 1;
+                                }
+                                else {
+                                    return false;
+                                }
                             }
                             same = false;
                         }
@@ -251,10 +219,15 @@ impl NewCommandInput {
                 } else {
                     return false;
                 }
+                
+                // if self.buffer_time > buffer_time {
+                //     index = 0;
+                //     buffer_time += 1;
+                // }
             }
         }
 
-        return true;
+        true
     }
 }
 
@@ -288,32 +261,16 @@ where
     deserializer.deserialize_any(CommandVisitor)
 }
 
-#[cfg(test)]
-mod input_tests {
-    use super::{NewCommandInput, StateInput};
-
-    #[test]
-    fn deserialize_command() {
-        let string = r#"{
-            "list": [
-                {
-                    "lk": "Press"
-                }
-            ],
-            "window": 1
-        }"#;
-
-        let result: NewCommandInput = serde_json::from_str(string).unwrap();
-    }
-}
-
-#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, Reflect, FromReflect)]
 pub enum ButtonPress {
     #[default]
     None = 0,
     Press = 1,
     Hold = 2,
     Release = 3,
+
+    // These are only used as part of command expressions
+    PressOrRelease
 }
 
 impl ButtonPress {
@@ -338,7 +295,7 @@ impl From<u32> for ButtonPress {
     }
 }
 
-#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(PrimitiveEnum_u8, Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, Reflect, FromReflect)]
 pub enum DirectionalInput {
     #[default]
     None = 0,
@@ -368,22 +325,22 @@ impl From<u32> for DirectionalInput {
 pub struct StateInput {
     #[serde(default)]
     #[packed_field(bits = "0..=1", ty = "enum")]
-    pub lp: ButtonPress,
+    pub a: ButtonPress,
     #[serde(default)]
     #[packed_field(bits = "2..=3", ty = "enum")]
-    pub mp: ButtonPress,
+    pub b: ButtonPress,
     #[serde(default)]
     #[packed_field(bits = "4..=5", ty = "enum")]
-    pub hp: ButtonPress,
+    pub c: ButtonPress,
     #[serde(default)]
     #[packed_field(bits = "6..=7", ty = "enum")]
-    pub lk: ButtonPress,
+    pub j: ButtonPress,
     #[serde(default)]
     #[packed_field(bits = "8..=9", ty = "enum")]
-    pub mk: ButtonPress,
+    pub k: ButtonPress,
     #[serde(default)]
     #[packed_field(bits = "10..=11", ty = "enum")]
-    pub hk: ButtonPress,
+    pub l: ButtonPress,
     #[serde(default)]
     #[packed_field(bits = "12..=13", ty = "enum")]
     pub x: DirectionalInput,
@@ -402,6 +359,7 @@ pub struct StateInput {
 }
 
 impl StateInput {
+    #![allow(clippy::too_many_arguments)]
     pub fn new(
         lp: ButtonPress,
         mp: ButtonPress,
@@ -415,12 +373,12 @@ impl StateInput {
         just_pressed_y: bool,
     ) -> StateInput {
         StateInput {
-            lp,
-            mp,
-            hp,
-            lk,
-            mk,
-            hk,
+            a: lp,
+            b: mp,
+            c: hp,
+            j: lk,
+            k: mk,
+            l: hk,
             x,
             just_pressed_x,
             y,
@@ -431,12 +389,12 @@ impl StateInput {
 
     pub fn get_button_from_action(&self, action: Action) -> ButtonPress {
         match action {
-            Action::Lp => self.lp,
-            Action::Mp => self.mp,
-            Action::Hp => self.hp,
-            Action::Lk => self.lk,
-            Action::Mk => self.mk,
-            Action::Hk => self.hk,
+            Action::A => self.a,
+            Action::B => self.b,
+            Action::C => self.c,
+            Action::J => self.j,
+            Action::K => self.k,
+            Action::L => self.l,
             _ => panic!(),
         }
     }
@@ -455,12 +413,12 @@ impl StateInput {
         match command {
             NewMatchExpression::Button(name, button) => {
                 let i = match name.as_str() {
-                    "lp" => self.lp,
-                    "mp" => self.mp,
-                    "hp" => self.hp,
-                    "lk" => self.lk,
-                    "mk" => self.mk,
-                    "hk" => self.hk,
+                    "a" => self.a,
+                    "b" => self.b,
+                    "c" => self.c,
+                    "lk" => self.j,
+                    "mk" => self.k,
+                    "hk" => self.l,
                     _ => panic!(),
                 };
 
@@ -486,7 +444,7 @@ impl StateInput {
         };
 
         StateInput {
-            lp,
+            a: lp,
             ..Default::default()
         }
     }
@@ -503,7 +461,7 @@ impl StateInput {
         };
 
         StateInput {
-            mp,
+            b: mp,
             ..Default::default()
         }
     }
@@ -520,7 +478,7 @@ impl StateInput {
         };
 
         StateInput {
-            hp,
+            c: hp,
             ..Default::default()
         }
     }
@@ -537,7 +495,7 @@ impl StateInput {
         };
 
         StateInput {
-            lk,
+            j: lk,
             ..Default::default()
         }
     }
@@ -554,7 +512,7 @@ impl StateInput {
         };
 
         StateInput {
-            mk,
+            k: mk,
             ..Default::default()
         }
     }
@@ -571,7 +529,7 @@ impl StateInput {
         };
 
         StateInput {
-            hk,
+            l: hk,
             ..Default::default()
         }
     }

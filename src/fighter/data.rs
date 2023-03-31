@@ -1,30 +1,37 @@
-use std::any;
+
 
 use bevy::prelude::{Entity, Vec3};
-use bevy::reflect::utility::GenericTypeInfoCell;
-use bevy::reflect::{TypeUuid, Typed, TypeInfo, StructInfo, NamedField, Struct, GetTypeRegistration, TypeRegistration, DynamicStruct, FieldIter};
+
+use bevy::reflect::{TypeUuid, Struct};
 use bevy::{prelude::Component, reflect::Reflect};
 use bevy::ecs::reflect::ReflectComponent;
-use bevy_inspector_egui::Inspectable;
-use parry3d::shape::{Cuboid, Capsule, Segment};
+use bevy::utils::HashMap;
+
+use parry3d::shape::{Capsule, Segment};
 use serde::{Deserialize, Serialize};
 
-use super::state::{HitboxData, HurtboxData};
+use super::hit::components::HitboxData;
+use super::state::HurtboxData;
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, Component, Reflect, TypeUuid)]
 #[reflect(Component)]
 #[uuid = "d99f5e90-13a4-11ed-861d-0242ac120002"]
 pub struct FighterData {
     pub name: String,
+    #[serde(default)]
+    pub states: Vec<String>,
     #[serde(alias = "walkSpeed")]
     pub walk_speed: f32,
     #[serde(alias = "walkForward", default)]
     pub walk_forward: f32,
     #[serde(alias = "walkBack", default)]
-    pub walk_back: f32
+    pub walk_back: f32,
+
+    #[serde(flatten)]
+    pub extra: HashMap<String, u8>
 }
 
-#[derive(Component, Clone, Reflect, Inspectable)]
+#[derive(Component, Clone, Reflect)]
 pub struct Collider {
     pub radius: f32,
     pub segment: SegmentProxy
@@ -37,46 +44,28 @@ impl Default for Collider {
     }
 }
 
-impl Into<Capsule> for Collider {
-    fn into(self) -> Capsule {
-        let radius = self.radius.into();
-        let segment = self.segment.into();
+impl From<Capsule> for Collider {
+    fn from(value: Capsule) -> Self {
+        let radius = value.radius;
+        let segment = value.segment.into();
 
-        Capsule {
-            segment,
-            radius,
-        }
-
+        Collider { segment, radius }
     }
 }
 
-impl Into<Capsule> for &Collider {
-    fn into(self) -> Capsule {
-        let radius = self.radius.into();
-        let segment = self.segment.clone().into();
+impl From<&Collider> for Capsule {
+    fn from(value: &Collider) -> Self {
+        let radius = value.radius;
+        let segment = value.segment.clone().into();
 
-        Capsule {
-            segment,
-            radius,
-        }
-    }
-}
-
-impl Into<Collider> for Capsule {
-    fn into(self) -> Collider {
-        let radius = self.radius.into();
-        let segment = self.segment.into();
-
-        Collider {
-            radius,
-            segment,
-        }
+        Capsule { segment, radius }
     }
 }
 
 
 
-#[derive(Clone, Reflect, Inspectable)]
+
+#[derive(Clone, Reflect)]
 pub struct SegmentProxy {
     pub a: Vec3,
     pub b: Vec3,
@@ -89,15 +78,15 @@ impl SegmentProxy {
 }
 
 
-impl Into<SegmentProxy> for Segment {
-    fn into(self) -> SegmentProxy {
-        SegmentProxy { a: self.a.into(), b: self.b.into() }
+impl From<SegmentProxy> for Segment {
+    fn from(value: SegmentProxy) -> Self {
+        Self { a: value.a.into(), b: value.b.into() }
     }
 }
 
-impl Into<Segment> for SegmentProxy {
-    fn into(self) -> Segment {
-        Segment { a: self.a.into(), b: self.b.into() }
+impl From<Segment> for SegmentProxy {
+    fn from(value: Segment) -> Self {
+        Self { a: value.a.into(), b: value.b.into() }
     }
 }
 
@@ -121,4 +110,3 @@ impl CollisionData {
 }
 
 pub struct HitEvent(pub CollisionData);
-

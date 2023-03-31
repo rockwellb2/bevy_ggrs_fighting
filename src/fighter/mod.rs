@@ -1,14 +1,14 @@
 use bevy::{prelude::*};
-use bevy_inspector_egui::RegisterInspectable;
+//use bevy_inspector_egui::RegisterInspectable;
 
 
 
 
 use self::{
-    data::{FighterData, HitEvent, Collider, SegmentProxy}, 
-    state::{StateMap, CurrentState, State as FightState, HitboxData, StateFrame, Facing, Health, Direction, ProjectileData, ProjectileReference, PlayerAxis, HurtboxData, Exclude}, 
+    data::{FighterData, HitEvent}, 
+    state::{StateMap, CurrentState, State as FightState, StateFrame, Facing, Health, Direction, ProjectileReference, Exclude, Velocity}, 
     systems::InputBuffer, event::TransitionEvent,
-    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Object, Velo, VectorType, OnExitSetPos, InputWindowCheck, InputMet}
+    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Velo, OnExitSetPos, InputWindowCheck, InputMet, OnExitZeroVelo}, hit::components::HitboxData
 };
 
 pub(crate) mod state;
@@ -17,6 +17,7 @@ pub(crate) mod data;
 pub(crate) mod event;
 pub(crate) mod modifiers;
 pub(crate) mod animation;
+pub(crate) mod hit;
 
 #[derive(Component)]
 pub struct Fighter;
@@ -37,6 +38,7 @@ impl Plugin for FighterPlugin {
             .register_type::<CreateObject>()
             .register_type::<Velo>()
             .register_type::<OnExitSetPos>()
+            .register_type::<OnExitZeroVelo>()
             .register_type::<InputWindowCheck>()
 
 
@@ -54,20 +56,14 @@ impl Plugin for FighterPlugin {
             .register_type::<StateMap>()
             .register_type::<Direction>()
             .register_type::<InputMet>()
-            .register_inspectable::<Direction>()
-            //.register_inspectable::<HitboxData>()
-            .register_inspectable::<ProjectileData>()
-            .register_inspectable::<Object>()
-            .register_inspectable::<VectorType>()
-            .register_inspectable::<Option<VectorType>>()
-            .register_inspectable::<PlayerAxis>()
-            .register_inspectable::<HurtboxData>()
-            //.register_inspectable::<HitboxData>()
-            .register_inspectable::<Collider>()
-            .register_inspectable::<SegmentProxy>()
-            //.register_inspectable::<ProjectileReference>()
+            .register_type::<Velocity>()
+
+        
             .register_type::<ProjectileReference>()
 
+
+
+            
             .register_type::<FighterData>();
     }
 }

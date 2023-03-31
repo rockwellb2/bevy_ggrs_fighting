@@ -1,13 +1,12 @@
 use crate::input::NewCommandInput;
 use bevy::prelude::{Vec3, default};
 use bevy::{reflect::Reflect, prelude::Component};
-use bevy_inspector_egui::Inspectable;
 use serde::{Serialize, Deserialize};
 use std::fmt::Debug;
-use bevy::reflect::{reflect_trait, ReflectDeserialize};
+use bevy::reflect::{reflect_trait, ReflectDeserialize, FromReflect};
 use bevy::ecs::reflect::ReflectComponent;
 
-use super::state::{HitboxData, ProjectileData};
+use super::state::{ProjectileData, FrameWindow, Frame};
 
 #[typetag::serde]
 #[reflect_trait]
@@ -68,6 +67,17 @@ impl StateModifier for OnExitSetPos {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
+#[reflect(Component, Deserialize, StateModifier)]
+pub struct OnExitZeroVelo;
+
+#[typetag::serde]
+impl StateModifier for OnExitZeroVelo {
+    fn dyn_clone(&self) -> Box<dyn StateModifier> {
+        Box::new(self.clone())
+    }
+}
+
 // The below modifer sets this component
 #[derive(Component, Serialize, Deserialize, Reflect, Default)]
 #[reflect(Component)]
@@ -78,10 +88,7 @@ pub struct InputMet(pub bool);
 #[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
 #[reflect(Component, Deserialize, StateModifier)]
 pub struct InputWindowCheck {
-    #[serde(alias = "windowStart", default)]
-    pub window_start: u16,
-    #[serde(alias = "windowEnd", default)]
-    pub window_end: u16,
+    pub window: FrameWindow,
     #[serde(alias = "commandInput", default)]
     pub command_input: NewCommandInput
 
@@ -99,7 +106,7 @@ impl StateModifier for InputWindowCheck {
 
 
 
-#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
 pub enum Object {
     Projectile(ProjectileData),
     #[default]
@@ -127,7 +134,7 @@ pub struct Velo {
 
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone, FromReflect)]
 #[serde(untagged)]
 pub enum VectorType {
     Vec(Vec3),

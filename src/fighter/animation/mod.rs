@@ -1,7 +1,14 @@
 pub mod setup {
+    use crate::battle::HurtboxMaterial;
+    use crate::fighter::data::Collider;
     use crate::AnimEntity;
+    use crate::fighter::state::FighterPosition;
 
+    use bevy::gltf::GltfExtras;
     use bevy::prelude::AnimationPlayer;
+    use bevy::prelude::Children;
+    use bevy::prelude::HierarchyQueryExt;
+    use parry3d::shape::Capsule;
 
     use super::super::state::Owner;
 
@@ -75,13 +82,50 @@ pub mod setup {
                         .expect("Split didn't work"),
                 ) {
                     let length = animation_clips
-                        .get(&animation)
+                        .get(animation)
                         .expect("AnimationClip doesn't exist")
                         .duration();
 
                     commands
                         .entity(entity)
                         .insert(Animation(animation.clone(), length));
+                }
+            }
+        }
+    }
+
+    pub fn insert_hurtbox_data(
+        mut commands: Commands,
+        fighter_query: Query<Entity, With<Fighter>>,
+        children_query: Query<&Children>,
+        extras_query: Query<(&GltfExtras, &Name)>,
+
+        hurtbox_material: Res<HurtboxMaterial>
+    ) {
+        let hurtbox_material = &hurtbox_material.0;
+
+        for player in fighter_query.iter() {
+            for descendent in children_query.iter_descendants(player) {
+                if let Ok((extras, name)) = extras_query.get(descendent) {
+                    if name.contains("Hurt") {
+                        let hurt: HurtboxData = serde_json::de::from_str(extras.value.as_str())
+                            .expect("Could not deserialize as HurtboxData");
+
+                        let capsule = Capsule::new_y(hurt.half_height - hurt.radius, hurt.radius);
+                        let collider: Collider = capsule.into();
+                        commands.entity(descendent).insert((hurt, collider));
+
+                        if let Ok(children) = children_query.get(descendent) {
+                            for child in children.iter() {
+                                commands.entity(*child).insert(hurtbox_material.clone());
+                            }
+                        }
+                    }
+                
+                    if extras.value.contains("fighterPosition") {
+                        commands.entity(descendent).insert(FighterPosition);
+                    }
+                
                 }
             }
         }
@@ -112,6 +156,7 @@ pub mod setup {
 
         if hurt_iter.len() > 0 {
             for (hurt_ent, _hurtbox) in hurt_iter {
+                println!("How many time does this activate?");
                 let mut ancestor = parent_query
                     .get(hurt_ent)
                     .expect("Entity doesn't have Parent");
@@ -133,6 +178,8 @@ pub mod setup {
 
             *state = RoundState::EnterRound;
         }
+
+        println!("Does it stay here endlessly?");
     }
 
     pub fn add_animation_player_system(
@@ -167,30 +214,24 @@ pub(crate) mod components {
 pub(crate) mod rollback {
     use crate::{fighter::state::StateMap, game::FRAME};
 
-    
     use super::{super::state::State, components::Animation};
 
-    
     use super::super::super::Fighter;
 
     use bevy::prelude::With;
 
-    use super::super::state::{StateFrame, CurrentState};
+    use super::super::state::{CurrentState, StateFrame};
 
-    
     use crate::AnimEntity;
 
-    
-    
-    
-    use bevy::prelude::{Query, Commands, AnimationPlayer, Parent, Entity};
+    use bevy::prelude::{AnimationPlayer, Commands, Entity, Parent, Query};
 
-    
     /// Rollback System
     ///
     /// # Panics
     ///
     /// Panics if .
+    #[allow(clippy::type_complexity)]
     pub fn animation_system(
         mut commands: Commands,
         mut animation_play: Query<(Entity, &Parent, &mut AnimationPlayer)>,

@@ -91,7 +91,7 @@ impl<'a> Iterator for BufferIter<'a> {
         }
 
         let head = self.head;
-        self.head = if self.head + 1 <= self.ring.len() - 1 {
+        self.head = if self.head < self.ring.len() - 1 {
             self.head + 1
         }
         else {

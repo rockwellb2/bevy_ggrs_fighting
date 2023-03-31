@@ -1,19 +1,17 @@
-use std::{
-    f32::consts::{FRAC_PI_2, PI},
-    ops::Deref,
-};
+#![allow(clippy::type_complexity)]
 
 use super::{
     data::{Collider, CollisionData, FighterData, HitEvent},
     event::TransitionEvent,
+    hit::components::{OnHit, AirborneHitstun},
     modifiers::{
-        AdjustFacing, CreateObject, InputMet, InputWindowCheck, Movement, Object, OnExitSetPos,
-        VectorType, Velo,
+        AdjustFacing, CreateObject, InputMet, InputWindowCheck, Object, OnExitSetPos, VectorType,
+        Velo, OnExitZeroVelo,
     },
     state::{
-        Active, ActiveHitboxes, BoneMap, Conditions, CurrentState, Direction, Exclude,
-        Facing, HBox, Health, HitboxData, HurtboxData, Hurtboxes, InHitstun, Owner, PlayerAxis,
-        ProjectileData, ProjectileReference, State, StateFrame, StateMap, Velocity,
+        Active, ActiveHitboxes, BoneMap, Conditions, CurrentState, Direction, Exclude, Facing,
+        GroundedHitstun, HBox, Health, HurtboxData, Hurtboxes, Owner, PlayerAxis, ProjectileData,
+        ProjectileReference, State, StateFrame, StateMap, Velocity, AIR_HITSTUN, GRND_HITSTUN_KB,
     },
     Fighter,
 };
@@ -21,38 +19,37 @@ use bevy::{
     ecs::reflect::ReflectComponent,
     math::Vec3Swizzles,
     prelude::{
-        AnimationPlayer, BuildChildren, Camera, ChangeTrackers, Changed, Commands, Component,
-        Entity, EulerRot, EventReader, EventWriter, GlobalTransform, KeyCode, Name, Or, ParamSet,
-        Parent, PbrBundle, Quat, Query, Res, ResMut, SpatialBundle, Transform, Vec3, Visibility,
-        With, Without,
+        BuildChildren, ChangeTrackers, Changed, Commands, Component, Entity, EulerRot, EventReader,
+        EventWriter, GlobalTransform, KeyCode, Name, Or, ParamSet, PbrBundle, Quat, Query, Res,
+        ResMut, Transform, Vec3, Visibility, With, Without,
     },
     reflect::{FromReflect, Reflect, Struct},
     ui::{Style, Val},
     utils::{default, hashbrown::HashSet, HashMap},
 };
-use bevy_ggrs::{Rollback, RollbackIdProvider};
-use ggrs::InputStatus;
-use nalgebra::{Isometry3, UnitQuaternion, Vector3};
+use bevy_ggrs::{PlayerInputs, Rollback, RollbackIdProvider};
+
+use nalgebra::Isometry3;
 use parry3d::{
-    bounding_volume::{BoundingVolume, AABB},
+    bounding_volume::{Aabb, BoundingVolume},
     math::Point,
     query::intersection_test,
-    shape::{Capsule, Cuboid},
+    shape::Capsule,
 };
 
 use bevy::input::Input;
 
 use crate::{
-    battle::{HitboxMaterial, Lifebar, MatchCamera, PlayerEntities},
-    game::{Paused, RoundState, FRAME},
-    input::{Input as FightInput, StateInput, LEFT, LEFT_HELD, RIGHT, RIGHT_HELD},
+    battle::{HitboxMaterial, Lifebar, MatchCamera, PlayerEntities, MatchCameraRoot},
+    fighter::hit::components::HitboxData,
+    game::{Paused, RoundState},
     util::Buffer,
-    AnimEntity, GameDebug, HitboxMap, Player, FPS,
+    GGRSConfig, HitboxMap, Player, FPS,
 };
 
 pub fn buffer_insert_system(
     mut query: Query<(&mut InputBuffer, &Player)>,
-    inputs: Res<Vec<(FightInput, InputStatus)>>,
+    inputs: Res<PlayerInputs<GGRSConfig>>,
 ) {
     for (mut buffer, player) in query.iter_mut() {
         if player.0 != 1 {
@@ -74,6 +71,8 @@ pub fn movement_system(
         &Facing,
         &PlayerAxis,
     )>,
+
+    facing_query: Query<&AdjustFacing>
 ) {
     for (map, current, mut tf, mut velocity, frame, data, facing, axis) in fighter_query.iter_mut()
     {
@@ -86,7 +85,7 @@ pub fn movement_system(
                         VectorType::Vec(vector) => *vector,
                         VectorType::Variable(var_name) => {
                             let raw = data
-                                .field(&var_name)
+                                .field(var_name)
                                 .expect("Couldn't get value for field of this name");
                             let variable = f32::from_reflect(raw)
                                 .expect("Couldn't create f32 from reflected value");
@@ -101,11 +100,11 @@ pub fn movement_system(
                 }
             } else {
                 if let Some(accel) = &velo.acceleration {
-                    let accel: Vec3 = match accel {
+                    let mut accel: Vec3 = match accel {
                         VectorType::Vec(vector) => *vector,
                         VectorType::Variable(var_name) => {
                             let raw = data
-                                .field(&var_name)
+                                .field(var_name)
                                 .expect("Couldn't get value for field of this name");
                             let variable = f32::from_reflect(raw)
                                 .expect("Couldn't create f32 from reflected value");
@@ -114,22 +113,37 @@ pub fn movement_system(
                         }
                         VectorType::Warning => panic!(),
                     };
-
+                    accel.x *= facing.0.sign();
                     velocity.0 += accel;
                 }
             }
 
-            tf.translation += (velocity.0.x / FPS as f32) * axis.x;
-            tf.translation.y += velocity.0.y / FPS as f32;
-            tf.translation += (velocity.0.z / FPS as f32) * axis.z;
+            // tf.translation += (velocity.0.x / FPS as f32) * axis.x;
+            // tf.translation.y += velocity.0.y / FPS as f32;
+            // tf.translation += (velocity.0.z / FPS as f32) * axis.z;
 
-            //tf.translation += velocity.0 / FPS as f32;
+            // //tf.translation += velocity.0 / FPS as f32;
 
-            tf.translation.y = tf.translation.y.max(0.);
+            // tf.translation.y = tf.translation.y.max(0.);
 
-            tf.look_at(axis.opponent_pos, Vec3::Y);
-            //tf.rotate_axis(Vec3::Y, FRAC_PI_2);
+            // tf.look_at(axis.opponent_pos, Vec3::Y);
+            // //tf.rotate_axis(Vec3::Y, FRAC_PI_2);
         }
+
+        tf.translation += (velocity.0.x / FPS as f32) * axis.x;
+        tf.translation.y += velocity.0.y / FPS as f32;
+        tf.translation += (velocity.0.z / FPS as f32) * axis.z;
+
+        //tf.translation += velocity.0 / FPS as f32;
+
+        tf.translation.y = tf.translation.y.max(0.);
+        
+        if facing_query.get(*s).is_ok() {
+            let mut opp_pos = axis.opponent_pos;
+            opp_pos.y = tf.translation.y;
+            tf.look_at(opp_pos, Vec3::Y);
+        }
+        //tf.rotate_axis(Vec3::Y, FRAC_PI_2);
     }
 }
 
@@ -143,17 +157,34 @@ pub fn increment_frame_system(
 
 pub fn hitstun_system(
     mut commands: Commands,
-    mut query: Query<(Entity, &mut CurrentState, &mut StateFrame, &InHitstun), With<Fighter>>,
+    mut query: Query<(Entity, &mut CurrentState, &mut StateFrame, &mut Velocity, Option<&GroundedHitstun>, Option<&AirborneHitstun>, &mut Transform), With<Fighter>>,
 ) {
-    for (fighter, mut current, mut frame, hitstun) in query.iter_mut() {
-        if frame.0 > hitstun.0 {
-            frame.0 = 1;
-            current.0 = 0;
-            commands.entity(fighter).remove::<InHitstun>();
+    for (fighter, mut current, mut frame, mut velo, hitstun, airborne, mut tf ) in query.iter_mut() {
+        if let Some(hitstun) = hitstun {
+            if frame.0 > hitstun.0 {
+                frame.0 = 1;
+                current.0 = 0;
+                velo.0 = Vec3::ZERO;
+                commands.entity(fighter).remove::<GroundedHitstun>();
+            }
         }
+
+        if airborne.is_some() {
+            if tf.translation.y <= 0. && frame.0 != 1 {
+                frame.0 = 1;
+                tf.translation.y = 0.;
+                current.0 = 0;
+                velo.0 = Vec3::ZERO;
+                commands.entity(fighter).remove::<AirborneHitstun>();
+            }
+        }
+        
     }
+
+    
 }
 
+#[allow(clippy::type_complexity)]
 pub fn process_input_system(
     //mut commands: Commands,
     query: Query<
@@ -212,16 +243,16 @@ pub fn process_input_system(
                                     break 'all;
                                 }
                             }
-                            Conditions::Frame(start_frame, end_frame) => {
-                                if let Some(start) = start_frame {
-                                    if frame.0 < *start {
+                            Conditions::Frame(window) => {
+                                if let Ok(start) = window.try_get_start_frame() {
+                                    if frame.0 < start {
                                         meets_conditions = false;
                                         break 'all;
                                     }
                                 }
 
-                                if let Some(end) = end_frame {
-                                    if frame.0 > *end {
+                                if let Ok(end) = window.try_get_end_frame() {
+                                    if frame.0 > end {
                                         meets_conditions = false;
                                         break 'all;
                                     }
@@ -288,16 +319,16 @@ pub fn process_input_system(
                                     break 'conditions;
                                 }
                             }
-                            Conditions::Frame(start_frame, end_frame) => {
-                                if let Some(start) = start_frame {
-                                    if frame.0 < *start {
+                            Conditions::Frame(window) => {
+                                if let Ok(start) = window.try_get_start_frame() {
+                                    if frame.0 < start {
                                         met = false;
                                         break 'conditions;
                                     }
                                 }
 
-                                if let Some(end) = end_frame {
-                                    if frame.0 > *end {
+                                if let Ok(end) = window.try_get_end_frame() {
+                                    if frame.0 > end {
                                         met = false;
                                         break 'conditions;
                                     }
@@ -336,6 +367,7 @@ pub fn process_input_system(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn transition_system(
     mut commands: Commands,
     mut trans_reader: EventReader<TransitionEvent>,
@@ -347,17 +379,19 @@ pub fn transition_system(
             &mut StateFrame,
             &InputBuffer,
             &BoneMap,
+            &mut Velocity
         ),
         With<Fighter>,
     >,
     state_query: Query<&State>,
     set_pos_query: Query<&OnExitSetPos>,
+    zero_velo_query: Query<&OnExitZeroVelo>,
     mut input_met_query: Query<&mut InputMet>,
 
     mut transform_set: ParamSet<(Query<&GlobalTransform>, Query<&mut Transform>)>,
 ) {
     for event in trans_reader.iter() {
-        if let Ok((fighter, mut current, map, mut frame, _buffer, bone_map)) =
+        if let Ok((fighter, mut current, map, mut frame, _buffer, bone_map, mut velo)) =
             fighter_query.get_mut(event.fighter)
         {
             println!("Transition {} to {}", current.0, event.to_id);
@@ -382,6 +416,11 @@ pub fn transition_system(
                 tf.translation.z = pos.z;
             }
 
+            // OnExitZeroVelo 
+            if zero_velo_query.get(*state).is_ok() {
+                velo.0 = Vec3::ZERO;
+            }
+
             // InputMet reset
             if let Ok(mut met) = input_met_query.get_mut(*state) {
                 met.0 = false;
@@ -399,6 +438,7 @@ pub fn transition_system(
 #[reflect(Component)]
 pub struct InputBuffer(pub Buffer);
 
+#[allow(clippy::type_complexity)]
 pub fn hitbox_component_system(
     mut commands: Commands,
     mut fighter_query: Query<
@@ -413,7 +453,7 @@ pub fn hitbox_component_system(
             &PlayerAxis,
             &mut ActiveHitboxes,
         ),
-        (With<Fighter>, Without<InHitstun>),
+        (With<Fighter>, Without<GroundedHitstun>),
     >,
     state_query: Query<&State>,
     hitbox_query: Query<&HitboxData>,
@@ -440,7 +480,7 @@ pub fn hitbox_component_system(
                             .entity(hitbox.bone_entity.expect("Bone entity doesn't exist"))
                             .add_children(|parent| {
                                 parent
-                                    .spawn_bundle(PbrBundle {
+                                    .spawn(PbrBundle {
                                         transform: Transform {
                                             translation: hitbox.offset,
                                             rotation: Quat::from_euler(
@@ -479,12 +519,13 @@ pub fn hitbox_removal_system(
     for (entity, data, owner) in query.iter() {
         let frame = fighter_query.get(owner.0).expect("Owner doesn't exist");
 
-        if frame.0 > data.end_frame {
+        if frame.0 > data.get_end_frame() {
             commands.entity(entity).despawn();
         }
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn hurtbox_component_system(
     mut commands: Commands,
     mut fighter_query: Query<
@@ -533,33 +574,6 @@ pub fn hurtbox_component_system(
     //                     }
     //                 }
     //             }
-
-    //             if let Some(set) = hurtboxes.get(&frame.0) {
-    //                 for h in set {
-    //                     let hurtbox = hurtbox_query.get(*h).expect("Hurtbox entity does not exist");
-    //                     let offset = hurtbox.offset;
-
-    //                         let mut transform = Transform::from_translation(tf.translation);
-    //                         transform.rotate_x(hurtbox.rotation.0);
-    //                         transform.rotate_z(hurtbox.rotation.1);
-    //                         transform.rotate(tf.rotation);
-    //                         transform.translation.y = 0.;
-    //                         transform.translation += offset.x * axis.x;
-    //                         transform.translation += offset.z * axis.z;
-    //                         transform.translation.y += offset.y;
-
-    //                     commands
-    //                         .entity(*h)
-    //                         .insert(Active(HashSet::new()))
-    //                         .insert_bundle(SpatialBundle {
-    //                             transform,
-    //                             ..default()
-    //                         });
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 }
 
 pub fn hurtbox_removal_system(
@@ -580,6 +594,7 @@ pub fn hurtbox_removal_system(
 }
 
 // Isn't removed until after stage is over, may be a problem?
+#[allow(clippy::type_complexity)]
 pub fn projectile_system(
     mut commands: Commands,
     mut query: Query<
@@ -655,7 +670,7 @@ pub fn adjust_facing_system(
         let state1 = map1.get(&current1.0).unwrap();
         let state2 = map2.get(&current2.0).unwrap();
 
-        if let Ok(_) = state_query.get(*state1) {
+        if state_query.get(*state1).is_ok() {
             facing1.0 = if tf1.translation.x > tf2.translation.x {
                 Direction::Left
             } else {
@@ -663,7 +678,7 @@ pub fn adjust_facing_system(
             };
         }
 
-        if let Ok(_) = state_query.get(*state2) {
+        if state_query.get(*state2).is_ok() {
             facing2.0 = if tf1.translation.x > tf2.translation.x {
                 Direction::Right
             } else {
@@ -673,6 +688,7 @@ pub fn adjust_facing_system(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn object_system(
     mut commands: Commands,
 
@@ -729,8 +745,14 @@ pub fn object_system(
                         };
 
                         let id = *id.expect("All IDs are in use!");
-                        let new_pos =
-                            tf.translation + (facing.0.sign() * projectile.start_position);
+
+                        let mut new_pos = tf.translation;
+                        new_pos += projectile.start_position.x * axis.x;
+                        new_pos.y = projectile.start_position.y;
+                        new_pos += projectile.start_position.z * axis.z;
+
+
+
                         changes.push((id, new_pos));
 
                         commands
@@ -753,6 +775,7 @@ pub fn object_system(
     });
 }
 
+#[allow(clippy::type_complexity)]
 pub fn hbox_position_system<T: HBox>(
     mut set: ParamSet<(
         Query<(&T, &Owner, &mut Transform), With<Active>>, // Hbox Query
@@ -810,7 +833,7 @@ pub fn collision_system(
     }
 
     if let Ok([hurtboxes1, hurtboxes2]) = fighter_query.get_many(players.as_ref().into()) {
-        if hitboxes_1.len() > 0 {
+        if !hitboxes_1.is_empty() {
             let mut hurt_grouping: Vec<(Isometry3<f32>, Capsule, HurtboxData)> = Vec::new();
             let mut hurt_points: Vec<Point<f32>> = Vec::new();
 
@@ -826,7 +849,7 @@ pub fn collision_system(
                 hurt_grouping.push((iso, capsule, hurt_data.clone()));
             }
 
-            let comp_aabb = AABB::from_points(&hurt_points);
+            let comp_aabb = Aabb::from_points(&hurt_points);
 
             'hitbox_loop: for (hit_ent, hitbox1, collider1, tf1) in hit_query.iter_many(&hitboxes_1)
             {
@@ -860,74 +883,6 @@ pub fn collision_system(
         }
     }
 
-    // for (hitbox, hit_owner, active) in hitbox_query.iter_mut() {
-    //     for (hurtbox, hurt_owner, hurt_name) in hurtbox_query.iter() {
-    //         //println!("Within hurtbox query");
-    //         if active.0.contains(&hurt_owner.0) {
-    //             break;
-    //         }
-    //         if hit_owner != hurt_owner {
-    //             let (hit_iso, hit_shape, hit_data) = if seen_hitboxes.contains_key(&hitbox) {
-    //                 seen_hitboxes.get(&hitbox).unwrap().to_owned()
-    //             } else {
-    //                 let (data, hit_collider, hit_tf) = hit_query.get(hitbox).unwrap();
-    //                 //let iso = Isometry3::from(hit_vec);
-    //                 let iso: Isometry3<f32> = (hit_tf.translation, hit_tf.rotation).into();
-    //                 let iso = iso;
-
-    //                 seen_hitboxes.insert(
-    //                     hitbox,
-    //                     (iso.clone(), hit_collider.clone().into(), data.clone()),
-    //                 );
-    //                 (iso, hit_collider.clone().into(), data.clone())
-    //             };
-
-    //             let (hurt_iso, hurt_shape, hurt_data) = if seen_hurtboxes.contains_key(&hurtbox) {
-    //                 seen_hurtboxes.get(&hurtbox).unwrap().to_owned()
-    //             } else {
-    //                 let (data, hurt_collider, hurt_tf) = hurt_query.get(hurtbox).unwrap();
-    //                 //let hurt_vec: Vector3<f32> = hurt_tf.translation.into();
-    //                 //let iso = Isometry3::from(hurt_vec);
-    //                 let hurt_tf = hurt_tf.compute_transform();
-    //                 let iso: Isometry3<f32> = (hurt_tf.translation, hurt_tf.rotation).into();
-
-    //                 seen_hurtboxes.insert(
-    //                     hurtbox,
-    //                     (iso.clone(), hurt_collider.clone().into(), data.clone()),
-    //                 );
-    //                 (iso, hurt_collider.clone().into(), data.clone())
-    //             };
-
-    //             if let Some(c) = collisions.get(&(hit_owner.0, hurt_owner.0)) {
-    //                 if hit_data.priority >= c.get_attacker_priority() {
-    //                     break;
-    //                 }
-    //             }
-
-    //             // let hit_shape = hit_shape.transform_by(&hit_iso);
-    //             // let hurt_shape = hurt_shape.transform_by(&hurt_iso);
-
-    //             if let Ok(intersect) =
-    //                 intersection_test(&hit_iso, &hit_shape, &hurt_iso, &hurt_shape)
-    //             {
-    //                 if intersect {
-    //                     collisions.insert(
-    //                         (hit_owner.0, hurt_owner.0),
-    //                         CollisionData {
-    //                             attacker_box: hit_data,
-    //                             attacker: hit_owner.0,
-    //                             recipient_box: hurt_data,
-    //                             recipient: hurt_owner.0,
-    //                         },
-    //                     );
-
-    //                     println!("Intersecting hurtbox name: {}", hurt_name.as_str());
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     for (_, collision) in collisions {
         hit_writer.send(HitEvent(collision));
     }
@@ -937,22 +892,62 @@ pub fn hit_event_system(
     mut commands: Commands,
     mut hit_reader: EventReader<HitEvent>,
     mut fighter_query: Query<
-        (Entity, &mut Health, &mut StateFrame, &mut CurrentState),
+        (
+            Entity,
+            &mut Health,
+            &mut StateFrame,
+            &mut CurrentState,
+            &mut Velocity,
+            &Facing,
+        ),
         With<Fighter>,
     >,
     mut hitbox_query: Query<(&mut Exclude, &HitboxData, &Owner)>,
 ) {
     for hit_event in hit_reader.iter() {
-        if let Ok((fighter, mut health, mut frame, mut current)) =
+        if let Ok((fighter, mut health, mut frame, mut current, mut velo, facing)) =
             fighter_query.get_mut(hit_event.0.recipient)
         {
             health.0 = health.0.saturating_sub(hit_event.0.attacker_box.damage);
-            commands
-                .entity(fighter)
-                .insert(InHitstun(hit_event.0.attacker_box.hitstun));
 
-            frame.0 = 1;
-            current.0 = 3000;
+            match hit_event.0.attacker_box.on_hit {
+                OnHit::Launch(kb) => {
+                    commands
+                        .entity(fighter)
+                        .insert(AirborneHitstun);
+                
+                    
+                    frame.0 = 1;
+                    current.0 = AIR_HITSTUN;
+
+                    let mut knockback = kb;
+                    knockback.x *= facing.0.sign();
+                    velo.0 = knockback;
+
+                    assert!(knockback.y > 0.);
+
+                },
+                OnHit::Grounded { kb, hitstun } => {
+                    commands
+                        .entity(fighter)
+                        .insert(GroundedHitstun(hitstun));
+
+                    frame.0 = 1;
+                    current.0 = GRND_HITSTUN_KB;
+
+                    let mut knockback = kb;
+                    knockback.x *= facing.0.sign();
+                    velo.0 = knockback;
+                },
+                OnHit::Stun(stun) => {
+
+                }
+            }
+
+            // let mut knockback = hit_event.0.attacker_box.knockback;
+            // knockback.x *= facing.0.sign();
+
+            // velo.0 = knockback;
         }
 
         for (mut exclude, _data, owner) in hitbox_query.iter_mut() {
@@ -1006,10 +1001,13 @@ pub fn ui_lifebar_system(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn camera_system(
     mut set: ParamSet<(
-        Query<&mut Transform, With<MatchCamera>>,
+        //Query<&mut Transform, With<MatchCamera>>,
+        Query<&mut Transform, With<MatchCameraRoot>>,
         Query<(&Transform, ChangeTrackers<Transform>)>,
+        Query<&mut Transform, With<MatchCamera>>
     )>,
 
     players: Res<PlayerEntities>,
@@ -1018,23 +1016,46 @@ pub fn camera_system(
     let [(tf1, change1), (tf2, change2)] = player_query.many(players.as_ref().into());
 
     if change1.is_changed() || change2.is_changed() {
-        let mut mid = tf1.translation.lerp(tf2.translation, 0.5);
-        let direction = (tf1.translation - tf2.translation).xz();
+        let d1 = tf1.translation;
+        let d2 = tf2.translation;
+        
+        let distance = d1.distance(d2);
+
+        let mid = d1.lerp(d2, 0.5);
+        let direction = (d1 - d2).xz();
         let direction: Vec3 = (direction.x, 0., direction.y).into();
         let perp = direction.cross(Vec3::Y);
 
-        // let tf1 = tf1.translation.clone();
-        // let tf2 = tf2.translation.clone();
-
         if let Ok(mut cam_tf) = set.p0().get_single_mut() {
-            cam_tf.translation = mid + perp * -2.;
-            mid.y = 1.2;
-            cam_tf.translation.y = 1.2;
-            cam_tf.look_at(mid, Vec3::Y);
+            cam_tf.translation = mid;
+            cam_tf.look_at(mid + perp, Vec3::Y);
         }
+
+        if distance > 3.5 {
+            if let Ok(mut c) = set.p2().get_single_mut() {
+                c.translation.z = distance;
+            }
+        }
+        
+
+
+
+        // let mut mid = d1.lerp(d2, 0.5);
+        // let direction = (d1 - d2).xz();
+        // let direction: Vec3 = (direction.x, 0., direction.y).into();
+        // let perp = direction.cross(Vec3::Y);
+
+        // // let tf1 = tf1.translation.clone();
+        // // let tf2 = tf2.translation.clone();
+
+        // if let Ok(mut cam_tf) = set.p0().get_single_mut() {
+        //     cam_tf.translation = mid + perp * -2.;
+        //     mid.y = 1.2;
+        //     cam_tf.translation.y = 1.2;
+        //     cam_tf.look_at(mid, Vec3::Y);
+        // }
     }
 }
-
 
 pub fn pause_system(
     input: Res<Input<KeyCode>>,
@@ -1076,8 +1097,8 @@ pub fn modifier_input_check(
 
         if let Ok((_, state, mut met, check)) = query.get_mut(*s) {
             if !met.0
-                && frame.0 >= check.window_start
-                && frame.0 <= check.window_end
+                && frame.0 >= check.window.get_start_frame()
+                && frame.0 <= check.window.get_end_frame()
                 && check.command_input.compare(&buffer.0, facing.0)
             {
                 met.0 = true;

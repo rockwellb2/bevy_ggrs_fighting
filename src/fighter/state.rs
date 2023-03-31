@@ -1,29 +1,34 @@
 use std::fmt::Debug;
 
 use bevy::ecs::reflect;
-use bevy::prelude::{AnimationClip, Entity, Handle, Mesh, StandardMaterial};
+use bevy::prelude::{Entity, Handle, Mesh};
 use bevy::reflect::{FromReflect, Reflect, TypeUuid};
 use bevy::utils;
 use bevy::utils::hashbrown::{HashMap, HashSet};
 use bevy::{
     ecs::reflect::ReflectComponent, math::Vec3, prelude::Component, reflect::ReflectDeserialize,
 };
-use bevy_editor_pls::default_windows::inspector::label_button;
 
-use bevy_inspector_egui::{egui, Inspectable};
+
+
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use serde_json::from_value;
+use serde_json::{from_value, Number};
 
 
 
 //use bevy_editor_pls::default_windows::inspector::InspectorWindow;
 
 use crate::input::{NewCommandInput, NewMatchExpression};
+use crate::fighter::hit::components::HitboxData;
 
 use super::modifiers::StateModifier;
 
-type Frame = u16;
+pub type Frame = u16;
+
+pub const GRND_HITSTUN_KB: u16 = 3000;
+pub const GRND_HITSTUN: u16 = 3001;
+pub const AIR_HITSTUN: u16 = 3002;
 
 #[derive(Default, Debug, Serialize, Deserialize, Component, Reflect)]
 #[reflect(Component)]
@@ -84,18 +89,57 @@ impl State {
 #[serde(rename_all = "camelCase")]
 pub enum Conditions {
     // used for the current state
-    In(Vec<u16>),
+    In(StateList),
     NotIn(u16),
     Command(NewCommandInput),
     // when current state is at the end of its duration
     EndDuration,
     // current frame of the stat
-    Frame(Option<u16>, Option<u16>),
+    Frame(FrameWindow),
     // if the fighter just touched the ground
     ReachGround,
     // hitbox id (optional), frame range cancel
     //OnHit(Option<usize>, u16)
     InputWindowCon(u16)
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect)]
+#[serde(from = "StateListHelper")]
+pub struct StateList(Vec<u16>);
+
+impl StateList {
+    pub fn contains(&self, value: &u16) -> bool {
+        self.0.contains(value)
+    }
+
+}
+
+impl From<u16> for StateList {
+    fn from(value: u16) -> Self {
+        Self(vec![value])
+    }
+}
+
+impl From<Vec<u16>> for StateList {
+    fn from(value: Vec<u16>) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum StateListHelper {
+    Unsigned(u16),
+    Seq(Vec<u16>)
+}
+
+impl From<StateListHelper> for StateList {
+    fn from(value: StateListHelper) -> Self {
+        match value {
+            StateListHelper::Unsigned(value) => value.into(),
+            StateListHelper::Seq(vec) => vec.into(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect, Default)]
@@ -141,7 +185,7 @@ impl<'de> Deserialize<'de> for SerializedState {
 
             if key == "id" {
                 id = value.as_u64().expect("u64") as u16;
-            } else if key == "debug_name" {
+            } else if key == "debug_name" || key == "name" {
                 debug_name = Some(value.as_str().expect("str").to_string());
             } else if key == "duration" {
                 duration = Some(value.as_u64().expect("u64") as u16);
@@ -209,94 +253,37 @@ pub enum HitLevel {
     High
 }
 
-#[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
-)]
-#[reflect(Component)]
-pub struct HitboxData {
-    #[serde(default)]
-    pub priority: u8,
-    #[serde(default)]
-    pub id: Option<usize>,
-    #[serde(default)]
-    pub global_id: Option<u32>,
-    pub bone: String,
-    #[serde(default)]
-    pub bone_entity: Option<Entity>,
-    pub radius: f32,
-    #[serde(alias = "halfHeight")]
-    pub half_height: f32,
-    #[serde(default)]
-    pub offset: Vec3,
-    #[serde(default, deserialize_with = "deserialize_rotation")]
-    pub rotation: (f32, f32),
-    pub damage: u16,
-    pub hitstun: u16,
-    pub blockstun: u16,
-    #[serde(alias = "startFrame")]
-    pub start_frame: u16,
-    #[serde(alias = "endFrame")]
-    pub end_frame: u16,
-    #[serde(default)]
-    rehit: Option<u16>, // Number frames after hitting that hitbox can hit again,
-    #[serde(alias = "hitLevel", default)]
-    hit_level: HitLevel
-}
 
-fn deserialize_rotation<'de, D>(deserializer: D) -> Result<(f32, f32), D::Error>
-where
-    D: de::Deserializer<'de>,
-{
-    struct RotVisitor;
+pub fn deserialize_rotation<'de, D>(deserializer: D) -> Result<(f32, f32), D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct RotVisitor;
 
-    impl<'de> Visitor<'de> for RotVisitor {
-        type Value = (f32, f32);
+        impl<'de> Visitor<'de> for RotVisitor {
+            type Value = (f32, f32);
 
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a tuple containing a the x and z rotations in radians")
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a tuple containing a the x and z rotations in radians")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let mut x: f32 = seq.next_element()?.expect("Couldn't convert to f32");
+                let mut z: f32 = seq.next_element()?.expect("Couldn't convert to f32");
+
+                x = x.to_radians();
+                z = z.to_radians();
+
+                Ok((x, z))
+            }
         }
 
-        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: de::SeqAccess<'de>,
-        {
-            let mut x: f32 = seq.next_element()?.expect("Couldn't convert to f32");
-            let mut z: f32 = seq.next_element()?.expect("Couldn't convert to f32");
-
-            x = x.to_radians();
-            z = z.to_radians();
-
-            Ok((x, z))
-        }
+        deserializer.deserialize_seq(RotVisitor)
     }
 
-    deserializer.deserialize_seq(RotVisitor)
-}
-
-impl HitboxData {
-    pub fn mesh_default() -> Option<Handle<Mesh>> {
-        None
-    }
-
-    pub fn set_global_id(&mut self, global_id: u32) {
-        self.global_id = Some(global_id);
-
-    }
-}
-
-impl HBox for HitboxData {
-    fn get_priority(&self) -> u8 {
-        self.priority
-    }
-
-    fn get_offset(&self) -> Vec3 {
-        self.offset
-    }
-
-    fn set_id(&mut self, value: usize) {
-        self.id = Some(value);
-    }
-}
 
 #[derive(Component)]
 pub struct BoneMap(pub HashMap<String, Entity>);
@@ -305,7 +292,7 @@ pub struct BoneMap(pub HashMap<String, Entity>);
 pub struct ActiveHitboxes(pub Vec<Entity>);
 
 #[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
 )]
 #[reflect(Component)]
 pub struct HurtboxData {
@@ -358,7 +345,7 @@ impl Hurtboxes {
 }
 
 #[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
 )]
 #[reflect(Component)]
 pub struct ProjectileData {
@@ -387,7 +374,7 @@ impl ProjectileData {
 }
 
 #[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component, Inspectable,
+    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
 )]
 #[reflect(Component)]
 pub struct Velocity(pub Vec3);
@@ -504,7 +491,7 @@ pub struct StateFrame(pub u16);
 #[reflect(Component)]
 pub struct Exclude(pub HashSet<Entity>);
 
-#[derive(Component, Inspectable, PartialEq, Reflect)]
+#[derive(Component, PartialEq, Reflect)]
 pub struct Owner(pub Entity);
 
 impl Owner {
@@ -520,7 +507,7 @@ impl Default for Owner {
 }
 
 #[derive(
-    Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable, Copy, PartialEq,
+    Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Copy, PartialEq,
 )]
 pub enum Direction {
     Left,
@@ -549,19 +536,19 @@ impl From<f32> for Direction {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
 pub struct Facing(pub Direction);
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
 pub struct Health(pub u16);
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
-pub struct InHitstun(pub u16);
+pub struct GroundedHitstun(pub Frame);
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Inspectable)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
 #[reflect(Component)]
 pub struct PlayerAxis {
     pub opponent_pos: Vec3,
@@ -570,15 +557,37 @@ pub struct PlayerAxis {
 }
 
 
-#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, FromReflect)]
+#[serde(from = "FrameWindowHelper")]
+
 pub struct FrameWindow {
     #[serde(default)]
-    start: Option<Frame>,
+    pub start: Option<Frame>,
     #[serde(default)]
-    end: Option<Frame>
+    pub end: Option<Frame>
 }
 
 impl FrameWindow {
+    pub fn get_start_frame(&self) -> Frame {
+        self.start.expect("Start frame doesn't exist in FrameWindow")
+    }
+
+    pub fn get_end_frame(&self) -> Frame {
+        self.end.expect("End frame doesn't exist in FrameWindow")
+    }
+
+    pub fn try_get_start_frame(&self) -> Result<Frame, ()> {
+        self.start.ok_or(())
+    }
+
+    pub fn try_get_end_frame(&self) -> Result<Frame, ()> {
+        self.end.ok_or(())
+    }
+
+
+
+
+
     pub fn from_end(end: Frame) -> FrameWindow {
         FrameWindow {
             start: None,
@@ -606,3 +615,37 @@ impl From<[Frame; 2]> for FrameWindow {
         FrameWindow { start: Some(values[0]), end: Some(values[1]) }
     }
 }
+
+impl From<Frame> for FrameWindow {
+    fn from(value: Frame) -> Self {
+        FrameWindow { start: Some(value), end: Some(value) }
+    }
+}
+
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum FrameWindowHelper {
+    Seq([Frame; 2]),
+    //Seq(Vec<Frame>),
+    Map(HashMap<String, Frame>),
+    Unsigned(Frame)
+}
+
+impl From<FrameWindowHelper> for FrameWindow {
+    fn from(value: FrameWindowHelper) -> Self {
+        match value {
+            FrameWindowHelper::Seq(array) => array.into(),
+            FrameWindowHelper::Map(map) => {
+                let start = map.get("start").copied();
+                let end = map.get("end").copied();
+                FrameWindow {start, end }
+            },
+            FrameWindowHelper::Unsigned(value) => value.into(),
+
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone)]
+pub struct FighterPosition;
