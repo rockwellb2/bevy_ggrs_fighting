@@ -15,12 +15,12 @@ opt-level = 3
 
 [dependencies]
 structopt = "0.3"
-bevy = {version = "0.9.1", features = ["serialize", "trace"]}
-bevy_ggrs = "0.11.0"
+bevy = {version = "0.10.1", features = ["serialize", "trace"]}
+bevy_ggrs = "0.12.0"
 #bevy_ggrs = { git = "https://github.com/gschup/bevy_ggrs"}
 
 #ggrs = { git = "https://github.com/gschup/ggrs", features=["sync-send"]}
-ggrs = { version = "0.9.3", features = ["sync-send"]}
+ggrs = { version = "0.9.4", features = ["sync-send"]}
 
 aws-sdk-gamelift = "0.21.0"
 aws-config = "0.51.0"
@@ -35,18 +35,18 @@ regex = "1"
 packed_struct = {version="0.10.0", features= ["use_serde"]}
 
 parry3d = "0.13.0"
-nalgebra = {version = "0.32.1", features = ["glam022"]}
+nalgebra = {version = "0.32.2", features = ["glam023"]}
 
 serde = "1.0.137"
 serde_json = "1.0.93"
 serde_closure = "0.3.2"
 typetag = "0.2.0"
-bevy_common_assets = {version = "0.4.0", features = ["json"]}
+bevy_common_assets = {version = "0.6.0", features = ["json"]}
 iyes_loopless = "0.9.1"
-iyes_progress = {version = "0.7.1", features = ["assets", "iyes_loopless"]}
-bevy_prototype_lyon = "0.7.2"
-leafwing-input-manager = "0.8.0"
-bevy-scene-hook = "5.2.0"
+iyes_progress = {version = "0.8.0", features = ["assets"]}
+#bevy_prototype_lyon = "0.7.2"
+leafwing-input-manager = "0.9.1"
+#bevy-scene-hook = "5.2.0"
 
 
 

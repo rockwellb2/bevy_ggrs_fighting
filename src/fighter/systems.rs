@@ -3,10 +3,10 @@
 use super::{
     data::{Collider, CollisionData, FighterData, HitEvent},
     event::TransitionEvent,
-    hit::components::{OnHit, AirborneHitstun},
+    hit::components::{AirborneHitstun, OnHit},
     modifiers::{
-        AdjustFacing, CreateObject, InputMet, InputWindowCheck, Object, OnExitSetPos, VectorType,
-        Velo, OnExitZeroVelo,
+        AdjustFacing, CreateObject, InputMet, InputWindowCheck, Object, OnExitSetPos,
+        OnExitZeroVelo, VectorType, Velo,
     },
     state::{
         Active, ActiveHitboxes, BoneMap, Conditions, CurrentState, Direction, Exclude, Facing,
@@ -21,7 +21,7 @@ use bevy::{
     prelude::{
         BuildChildren, ChangeTrackers, Changed, Commands, Component, Entity, EulerRot, EventReader,
         EventWriter, GlobalTransform, KeyCode, Name, Or, ParamSet, PbrBundle, Quat, Query, Res,
-        ResMut, Transform, Vec3, Visibility, With, Without,
+        ResMut, Transform, Vec3, Visibility, With, Without, SystemSet,
     },
     reflect::{FromReflect, Reflect, Struct},
     ui::{Style, Val},
@@ -40,12 +40,37 @@ use parry3d::{
 use bevy::input::Input;
 
 use crate::{
-    battle::{HitboxMaterial, Lifebar, MatchCamera, PlayerEntities, MatchCameraRoot},
+    battle::{HitboxMaterial, Lifebar, MatchCamera, MatchCameraRoot, PlayerEntities},
     fighter::hit::components::HitboxData,
     game::{Paused, RoundState},
     util::Buffer,
     GGRSConfig, HitboxMap, Player, FPS,
 };
+
+
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub enum RollbackSet {
+    Stage0,
+    Stage1,
+    Stage2
+}
+
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub struct NonRollbackSet;
+
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub enum SetupSet {
+    Setup,
+    Loading,
+    ExitLoading,
+    Armature,
+    EnterRound,
+    ExtraSetup,
+    
+}
+
+
+
 
 pub fn buffer_insert_system(
     mut query: Query<(&mut InputBuffer, &Player)>,
@@ -72,7 +97,7 @@ pub fn movement_system(
         &PlayerAxis,
     )>,
 
-    facing_query: Query<&AdjustFacing>
+    facing_query: Query<&AdjustFacing>,
 ) {
     for (map, current, mut tf, mut velocity, frame, data, facing, axis) in fighter_query.iter_mut()
     {
@@ -137,7 +162,7 @@ pub fn movement_system(
         //tf.translation += velocity.0 / FPS as f32;
 
         tf.translation.y = tf.translation.y.max(0.);
-        
+
         if facing_query.get(*s).is_ok() {
             let mut opp_pos = axis.opponent_pos;
             opp_pos.y = tf.translation.y;
@@ -157,9 +182,20 @@ pub fn increment_frame_system(
 
 pub fn hitstun_system(
     mut commands: Commands,
-    mut query: Query<(Entity, &mut CurrentState, &mut StateFrame, &mut Velocity, Option<&GroundedHitstun>, Option<&AirborneHitstun>, &mut Transform), With<Fighter>>,
+    mut query: Query<
+        (
+            Entity,
+            &mut CurrentState,
+            &mut StateFrame,
+            &mut Velocity,
+            Option<&GroundedHitstun>,
+            Option<&AirborneHitstun>,
+            &mut Transform,
+        ),
+        With<Fighter>,
+    >,
 ) {
-    for (fighter, mut current, mut frame, mut velo, hitstun, airborne, mut tf ) in query.iter_mut() {
+    for (fighter, mut current, mut frame, mut velo, hitstun, airborne, mut tf) in query.iter_mut() {
         if let Some(hitstun) = hitstun {
             if frame.0 > hitstun.0 {
                 frame.0 = 1;
@@ -178,10 +214,7 @@ pub fn hitstun_system(
                 commands.entity(fighter).remove::<AirborneHitstun>();
             }
         }
-        
     }
-
-    
 }
 
 #[allow(clippy::type_complexity)]
@@ -379,7 +412,7 @@ pub fn transition_system(
             &mut StateFrame,
             &InputBuffer,
             &BoneMap,
-            &mut Velocity
+            &mut Velocity,
         ),
         With<Fighter>,
     >,
@@ -416,7 +449,7 @@ pub fn transition_system(
                 tf.translation.z = pos.z;
             }
 
-            // OnExitZeroVelo 
+            // OnExitZeroVelo
             if zero_velo_query.get(*state).is_ok() {
                 velo.0 = Vec3::ZERO;
             }
@@ -476,32 +509,57 @@ pub fn hitbox_component_system(
                             .get(&hitbox.global_id.expect("GlobalID doesn't exist"))
                             .expect("No Hitbox found for given GlobalID");
 
-                        let h = commands
-                            .entity(hitbox.bone_entity.expect("Bone entity doesn't exist"))
-                            .add_children(|parent| {
-                                parent
-                                    .spawn(PbrBundle {
-                                        transform: Transform {
-                                            translation: hitbox.offset,
-                                            rotation: Quat::from_euler(
-                                                EulerRot::default(),
-                                                0.,
-                                                hitbox.rotation.0,
-                                                hitbox.rotation.1,
-                                            ),
-                                            ..default()
-                                        },
-                                        mesh: hit_collider.0.clone(),
-                                        material: hitbox_material.0.clone(),
-                                        ..default()
-                                    })
-                                    .insert(hitbox.clone())
-                                    .insert(Rollback::new(rip.next_id()))
-                                    .insert(hit_collider.1.clone())
-                                    .insert(Owner(entity))
-                                    .insert(Exclude(HashSet::new()))
-                                    .id()
-                            });
+                        // let h = commands
+                        //     .entity(hitbox.bone_entity.expect("Bone entity doesn't exist"))
+                        // .add_children(|parent| {
+                        //     parent
+                        //         .spawn(PbrBundle {
+                        //             transform: Transform {
+                        //                 translation: hitbox.offset,
+                        //                 rotation: Quat::from_euler(
+                        //                     EulerRot::default(),
+                        //                     0.,
+                        //                     hitbox.rotation.0,
+                        //                     hitbox.rotation.1,
+                        //                 ),
+                        //                 ..default()
+                        //             },
+                        //             mesh: hit_collider.0.clone(),
+                        //             material: hitbox_material.0.clone(),
+                        //             ..default()
+                        //         })
+                        //         .insert(hitbox.clone())
+                        //         .insert(Rollback::new(rip.next_id()))
+                        //         .insert(hit_collider.1.clone())
+                        //         .insert(Owner(entity))
+                        //         .insert(Exclude(HashSet::new()))
+                        //         .id()
+                        // });
+
+                        let h = commands.spawn((
+                            PbrBundle {
+                                transform: Transform {
+                                    translation: hitbox.offset,
+                                    rotation: Quat::from_euler(
+                                        EulerRot::default(),
+                                        0.,
+                                        hitbox.rotation.0,
+                                        hitbox.rotation.1,
+                                    ),
+                                    ..default()
+                                },
+                                mesh: hit_collider.0.clone(),
+                                material: hitbox_material.0.clone(),
+                                ..default()
+                            },
+                            hitbox.clone(),
+                            Rollback::new(rip.next_id()),
+                            hit_collider.1.clone(),
+                            Owner(entity),
+                            Exclude(HashSet::new())
+                        ))
+                        .set_parent(hitbox.bone_entity.expect("Bone entity doesn't exist"))
+                        .id();
 
                         active_hits.0.push(h);
                     }
@@ -637,7 +695,8 @@ pub fn projectile_system(
                 let amount = proj_ref.amount_in_use.get_mut(&data.name).unwrap();
                 *amount -= 1;
 
-                visibility.is_visible = false;
+                //visibility.is_visible = false;
+                *visibility = Visibility::Hidden;
 
                 commands.entity(projectile).remove::<Active>();
             }
@@ -751,8 +810,6 @@ pub fn object_system(
                         new_pos.y = projectile.start_position.y;
                         new_pos += projectile.start_position.z * axis.z;
 
-
-
                         changes.push((id, new_pos));
 
                         commands
@@ -769,7 +826,8 @@ pub fn object_system(
     changes.into_iter().for_each(|(entity, pos)| {
         if let Ok((mut tf, mut visibility, mut frame)) = set.p0().get_mut(entity) {
             tf.translation = pos;
-            visibility.is_visible = true;
+            //visibility.is_visible = true;
+            *visibility = Visibility::Inherited;
             frame.0 = 1;
         }
     });
@@ -912,11 +970,8 @@ pub fn hit_event_system(
 
             match hit_event.0.attacker_box.on_hit {
                 OnHit::Launch(kb) => {
-                    commands
-                        .entity(fighter)
-                        .insert(AirborneHitstun);
-                
-                    
+                    commands.entity(fighter).insert(AirborneHitstun);
+
                     frame.0 = 1;
                     current.0 = AIR_HITSTUN;
 
@@ -925,12 +980,9 @@ pub fn hit_event_system(
                     velo.0 = knockback;
 
                     assert!(knockback.y > 0.);
-
-                },
+                }
                 OnHit::Grounded { kb, hitstun } => {
-                    commands
-                        .entity(fighter)
-                        .insert(GroundedHitstun(hitstun));
+                    commands.entity(fighter).insert(GroundedHitstun(hitstun));
 
                     frame.0 = 1;
                     current.0 = GRND_HITSTUN_KB;
@@ -938,10 +990,8 @@ pub fn hit_event_system(
                     let mut knockback = kb;
                     knockback.x *= facing.0.sign();
                     velo.0 = knockback;
-                },
-                OnHit::Stun(stun) => {
-
                 }
+                OnHit::Stun(stun) => {}
             }
 
             // let mut knockback = hit_event.0.attacker_box.knockback;
@@ -1007,7 +1057,7 @@ pub fn camera_system(
         //Query<&mut Transform, With<MatchCamera>>,
         Query<&mut Transform, With<MatchCameraRoot>>,
         Query<(&Transform, ChangeTrackers<Transform>)>,
-        Query<&mut Transform, With<MatchCamera>>
+        Query<&mut Transform, With<MatchCamera>>,
     )>,
 
     players: Res<PlayerEntities>,
@@ -1018,7 +1068,7 @@ pub fn camera_system(
     if change1.is_changed() || change2.is_changed() {
         let d1 = tf1.translation;
         let d2 = tf2.translation;
-        
+
         let distance = d1.distance(d2);
 
         let mid = d1.lerp(d2, 0.5);
@@ -1036,9 +1086,6 @@ pub fn camera_system(
                 c.translation.z = distance;
             }
         }
-        
-
-
 
         // let mut mid = d1.lerp(d2, 0.5);
         // let direction = (d1 - d2).xz();

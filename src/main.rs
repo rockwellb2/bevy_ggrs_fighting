@@ -4,37 +4,36 @@ use bevy::{
     reflect::TypeRegistry, utils::HashMap,
 };
 use bevy_editor_pls::EditorPlugin;
-use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider, Session};
+use bevy_ggrs::{GGRSPlugin, GGRSSchedule, Rollback, RollbackIdProvider, Session};
 
-use bevy_scene_hook::HookPlugin;
 use fighter::{
+    hit::components::{AirborneHitstun, HitboxData},
     state::{
-        Active, ActiveHitboxes, CurrentState, Facing, HBox, Health,
-        HurtboxData, GroundedHitstun, PlayerAxis, ProjectileReference,
-        SerializedStateVec, StateFrame, Velocity,
+        Active, ActiveHitboxes, CurrentState, Facing, GroundedHitstun, HBox, Health, HurtboxData,
+        PlayerAxis, ProjectileReference, SerializedStateVec, StateFrame, Velocity,
     },
     systems::{
-        axis_system, buffer_insert_system, camera_system, collision_system,
-        hbox_position_system, hit_event_system, hitbox_component_system, hitbox_removal_system,
-        hitstun_system, hurtbox_component_system, hurtbox_removal_system, increment_frame_system, modifier_input_check, movement_system, object_system, pause_system,
-        process_input_system, projectile_system, transition_system, ui_lifebar_system, InputBuffer,
+        axis_system, buffer_insert_system, camera_system, collision_system, hbox_position_system,
+        hit_event_system, hitbox_component_system, hitbox_removal_system, hitstun_system,
+        hurtbox_component_system, hurtbox_removal_system, increment_frame_system,
+        modifier_input_check, movement_system, object_system, pause_system, process_input_system,
+        projectile_system, transition_system, ui_lifebar_system, InputBuffer, NonRollbackSet,
+        RollbackSet, SetupSet,
     },
-    Fighter, FighterPlugin, hit::components::{HitboxData, AirborneHitstun},
+    Fighter, FighterPlugin,
 };
 use game::{
-    debug::state_text_system, not_if_paused, on_armature, on_enter_loading, on_enter_round, on_exit_loading, on_extra_setup,
-    on_loading, on_round, paused_advance_or_round, Paused, RoundState, ADD_HITBOX,
-    ADD_HURTBOX, AXIS, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT, INPUT_BUFFER,
-    MOD_INPUT_CHECK, MOVEMENT, PROCESS, PROJECTILE, REMOVE_HITBOX, REMOVE_HURTBOX, TRANSITION,
-    UPDATE_HIT_POS, UPDATE_HURT_POS,
+    debug::state_text_system, not_if_paused, on_armature, on_enter_loading, on_enter_round,
+    on_exit_loading, on_extra_setup, on_loading, on_round, paused_advance_or_round, Paused,
+    RoundState, ADD_HITBOX, ADD_HURTBOX, AXIS, COLLISION, FRAME_INCREMENT, HITSTUN, HIT_EVENT,
+    INPUT_BUFFER, MOD_INPUT_CHECK, MOVEMENT, PROCESS, PROJECTILE, REMOVE_HITBOX, REMOVE_HURTBOX,
+    TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS,
 };
 use ggrs::Config;
 //use bevy_editor_pls::prelude::*;
 
 use bevy_common_assets::json::JsonAssetPlugin;
-use bevy_prototype_lyon::prelude::*;
 use input::Action;
-
 
 use leafwing_input_manager::prelude::InputManagerPlugin;
 
@@ -42,9 +41,6 @@ use parry3d::shape::{Capsule, Cuboid};
 use structopt::StructOpt;
 
 use std::{env, net::SocketAddr};
-
-
-
 
 use crate::{
     battle::{PlayerEntities, PlayerHandleAccess},
@@ -178,128 +174,127 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .register_rollback_component::<ActiveHitboxes>()
         .register_rollback_component::<Owner>()
         .register_rollback_resource::<RoundState>()
-        .with_rollback_schedule(
-            Schedule::default()
-                
-                .with_stage(
-                    ROLLBACK_DEFAULT,
-                    SystemStage::parallel()
-                        .with_run_criteria(on_round)
-                        .with_system(buffer_insert_system.label(INPUT_BUFFER))
-                        .with_system(
-                            hitstun_system
-                                //.run_in_state(GameState::Fight)
-                                .label(HITSTUN)
-                                .after(INPUT_BUFFER),
-                        )
-                        .with_system(
-                            increment_frame_system
-                                //.run_in_state(GameState::Fight)
-                                .with_run_criteria(not_if_paused)
-                                .label(FRAME_INCREMENT)
-                                .after(HITSTUN),
-                        )
-                        .with_system(
-                            modifier_input_check
-                                .label(MOD_INPUT_CHECK)
-                                .after(FRAME_INCREMENT),
-                        )
-                        .with_system(
-                            process_input_system
-                                //.run_in_state(GameState::Fight)
-                                .label(PROCESS)
-                                .after(MOD_INPUT_CHECK),
-                        )
-                        .with_system(
-                            transition_system
-                                //.run_in_state(GameState::Fight)
-                                .label(TRANSITION)
-                                .after(PROCESS),
-                        )
-                        .with_system(
-                            movement_system
-                                //.run_in_state(GameState::Fight)
-                                .label(MOVEMENT)
-                                .after(TRANSITION),
-                        )
-                        .with_system(axis_system.label(AXIS).after(MOVEMENT))
-                        // .with_system(
-                        //     adjust_facing_system
-                        //         //.run_in_state(GameState::Fight)
-                        //         .label(FACE)
-                        //         .after(AXIS),
-                        // )
-                        // projectile
-                        .with_system(object_system.label("object").after(AXIS))
-                        .with_system(
-                            fighter::animation::rollback::animation_system.after("object"),
-                        ),
-                )
-                .with_stage_after(
-                    ROLLBACK_DEFAULT,
-                    "Hitbox Stage",
-                    SystemStage::parallel()
-                        .with_run_criteria(on_round)
-                        .with_system(
-                            hitbox_component_system
-                                //.run_in_state(GameState::Fight)
-                                .label(ADD_HITBOX),
-                        )
-                        .with_system(
-                            hurtbox_component_system
-                                //.run_in_state(GameState::Fight)
-                                .after(ADD_HITBOX)
-                                .label(ADD_HURTBOX),
-                        )
-                        .with_system(projectile_system.after(ADD_HURTBOX).label(PROJECTILE))
-                        .with_system(
-                            hitbox_removal_system
-                                //.run_in_state(GameState::Fight)
-                                .label(REMOVE_HITBOX)
-                                .after(PROJECTILE),
-                        )
-                        .with_system(
-                            hurtbox_removal_system
-                                //.run_in_state(GameState::Fight)
-                                .label(REMOVE_HURTBOX)
-                                .after(REMOVE_HITBOX),
-                        )
-                        .with_system(
-                            hbox_position_system::<HitboxData>
-                                //.run_in_state(GameState::Fight)
-                                .label(UPDATE_HIT_POS)
-                                .after(REMOVE_HURTBOX),
-                        )
-                        .with_system(
-                            hbox_position_system::<HurtboxData>
-                                //.run_in_state(GameState::Fight)
-                                .label(UPDATE_HURT_POS)
-                                .after(UPDATE_HIT_POS),
-                        ),
-                )
-                .with_stage_after(
-                    "Hitbox Stage",
-                    "Collision Stage",
-                    SystemStage::parallel()
-                        .with_run_criteria(on_round)
-                        .with_system(
-                            collision_system
-                                //.run_in_state(GameState::Fight)
-                                .label(COLLISION),
-                        )
-                        .with_system(
-                            hit_event_system
-                                //.run_in_state(GameState::Fight)
-                                .label(HIT_EVENT)
-                                .after(COLLISION),
-                        ),
-                )
-                .with_stage_after("Collision Stage", "Debug Stage 2", SystemStage::parallel()),
-        )
+        // .with_rollback_schedule(
+        //     Schedule::default()
+        //         .with_stage(
+        //             ROLLBACK_DEFAULT,
+        //             SystemStage::parallel()
+        //                 .with_run_criteria(on_round)
+        //                 .with_system(buffer_insert_system.label(INPUT_BUFFER))
+        //                 .with_system(
+        //                     hitstun_system
+        //                         //.run_in_state(GameState::Fight)
+        //                         .label(HITSTUN)
+        //                         .after(INPUT_BUFFER),
+        //                 )
+        //                 .with_system(
+        //                     increment_frame_system
+        //                         //.run_in_state(GameState::Fight)
+        //                         .with_run_criteria(not_if_paused)
+        //                         .label(FRAME_INCREMENT)
+        //                         .after(HITSTUN),
+        //                 )
+        //                 .with_system(
+        //                     modifier_input_check
+        //                         .label(MOD_INPUT_CHECK)
+        //                         .after(FRAME_INCREMENT),
+        //                 )
+        //                 .with_system(
+        //                     process_input_system
+        //                         //.run_in_state(GameState::Fight)
+        //                         .label(PROCESS)
+        //                         .after(MOD_INPUT_CHECK),
+        //                 )
+        //                 .with_system(
+        //                     transition_system
+        //                         //.run_in_state(GameState::Fight)
+        //                         .label(TRANSITION)
+        //                         .after(PROCESS),
+        //                 )
+        //                 .with_system(
+        //                     movement_system
+        //                         //.run_in_state(GameState::Fight)
+        //                         .label(MOVEMENT)
+        //                         .after(TRANSITION),
+        //                 )
+        //                 .with_system(axis_system.label(AXIS).after(MOVEMENT))
+        //                 // .with_system(
+        //                 //     adjust_facing_system
+        //                 //         //.run_in_state(GameState::Fight)
+        //                 //         .label(FACE)
+        //                 //         .after(AXIS),
+        //                 // )
+        //                 // projectile
+        //                 .with_system(object_system.label("object").after(AXIS))
+        //                 .with_system(
+        //                     fighter::animation::rollback::animation_system.after("object"),
+        //                 ),
+        //         )
+        //         .with_stage_after(
+        //             ROLLBACK_DEFAULT,
+        //             "Hitbox Stage",
+        //             SystemStage::parallel()
+        //                 .with_run_criteria(on_round)
+        //                 .with_system(
+        //                     hitbox_component_system
+        //                         //.run_in_state(GameState::Fight)
+        //                         .label(ADD_HITBOX),
+        //                 )
+        //                 .with_system(
+        //                     hurtbox_component_system
+        //                         //.run_in_state(GameState::Fight)
+        //                         .after(ADD_HITBOX)
+        //                         .label(ADD_HURTBOX),
+        //                 )
+        //                 .with_system(projectile_system.after(ADD_HURTBOX).label(PROJECTILE))
+        //                 .with_system(
+        //                     hitbox_removal_system
+        //                         //.run_in_state(GameState::Fight)
+        //                         .label(REMOVE_HITBOX)
+        //                         .after(PROJECTILE),
+        //                 )
+        //                 .with_system(
+        //                     hurtbox_removal_system
+        //                         //.run_in_state(GameState::Fight)
+        //                         .label(REMOVE_HURTBOX)
+        //                         .after(REMOVE_HITBOX),
+        //                 )
+        //                 .with_system(
+        //                     hbox_position_system::<HitboxData>
+        //                         //.run_in_state(GameState::Fight)
+        //                         .label(UPDATE_HIT_POS)
+        //                         .after(REMOVE_HURTBOX),
+        //                 )
+        //                 .with_system(
+        //                     hbox_position_system::<HurtboxData>
+        //                         //.run_in_state(GameState::Fight)
+        //                         .label(UPDATE_HURT_POS)
+        //                         .after(UPDATE_HIT_POS),
+        //                 ),
+        //         )
+        //         .with_stage_after(
+        //             "Hitbox Stage",
+        //             "Collision Stage",
+        //             SystemStage::parallel()
+        //                 .with_run_criteria(on_round)
+        //                 .with_system(
+        //                     collision_system
+        //                         //.run_in_state(GameState::Fight)
+        //                         .label(COLLISION),
+        //                 )
+        //                 .with_system(
+        //                     hit_event_system
+        //                         //.run_in_state(GameState::Fight)
+        //                         .label(HIT_EVENT)
+        //                         .after(COLLISION),
+        //                 ),
+        //         )
+        //         .with_stage_after("Collision Stage", "Debug Stage 2", SystemStage::parallel()),
+        // )
         .build(&mut app);
 
     app.add_plugins(DefaultPlugins)
-        .add_plugin(ShapePlugin)
+        //.add_plugin(ShapePlugin)
         .add_plugin(JsonAssetPlugin::<SerializedStateVec>::new(&[
             "sl.json", "states",
         ]))
@@ -307,78 +302,194 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .insert_resource(RoundState::EnterLoading)
         .add_plugin(InputManagerPlugin::<Action>::default())
         // Inspector/Editor Plugins
-        .add_plugin(EditorPlugin)
+        .add_plugin(EditorPlugin::default())
         //.add_plugin(WorldInspectorPlugin::new())
         .add_plugin(FrameTimeDiagnosticsPlugin)
+        .edit_schedule(GGRSSchedule, |schedule| {
+            schedule.configure_sets((
+                SetupSet::Setup.run_if(on_enter_loading),
+                SetupSet::Armature.run_if(on_armature),
+                SetupSet::EnterRound.run_if(on_enter_round),
+                SetupSet::ExtraSetup.run_if(on_extra_setup),
+                NonRollbackSet.run_if(on_round),
+                RollbackSet::Stage0
+                    .before(RollbackSet::Stage1)
+                    .run_if(on_round),
+                RollbackSet::Stage1
+                    .after(RollbackSet::Stage0)
+                    .run_if(on_round),
+                RollbackSet::Stage2
+                    .after(RollbackSet::Stage1)
+                    .run_if(on_round),
+            ));
+        })
+        .configure_sets((
+            SetupSet::Setup.run_if(on_enter_loading),
+            SetupSet::Loading.run_if(on_loading),
+            SetupSet::ExitLoading.run_if(on_exit_loading),
+            SetupSet::Armature.run_if(on_armature),
+            SetupSet::EnterRound.run_if(on_enter_round),
+            SetupSet::ExtraSetup.run_if(on_extra_setup),
+            NonRollbackSet.run_if(on_round),
+            RollbackSet::Stage0
+                .before(RollbackSet::Stage1)
+                .run_if(on_round),
+            RollbackSet::Stage1
+                .after(RollbackSet::Stage0)
+                .run_if(on_round),
+            RollbackSet::Stage2
+                .after(RollbackSet::Stage1)
+                .run_if(on_round),
+        ))
+        .add_systems(
+            (
+                apply_system_buffers,
+                buffer_insert_system,
+                hitstun_system,
+                increment_frame_system,
+                modifier_input_check,
+                process_input_system,
+                transition_system,
+                movement_system,
+                axis_system,
+                object_system,
+                fighter::animation::rollback::animation_system,
+                apply_system_buffers,
+            )
+                .chain()
+                .in_set(RollbackSet::Stage0)
+                .in_schedule(GGRSSchedule),
+        )
+        .add_systems(
+            (
+                hitbox_component_system,
+                hurtbox_component_system,
+                hitbox_removal_system,
+                hurtbox_removal_system,
+                hbox_position_system::<HitboxData>,
+                hbox_position_system::<HurtboxData>,
+                apply_system_buffers,
+                collision_system,
+                hit_event_system,
+                apply_system_buffers
+            )
+                .chain()
+                .in_set(RollbackSet::Stage1)
+                .in_schedule(GGRSSchedule),
+        )
         // Non-rollback Systems
-        .add_system_set(
-            SystemSet::new()
-                .with_run_criteria(on_round)
-                .with_system(ui_lifebar_system)
-                .with_system(camera_system)
-                .with_system(state_text_system), //.with_system(animation_system)
+        .add_systems((ui_lifebar_system, camera_system, state_text_system).in_set(NonRollbackSet))
+        .add_systems(
+            (load_fighters, create_battle_ui, apply_system_buffers)
+                .chain()
+                .in_set(SetupSet::Setup),
         )
-        .add_stage(
-            "Setup Stage",
-            SystemStage::parallel()
-                .with_run_criteria(on_enter_loading)
-                .with_system(load_fighters.label("load_fighters"))
-                .with_system(create_battle_ui.after("load_fighters")),
+        // MIGHT NEED TO APPLY THINGS BETWEEN THESE
+        .add_systems(
+            (loading_wait, apply_system_buffers)
+                .chain()
+                .in_set(SetupSet::Loading),
         )
-        .add_stage_after(
-            "Setup Stage",
-            "Loading Stage",
-            SystemStage::parallel()
-                .with_run_criteria(on_loading)
-                .with_system(loading_wait),
+        .add_systems(
+            (spawn_fighters, apply_system_buffers)
+                .chain()
+                .in_set(SetupSet::ExitLoading),
         )
-        .add_stage_after(
-            "Loading Stage",
-            "Exit Loading Stage",
-            SystemStage::parallel()
-                .with_run_criteria(on_exit_loading)
-                .with_system(spawn_fighters),
+        .add_systems(
+            (
+                fighter::animation::setup::insert_hurtbox_data,
+                fighter::animation::setup::armature_system,
+                apply_system_buffers,
+            )
+                .chain()
+                .in_set(SetupSet::Armature),
         )
-        .add_stage_after(
-            "Exit Loading Stage",
-            "Armature Stage",
-            SystemStage::parallel()
-                .with_run_criteria(on_armature)
-                .with_system(fighter::animation::setup::insert_hurtbox_data.label("insert_hdata"))
-                .with_system(fighter::animation::setup::armature_system.after("insert_hdata")),
+        .add_systems(
+            (
+                startup,
+                apply_system_buffers,
+                fighter::animation::setup::insert_animations,
+                insert_meshes,
+                apply_system_buffers,
+            )
+                .chain()
+                .in_set(SetupSet::EnterRound),
         )
-        .add_stage_after(
-            "Armature Stage",
-            "Enter Round Stage",
-            SystemStage::parallel()
-                .with_run_criteria(on_enter_round)
-                .with_system(startup.label("startup"))
-                .with_system(
-                    fighter::animation::setup::insert_animations
-                        .label("insert_anim")
-                )
-                .with_system(insert_meshes.after("insert_anim")),
+        .add_systems(
+            (
+                fighter::animation::setup::add_animation_player_system,
+                extra_setup_system,
+                apply_system_buffers,
+            )
+                .chain()
+                .in_set(SetupSet::ExtraSetup),
         )
-        .add_stage_after(
-            "Enter Round Stage",
-            "Extra Setup Stage",
-            SystemStage::parallel()
-                .with_run_criteria(on_extra_setup)
-                .with_system(fighter::animation::setup::add_animation_player_system.before("extra"))
-                .with_system(extra_setup_system.label("extra")),
-        )
+        // Non-rollback Systems
+        // .add_system_set(
+        //     SystemSet::new()
+        //         .with_run_criteria(on_round)
+        //         .with_system(ui_lifebar_system)
+        //         .with_system(camera_system)
+        //         .with_system(state_text_system), //.with_system(animation_system)
+        // )
+        // .add_stage(
+        //     "Setup Stage",
+        //     SystemStage::parallel()
+        //         .with_run_criteria(on_enter_loading)
+        //         .with_system(load_fighters.label("load_fighters"))
+        //         .with_system(create_battle_ui.after("load_fighters")),
+        // )
+        // .add_stage_after(
+        //     "Setup Stage",
+        //     "Loading Stage",
+        //     SystemStage::parallel()
+        //         .with_run_criteria(on_loading)
+        //         .with_system(loading_wait),
+        // )
+        // .add_stage_after(
+        //     "Loading Stage",
+        //     "Exit Loading Stage",
+        //     SystemStage::parallel()
+        //         .with_run_criteria(on_exit_loading)
+        //         .with_system(spawn_fighters),
+        // )
+        // .add_stage_after(
+        //     "Exit Loading Stage",
+        //     "Armature Stage",
+        //     SystemStage::parallel()
+        //         .with_run_criteria(on_armature)
+        //         .with_system(fighter::animation::setup::insert_hurtbox_data.label("insert_hdata"))
+        //         .with_system(fighter::animation::setup::armature_system.after("insert_hdata")),
+        // )
+        // .add_stage_after(
+        //     "Armature Stage",
+        //     "Enter Round Stage",
+        //     SystemStage::parallel()
+        //         .with_run_criteria(on_enter_round)
+        //         .with_system(startup.label("startup"))
+        //         .with_system(fighter::animation::setup::insert_animations.label("insert_anim"))
+        //         .with_system(insert_meshes.after("insert_anim")),
+        // )
+        // .add_stage_after(
+        //     "Enter Round Stage",
+        //     "Extra Setup Stage",
+        //     SystemStage::parallel()
+        //         .with_run_criteria(on_extra_setup)
+        //         .with_system(fighter::animation::setup::add_animation_player_system.before("extra"))
+        //         .with_system(extra_setup_system.label("extra")),
+        // )
         // Debug Systems
         .add_system(bevy::window::close_on_esc)
-        .add_system(pause_system.with_run_criteria(paused_advance_or_round))
+        .add_system(pause_system.run_if(paused_advance_or_round))
         // Debug Resources
         .insert_resource(GameDebug(opt.debug_mode))
         // Rollback resources
         // Custom Plugins
         .add_plugin(FighterPlugin)
-        .add_plugin(HookPlugin)
+        //.add_plugin(HookPlugin)
         .register_type::<Player>()
         .insert_resource(Paused(false))
-        .insert_resource(Msaa { samples: 1 });
+        .insert_resource(Msaa::Sample2);
 
     app.run();
 
@@ -526,7 +637,10 @@ fn populate_entities_with_states(
                     let registration = type_registry.get_with_name(modifier.type_name()).unwrap();
 
                     let reflect_component = registration.data::<ReflectComponent>().unwrap();
-                    reflect_component.insert(world, entity, &**&modifier);
+
+                    let mut e = world.entity_mut(entity);
+                    //reflect_component.insert(world, entity, &**&modifier);
+                    reflect_component.insert(&mut e, &**&modifier);
                 }
             }
 
@@ -582,12 +696,3 @@ pub fn insert_meshes(
 #[derive(Component)]
 pub struct AnimEntity(pub Entity);
 
-pub fn increase_frame_system(mut frame_count: ResMut<FrameCount>) {
-    frame_count.frame += 1;
-}
-
-#[derive(Default, Reflect, Hash, Component, Resource)]
-#[reflect(Hash)]
-pub struct FrameCount {
-    pub frame: u32,
-}

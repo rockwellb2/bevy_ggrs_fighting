@@ -326,7 +326,8 @@ pub fn spawn_fighters(
 
     commands
         .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Plane { size: 100. })),
+            //mesh: meshes.add(Mesh::from(shape::Plane { size: 100. })),
+            mesh: meshes.add(Mesh::from(shape::Plane { size: 100., subdivisions: 0 })),
             material: materials.add(Color::WHITE.into()),
             ..default()
         })
@@ -399,7 +400,8 @@ pub fn extra_setup_system(
                                 ..default()
                             })),
                             material: projectile_material.clone(),
-                            visibility: Visibility { is_visible: false },
+                            //visibility: Visibility { is_visible: false },
+                            visibility: Visibility::Hidden,
                             ..default()
                         })
                         // .insert_bundle(VisibilityBundle {

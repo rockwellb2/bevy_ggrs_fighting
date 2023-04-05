@@ -1,6 +1,6 @@
 pub mod debug;
 
-use bevy::{reflect::Reflect, prelude::{Component, ResMut, Res, Resource}, ecs::schedule::ShouldRun};
+use bevy::{reflect::Reflect, prelude::{Component, ResMut, Res, Resource}};
 
 use crate::GameDebug;
 
@@ -31,22 +31,22 @@ pub const FRAME: f32 = 1. / 60.;
 #[derive(Resource)]
 pub struct Paused(pub bool);
 
-pub fn not_if_paused(paused: Res<Paused>) -> ShouldRun {
+pub fn not_if_paused(paused: Res<Paused>) -> bool {
     if paused.0 {
-        ShouldRun::No
+        false
     }
     else {
-        ShouldRun::Yes
+        true
     }
 
 }
 
-pub fn if_paused(paused: Res<Paused>) -> ShouldRun {
+pub fn if_paused(paused: Res<Paused>) -> bool {
     if paused.0 {
-        ShouldRun::Yes
+        true
     }
     else {
-        ShouldRun::No
+        false
     }
 }
 
@@ -54,15 +54,15 @@ pub fn if_paused(paused: Res<Paused>) -> ShouldRun {
 pub fn on_debug(
     debug: Res<GameDebug>,
     state: Res<RoundState>
-) -> ShouldRun {
+) -> bool {
     if debug.0  {
         match *state {
-            RoundState::Paused | RoundState::Round => ShouldRun::Yes,
-            _ => ShouldRun::No
+            RoundState::Paused | RoundState::Round => true,
+            _ => false
         }
     }
     else {
-        ShouldRun::No
+        false
     }
 
 }
@@ -70,19 +70,19 @@ pub fn on_debug(
 pub fn on_debug_and_game_paused(
     debug: Res<GameDebug>,
     paused: Res<Paused>
-) -> ShouldRun {
+) -> bool {
     if debug.0 && paused.0 {
-        ShouldRun::Yes
+        true
     }
     else {
-        ShouldRun::No
+        false
     }
 }
 
-pub fn paused_advance_or_round(state: Res<RoundState>) -> ShouldRun {
+pub fn paused_advance_or_round(state: Res<RoundState>) -> bool {
     match *state {
-        RoundState::Paused | RoundState::AdvanceFrame | RoundState::Round => ShouldRun::Yes,
-        _ => ShouldRun::No
+        RoundState::Paused | RoundState::AdvanceFrame | RoundState::Round => true,
+        _ => false
     }
 }
 
@@ -114,52 +114,52 @@ pub enum RoundState {
 }
 
 
-pub fn on_enter_loading(state: Res<RoundState>) -> ShouldRun {
+pub fn on_enter_loading(state: Res<RoundState>) -> bool {
     match *state {
-        RoundState::EnterLoading => ShouldRun::Yes,
-        _ => ShouldRun::No
+        RoundState::EnterLoading => true,
+        _ => false
     }
 }
 
-pub fn on_loading(state: Res<RoundState>) -> ShouldRun {
+pub fn on_loading(state: Res<RoundState>) -> bool {
     match *state {
-        RoundState::Loading => ShouldRun::Yes,
-        _ => ShouldRun::No
+        RoundState::Loading => true,
+        _ => false
     }
 }
 
-pub fn on_exit_loading(state: Res<RoundState>) -> ShouldRun {
+pub fn on_exit_loading(state: Res<RoundState>) -> bool {
     match *state {
-        RoundState::ExitLoading => ShouldRun::Yes,
-        _ => ShouldRun::No
+        RoundState::ExitLoading => true,
+        _ => false
     }
 }
 
-pub fn on_round(state: Res<RoundState>) -> ShouldRun {
+pub fn on_round(state: Res<RoundState>) -> bool {
     match *state {
-        RoundState::Round | RoundState::AdvanceFrame => ShouldRun::Yes,
-        _ => ShouldRun::No
+        RoundState::Round | RoundState::AdvanceFrame => true,
+        _ => false
     }
 }
 
-pub fn on_enter_round(state: Res<RoundState>) -> ShouldRun {
+pub fn on_enter_round(state: Res<RoundState>) -> bool {
     match *state {
-        RoundState::EnterRound => ShouldRun::Yes,
-        _ => ShouldRun::No
+        RoundState::EnterRound => true,
+        _ => false
     }
 }
 
-pub fn on_extra_setup(state: Res<RoundState>) -> ShouldRun {
+pub fn on_extra_setup(state: Res<RoundState>) -> bool {
     match *state {
-        RoundState::ExtraSetup => ShouldRun::Yes,
-        _ => ShouldRun::No
+        RoundState::ExtraSetup => true,
+        _ => false
     }
 }
 
-pub fn on_armature(state: Res<RoundState>) -> ShouldRun {
+pub fn on_armature(state: Res<RoundState>) -> bool {
     match *state {
-        RoundState::Armature => ShouldRun::Yes,
-        _ => ShouldRun::No
+        RoundState::Armature => true,
+        _ => false
     }
 }
 
