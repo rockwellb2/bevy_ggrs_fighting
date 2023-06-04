@@ -37,7 +37,7 @@ use crate::{
             State as FightState, StateFrame, Velocity,
         },
         systems::InputBuffer,
-        Fighter,
+        Fighter, animation::components::FullBoneTransformMap,
     },
     game::{GameState, RoundState},
     input::{Action, BUFFER_SIZE},
@@ -69,6 +69,7 @@ pub struct PlayerHandles {
     pub state_list: Handle<SerializedStateVec>,
     pub fighter_data: Handle<FighterData>,
     pub model: Handle<Gltf>,
+    pub bones: Handle<FullBoneTransformMap>
 }
 
 impl PlayerHandles {
@@ -76,11 +77,13 @@ impl PlayerHandles {
         state_list: Handle<SerializedStateVec>,
         fighter_data: Handle<FighterData>,
         model: Handle<Gltf>,
+        bones: Handle<FullBoneTransformMap>
     ) -> PlayerHandles {
         PlayerHandles {
             state_list,
             fighter_data,
             model,
+            bones
         }
     }
 }
@@ -116,10 +119,14 @@ pub fn load_fighters(
     let model: Handle<Gltf> = asset_server.load("models/ryo_PROBLEM.glb");
     //let model: Handle<Gltf> = asset_server.load("models/Akira.glb");
 
+
+    let bone_list: Handle<FullBoneTransformMap> = 
+        asset_server.load("data/fighters/ryo/ryo.hurt");
+
     let f2: Handle<FighterData> = asset_server.load("data/fighters/abe/fighter_data.json");
 
-    let p1 = PlayerHandles::new(state_list.clone(), fighter_data, model.clone());
-    let p2 = PlayerHandles::new(state_list, f2, model);
+    let p1 = PlayerHandles::new(state_list.clone(), fighter_data, model.clone(), bone_list.clone());
+    let p2 = PlayerHandles::new(state_list, f2, model, bone_list);
     let access = PlayerHandleAccess::new(p1, p2);
 
     commands.insert_resource(access);
@@ -138,6 +145,8 @@ pub fn loading_wait(
         player_access.1.state_list.id(),
         player_access.0.model.id(),
         player_access.1.model.id(),
+        player_access.0.bones.id(),
+        player_access.1.bones.id()
     ];
 
     println!("LOADING...");

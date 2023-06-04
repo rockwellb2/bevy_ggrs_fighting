@@ -31,6 +31,8 @@ pub mod components {
         pub damage: u16,
         #[serde(alias = "onHit", default)]
         pub on_hit: OnHit,
+        #[serde(alias = "onAirHit", default = "HitboxData::on_air_hit_default")]
+        pub on_air_hit: OnHit,
         pub blockstun: Frame,
         window: FrameWindow,
         #[serde(default)]
@@ -54,6 +56,10 @@ pub mod components {
     }
 
     impl HitboxData {
+        fn on_air_hit_default() -> OnHit {
+            OnHit::Launch(Vec3::default())
+        }
+
         pub fn mesh_default() -> Option<Handle<Mesh>> {
             None
         }

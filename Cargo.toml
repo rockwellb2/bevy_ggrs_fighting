@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [profile.dev]
-opt-level = 1
+opt-level = 0
 
 [profile.dev.package."*"]
 opt-level = 3
@@ -39,9 +39,16 @@ nalgebra = {version = "0.32.2", features = ["glam023"]}
 
 serde = "1.0.137"
 serde_json = "1.0.93"
+serde-pickle = "1.1.1"
 serde_closure = "0.3.2"
 typetag = "0.2.0"
+
+
 bevy_common_assets = {version = "0.6.0", features = ["json"]}
+bevy_asset_loader = {version  ="0.16.0", features = ["standard_dynamic_assets"]}
+
+
+
 iyes_loopless = "0.9.1"
 iyes_progress = {version = "0.8.0", features = ["assets"]}
 #bevy_prototype_lyon = "0.7.2"
@@ -52,8 +59,21 @@ leafwing-input-manager = "0.9.1"
 
 bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls" }
 #bevy_editor_pls = "0.2.0"
-#bevy-inspector-egui = "0.17.0"
+bevy-inspector-egui = "0.18.3"
+#bevy_egui = "0.20.3"
 #bevy_prototype_frametime_display_plugin = { git = "https://github.com/IceSentry/bevy_prototype_frametime_display_plugin" }
 
 #required because above doesn't reimport Inspectable
 #bevy-inspector-egui = "0.8.0"
+
+[[bin]]
+name = "hitbox_editor"
+path = "src/bin/editor.rs"
+
+[[bin]]
+name = "bevy_ggrs_fighting"
+path = "src/bin/bevy_ggrs_fighting.rs"
+
+[lib]
+name = "bevy_fighting_lib"
+path = "src/lib.rs"

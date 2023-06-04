@@ -14,6 +14,7 @@ use crate::fighter::systems::InputBuffer;
 use crate::util::Buffer;
 
 pub const BUFFER_SIZE: usize = 60;
+pub const BUFFER_TIME: Frame = 3;
 
 
 pub const LEFT_HELD: u32 = 2048;
@@ -139,28 +140,32 @@ pub fn input(
 
 #[derive(Debug, Serialize, Deserialize, FromReflect, Reflect, Clone)]
 #[serde(untagged)]
-pub enum NewMatchExpression {
+pub enum MatchExpression {
     Button(String, ButtonPress),
     Directional(String, DirectionalInput, bool),
 }
 
-impl Default for NewMatchExpression {
+impl Default for MatchExpression {
     fn default() -> Self {
         Self::Button("a".to_string(), ButtonPress::None)
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, FromReflect, Reflect, Clone)]
-pub struct NewCommandInput {
-    list: Vec<Vec<NewMatchExpression>>,
-    #[serde(default = "NewCommandInput::window_default")]
+pub struct CommandInput {
+    list: Vec<Vec<MatchExpression>>,
+    #[serde(default = "CommandInput::window_default")]
     window: Frame,
-    #[serde(default, alias = "bufferTime")]
+    #[serde(default = "CommandInput::buffer_time_default", alias = "bufferTime")]
     buffer_time: Frame
 }
 
-impl NewCommandInput {
-    pub fn window_default() -> Frame {
+impl CommandInput {
+    fn buffer_time_default() -> Frame {
+        BUFFER_TIME
+    }
+
+    fn window_default() -> Frame {
         1
     }
 
@@ -409,9 +414,9 @@ impl StateInput {
         }
     }
 
-    pub fn compare_command(&self, command: NewMatchExpression) -> bool {
+    pub fn compare_command(&self, command: MatchExpression) -> bool {
         match command {
-            NewMatchExpression::Button(name, button) => {
+            MatchExpression::Button(name, button) => {
                 let i = match name.as_str() {
                     "a" => self.a,
                     "b" => self.b,
@@ -424,7 +429,7 @@ impl StateInput {
 
                 i == button
             }
-            NewMatchExpression::Directional(name, direction, just_pressed) => {
+            MatchExpression::Directional(name, direction, just_pressed) => {
                 let i = match name.as_str() {
                     "x" => (self.x, self.just_pressed_x),
                     "y" => (self.y, self.just_pressed_y),

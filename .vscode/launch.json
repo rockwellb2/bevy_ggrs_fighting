@@ -121,6 +121,31 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
-        }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Run executable 'hitbox_editor' with synctest args",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=hitbox_editor",
+                    "--package=bevy_ggrs_fighting"
+                ],
+                "filter": {
+                    "name": "hitbox_editor",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--num-players", "2",
+                "--check-distance", "1"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "CARGO_MANIFEST_DIR": "${workspaceFolder}", 
+            },
+
+        },
     ]
 }

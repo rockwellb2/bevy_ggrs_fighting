@@ -19,7 +19,7 @@ use serde_json::{from_value, Number};
 
 //use bevy_editor_pls::default_windows::inspector::InspectorWindow;
 
-use crate::input::{NewCommandInput, NewMatchExpression};
+use crate::input::{CommandInput, MatchExpression};
 use crate::fighter::hit::components::HitboxData;
 
 use super::modifiers::StateModifier;
@@ -91,7 +91,7 @@ pub enum Conditions {
     // used for the current state
     In(StateList),
     NotIn(u16),
-    Command(NewCommandInput),
+    Command(CommandInput),
     // when current state is at the end of its duration
     EndDuration,
     // current frame of the stat
@@ -146,7 +146,8 @@ impl From<StateListHelper> for StateList {
 pub enum StateHeight {
     #[default]
     Stand,
-    Crouch
+    Crouch,
+    Air
 }
 
 #[derive(Default, Serialize, Debug, Clone)]
@@ -204,7 +205,7 @@ impl<'de> Deserialize<'de> for SerializedState {
                 );
             } else if key == "transitions" {
                 transitions = from_value(value.clone()).expect("Can't convert array to Vec<u16>");
-            } else if key == "state_height" {
+            } else if key == "state_height" || key == "stateHeight" {
                 height = from_value(value.clone()).expect("Can't convert to StateHeight ")
             } else if key == "triggerAll" {
                 triggers.0 = Some(

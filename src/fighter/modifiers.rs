@@ -1,4 +1,4 @@
-use crate::input::NewCommandInput;
+use crate::input::CommandInput;
 use bevy::prelude::{Vec3, default};
 use bevy::{reflect::Reflect, prelude::Component};
 use serde::{Serialize, Deserialize};
@@ -33,7 +33,7 @@ impl StateModifier for Movement {
 
 #[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
 #[reflect(Component, Deserialize, StateModifier)]
-pub struct InputTransition(pub Vec<(NewCommandInput, u16)>);
+pub struct InputTransition(pub Vec<(CommandInput, u16)>);
 
 #[typetag::serde]
 impl StateModifier for InputTransition {
@@ -90,7 +90,7 @@ pub struct InputMet(pub bool);
 pub struct InputWindowCheck {
     pub window: FrameWindow,
     #[serde(alias = "commandInput", default)]
-    pub command_input: NewCommandInput
+    pub command_input: CommandInput
 
 }
 

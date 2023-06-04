@@ -4,7 +4,7 @@ use bevy::reflect::Reflect;
 
 
 pub(crate) mod scripting;
-
+pub mod pickle_asset_loader;
 
 
 

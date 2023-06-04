@@ -1,22 +1,25 @@
-pub mod setup {
-    use crate::battle::HurtboxMaterial;
+pub(crate) mod setup {
+    use super::components::{AnimEntity, BoneTransforms, FullBoneTransformMap};
+    use crate::battle::{HurtboxMaterial, PlayerEntities};
     use crate::fighter::data::Collider;
-    use crate::AnimEntity;
-    use crate::fighter::state::FighterPosition;
+    use crate::fighter::state::{BoneMap, FighterPosition};
 
-    use bevy::gltf::GltfExtras;
-    use bevy::prelude::AnimationPlayer;
-    use bevy::prelude::Children;
-    use bevy::prelude::HierarchyQueryExt;
+    use bevy::transform::TransformBundle;
+    use bevy::utils::HashMap;
+    use bevy::{
+        gltf::GltfExtras,
+        prelude::{AnimationPlayer, Children, HierarchyQueryExt},
+    };
     use parry3d::shape::Capsule;
 
     use super::super::state::Owner;
 
     use super::super::state::Hurtboxes;
+    use super::components::PositionEntity;
 
     use crate::game::RoundState;
 
-    use bevy::prelude::ResMut;
+    use bevy::prelude::{BuildChildren, Mat4, ResMut, Transform};
 
     use bevy::prelude::Parent;
 
@@ -50,8 +53,8 @@ pub mod setup {
 
     use bevy::prelude::Commands;
 
-    /// A setup function that iterates over all entities with a StateMap, then iterates over
-    /// that entity's state entities, inserting an Animation component in each
+    /// A setup function that iterates over all entities with a `StateMap`, then iterates over
+    /// that entity's state entities, inserting an `Animation` component in each
     ///
     /// # Arguments
     /// * `commands` - Bevy commands struct,
@@ -86,6 +89,11 @@ pub mod setup {
                         .expect("AnimationClip doesn't exist")
                         .duration();
 
+                    let get_rid_of_this = animation_clips
+                        .get(animation)
+                        .expect("AnimationClip doesn't exist")
+                        .curves();
+
                     commands
                         .entity(entity)
                         .insert(Animation(animation.clone(), length));
@@ -94,15 +102,27 @@ pub mod setup {
         }
     }
 
+    /// A setup function that looks at the extra GLTF properties and extracts data from them.
+    /// Currently, it looks at nodes with "Hurt" in them to transform them into Hurtboxes,
+    /// and nodes with the property "fighterPosition" to set it as the reference for the fighter's position.
+    ///
+    /// # Note
+    ///
+    /// Ordering of systems is a problem, where sometimes the `HurtboxMaterial` is not loaded when the resource is grabbed.
+    /// Current solution is hacky, and only works because `armature_system` only moves to next set after `HurtboxData` is found.
     pub fn insert_hurtbox_data(
         mut commands: Commands,
         fighter_query: Query<Entity, With<Fighter>>,
         children_query: Query<&Children>,
         extras_query: Query<(&GltfExtras, &Name)>,
 
-        hurtbox_material: Res<HurtboxMaterial>
+        hurtbox_material: Option<Res<HurtboxMaterial>>,
     ) {
-        let hurtbox_material = &hurtbox_material.0;
+        if hurtbox_material.is_none() {
+            return;
+        }
+
+        let hurtbox_material = &hurtbox_material.unwrap().0;
 
         for player in fighter_query.iter() {
             for descendent in children_query.iter_descendants(player) {
@@ -121,29 +141,56 @@ pub mod setup {
                             }
                         }
                     }
-                
+
                     if extras.value.contains("fighterPosition") {
+                        //if name.contains("GROUND") {
                         commands.entity(descendent).insert(FighterPosition);
                     }
-                
                 }
             }
         }
     }
 
-    /// A setup function that iterates over all entities with HurtboxData components, and finds their ancestor with
-    /// a Player component. The root entity is referenced in the Hurtbox entity as an Owner, and the Hurtbox
+    /// A setup function that that finds the descendent entity of each `Player` entity
+    /// with a `FighterPosition` entity and inserts a `PositionEntity` component into
+    /// the root entity.
+    ///
+    /// # Arguments
+    /// * `commands` - Bevy commands struct,
+    /// * `query` - A query to get all entities with a `FighterPosition` component
+    /// * `parent_query` -  A query used to get all ancestors of the above query
+    /// * `fighter_query` - A query to narrow down the above query to only those with `Fighter` and `Player` components
+    ///
+    ///
+    ///
+    pub fn set_position_entity(
+        mut commands: Commands,
+        query: Query<Entity, With<FighterPosition>>,
+        parent_query: Query<&Parent>,
+        fighter_query: Query<(With<Fighter>, With<Player>)>,
+    ) {
+        for entity in query.iter() {
+            for fighter in parent_query.iter_ancestors(entity) {
+                if fighter_query.get(fighter).is_ok() {
+                    commands.entity(fighter).insert(PositionEntity(entity));
+                }
+            }
+        }
+    }
+
+    /// A setup function that iterates over all entities with `HurtboxData` components, and finds their ancestor with
+    /// a `Player` component. The root entity is referenced in the Hurtbox entity as an `Owner`, and the Hurtbox
     /// is added to the root's Hurtboxes list.
     ///
     /// # Panics
     ///
     /// Panics if the parent of the starting hurtbox entity does not have a parent entity,
-    /// or if the root fighter entity does not contain a Hurtboxes component.
+    /// or if the root fighter entity does not contain a `Hurtboxes` component.
     ///
     ///
-    /// # NOTE
+    /// # Note
     ///
-    /// May loop indefinitely if the HurtboxData query never finds any entities
+    /// May loop indefinitely if the `HurtboxData` query never finds any entities
     ///
     pub fn armature_system(
         mut commands: Commands,
@@ -179,7 +226,7 @@ pub mod setup {
             *state = RoundState::EnterRound;
         }
 
-        println!("Does it stay here endlessly?");
+        //println!("Does it stay here endlessly?");
     }
 
     pub fn add_animation_player_system(
@@ -188,7 +235,7 @@ pub mod setup {
         parent_query: Query<&Parent>,
     ) {
         for (anim, _) in anim_player_query.iter() {
-            println!("What about here?");
+            //println!("What about here?");
             if let Ok(parent) = parent_query.get(anim) {
                 if let Ok(fighter) = parent_query.get(parent.get()) {
                     commands.entity(fighter.get()).insert(AnimEntity(anim));
@@ -196,10 +243,84 @@ pub mod setup {
             }
         }
     }
+
+    pub fn reparent_hurtbox_system(
+        mut commands: Commands,
+        players: Res<PlayerEntities>,
+        mut data: ResMut<Assets<FullBoneTransformMap>>,
+        handle_access: Res<PlayerHandleAccess>,
+        hurtboxes_query: Query<&Hurtboxes>,
+        parent_query: Query<(Entity, &Parent)>,
+        name_query: Query<&Name>,
+    ) {
+        let bones1 = data
+            .remove(&handle_access.0.bones)
+            .expect("FullBoneTransformMap doesn't exist");
+        let bones2 = data
+            .remove(&handle_access.1.bones)
+            .expect("FullBoneTransformMap doesn't exist");
+
+        let mut hurt_closure = |player: Entity, bones_trans: FullBoneTransformMap| {
+            if let Ok(hurtboxes) = hurtboxes_query.get(player) {
+                let mut children: Vec<Entity> = Vec::new();
+
+                for (ent, parent) in parent_query.iter_many(hurtboxes.list()) {
+                    let name = name_query
+                        .get(parent.get())
+                        .expect("Parent doesn't contain Name");
+
+                    let trans_list = bones_trans
+                        .0
+                        .get(name.as_str())
+                        .expect("FullBoneTransformMap doesn't contain bone name");
+
+                    let converted: HashMap<String, Vec<Transform>> = trans_list
+                        .into_iter()
+                        .map(|(action, list)| {
+                            let mut trans: Vec<Transform> = Vec::new();
+                            for matrix in list
+                                .into_iter()
+                                .map(|seq| Mat4::from_cols_array_2d(seq).transpose())
+                            {
+                                trans.push(Transform::from_matrix(matrix));
+                            }
+                            (action.to_string(), trans)
+                        })
+                        .collect();
+
+                    let child = commands
+                        .spawn(BoneTransforms(converted))
+                        .insert(TransformBundle::default())
+                        .add_child(ent)
+                        .id();
+
+                    children.push(child);
+                }
+
+                commands.entity(player).push_children(&children);
+            }
+        };
+
+        hurt_closure(players.0, bones1);
+        hurt_closure(players.1, bones2);
+
+
+    }
 }
 
 pub(crate) mod components {
-    use bevy::prelude::{AnimationClip, Component, Handle};
+    use bevy::{
+        prelude::{AnimationClip, Component, Entity, Handle, Transform},
+        reflect::TypeUuid,
+        utils::HashMap,
+    };
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Component)]
+    pub struct AnimEntity(pub Entity);
+
+    #[derive(Component)]
+    pub struct PositionEntity(pub Entity);
 
     #[derive(Component)]
     pub struct Animation(pub Handle<AnimationClip>, pub f32);
@@ -209,20 +330,29 @@ pub(crate) mod components {
             self.1
         }
     }
+
+    #[derive(Component)]
+    pub struct BoneTransforms(pub HashMap<String, Vec<Transform>>);
+
+    #[derive(Component)]
+    pub struct TransformListRef<'a>(pub &'a [Transform]);
+
+    #[derive(Serialize, Deserialize, TypeUuid, Clone)]
+    #[uuid = "9728bbfc-7beb-493a-b9a3-e4d63b5b0e81"]
+    pub struct FullBoneTransformMap(pub HashMap<String, HashMap<String, Vec<[[f32; 4]; 4]>>>);
 }
 
-pub(crate) mod rollback {
+pub mod rollback {
     use crate::{fighter::state::StateMap, game::FRAME};
 
     use super::{super::state::State, components::Animation};
 
-    use super::super::super::Fighter;
+    use crate::fighter::Fighter;
 
-    use bevy::prelude::With;
+    use bevy::prelude::{With, Children};
 
     use super::super::state::{CurrentState, StateFrame};
-
-    use crate::AnimEntity;
+    use super::components::AnimEntity;
 
     use bevy::prelude::{AnimationPlayer, Commands, Entity, Parent, Query};
 
@@ -270,4 +400,16 @@ pub(crate) mod rollback {
             }
         }
     }
+
+
+    // pub fn hurtbox_transform_system(
+    //     query: Query<(&Children, &StateFrame), With<Fighter>>,
+    //     transform_query: Query<&mut Transform>
+
+    // ) {
+    //     for (children) in query.iter() {
+    //         for 
+    //     }
+
+    // }
 }
