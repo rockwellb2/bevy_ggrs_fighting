@@ -56,6 +56,7 @@ impl StateMap {
 #[reflect(Component)]
 pub struct State {
     pub id: u16,
+    pub name: String,
     pub duration: Option<u16>,
     pub hitboxes: Option<HashMap<u16, Vec<HitboxData>>>,
     pub hurtboxes: Option<HashMap<u16, HashSet<Entity>>>,
@@ -68,6 +69,7 @@ impl State {
     pub fn from_serialized(serialized: SerializedState) -> Self {
         State {
             id: serialized.id,
+            name: serialized.debug_name.expect("No name for State"),
             duration: serialized.duration,
             hitboxes: None,
             hurtboxes: None,
@@ -471,11 +473,12 @@ pub struct Variables(HashMap<String, u32>);
 
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub struct CurrentState(pub u16);
+pub struct CurrentState(pub Entity);
+
 
 impl Default for CurrentState {
     fn default() -> Self {
-        Self(1)
+        Self(Entity::from_raw(u32::MAX))
     }
 }
 

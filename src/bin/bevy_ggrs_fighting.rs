@@ -90,7 +90,7 @@ struct Opt {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env::set_var("RUST_BACKTRACE", "1");
+    //env::set_var("RUST_BACKTRACE", "1");
 
     // let config = aws_config::from_env().region(gamelift::Region::new("us-east-1")).load().await;
     // let client = cognito::Client::new(&config);
@@ -325,7 +325,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 movement_system,
                 axis_system,
                 object_system,
-                fighter::animation::rollback::animation_system,
+                //fighter::animation::rollback::animation_system,
+                fighter::animation::rollback::on_change_state_system,
+                fighter::animation::rollback::hurtbox_transform_system, 
                 apply_system_buffers,
             )
                 .chain()
@@ -351,7 +353,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .in_schedule(GGRSSchedule),
         )
         // Non-rollback Systems
-        .add_systems((ui_lifebar_system, camera_system, state_text_system).in_set(NonRollbackSet))
+        .add_systems((
+            ui_lifebar_system, 
+            camera_system, 
+            state_text_system,
+            fighter::animation::rollback::animation_system
+        ).in_set(NonRollbackSet))
         // Non-rollback Systems
         // .add_system_set(
         //     SystemSet::new()

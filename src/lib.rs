@@ -15,7 +15,7 @@ use bevy_ggrs::{RollbackIdProvider, Rollback};
 use parry3d::shape::{Capsule, Cuboid};
 use ggrs::Config;
 
-use fighter::state::State as FightState;
+use fighter::state::{State as FightState, CurrentState};
 use crate::fighter::state::{SerializedStateVec, SerializedState, StateMap, Owner, HBox};
 use crate:: fighter::hit::components::HitboxData;
 use crate::fighter::data::Collider;
@@ -194,7 +194,10 @@ fn populate_entities_with_states(
             }
         }
 
-        world.entity_mut(player).insert(state_map);
+        world.entity_mut(player)
+            .insert(CurrentState(*state_map.get(&0).expect("State with ID of 0 doesn't exist")))
+            .insert(state_map);
+            
     });
 }
 

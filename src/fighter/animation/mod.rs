@@ -1,5 +1,10 @@
 pub(crate) mod setup {
-    use super::components::{AnimEntity, BoneTransforms, FullBoneTransformMap};
+    use std::default;
+    use std::f32::consts::{FRAC_PI_2, PI};
+    use std::mem::size_of;
+    use std::sync::Arc;
+
+    use super::components::{AnimEntity, BoneTransforms, FullBoneTransformMap, TransformListRef};
     use crate::battle::{HurtboxMaterial, PlayerEntities};
     use crate::fighter::data::Collider;
     use crate::fighter::state::{BoneMap, FighterPosition};
@@ -19,7 +24,9 @@ pub(crate) mod setup {
 
     use crate::game::RoundState;
 
-    use bevy::prelude::{BuildChildren, Mat4, ResMut, Transform};
+    use bevy::prelude::{
+        BuildChildren, Mat4, Quat, ResMut, SpatialBundle, Transform, Vec3, VisibilityBundle,
+    };
 
     use bevy::prelude::Parent;
 
@@ -47,7 +54,7 @@ pub(crate) mod setup {
 
     use bevy::gltf::Gltf;
 
-    use bevy::prelude::Assets;
+    use bevy::prelude::{default, Assets};
 
     use bevy::prelude::Res;
 
@@ -256,9 +263,9 @@ pub(crate) mod setup {
         let bones1 = data
             .remove(&handle_access.0.bones)
             .expect("FullBoneTransformMap doesn't exist");
-        let bones2 = data
-            .remove(&handle_access.1.bones)
-            .expect("FullBoneTransformMap doesn't exist");
+        // let bones2 = data
+        //     .remove(&handle_access.1.bones)
+        //     .expect("FullBoneTransformMap doesn't exist");
 
         let mut hurt_closure = |player: Entity, bones_trans: FullBoneTransformMap| {
             if let Ok(hurtboxes) = hurtboxes_query.get(player) {
@@ -274,7 +281,7 @@ pub(crate) mod setup {
                         .get(name.as_str())
                         .expect("FullBoneTransformMap doesn't contain bone name");
 
-                    let converted: HashMap<String, Vec<Transform>> = trans_list
+                    let converted: HashMap<String, Arc<Vec<Transform>>> = trans_list
                         .into_iter()
                         .map(|(action, list)| {
                             let mut trans: Vec<Transform> = Vec::new();
@@ -282,36 +289,54 @@ pub(crate) mod setup {
                                 .into_iter()
                                 .map(|seq| Mat4::from_cols_array_2d(seq).transpose())
                             {
+                                let mut temp = Transform::from_matrix(matrix);
                                 trans.push(Transform::from_matrix(matrix));
                             }
-                            (action.to_string(), trans)
+
+                            (action.to_string(), Arc::new(trans))
                         })
                         .collect();
 
                     let child = commands
-                        .spawn(BoneTransforms(converted))
+                        .spawn_empty()
+                        .insert(TransformListRef(
+                            converted.get("Idle").expect("No Idle in List").clone(),
+                        ))
+                        .insert(BoneTransforms(converted))
                         .insert(TransformBundle::default())
+                        .insert(VisibilityBundle::default())
                         .add_child(ent)
                         .id();
 
                     children.push(child);
                 }
 
-                commands.entity(player).push_children(&children);
+                let hurt_transforms = commands
+                    .spawn(SpatialBundle {
+                        //transform: Transform::from_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
+                        transform: Transform::from_rotation(Quat::from_euler(bevy::prelude::EulerRot::XYZ, -FRAC_PI_2, 0., PI)),
+                        
+                        ..default()
+                    })
+                    .insert(Name::new("Hurtbox Bones"))
+                    .id();
+
+                commands.entity(hurt_transforms).push_children(&children);
+                commands.entity(player).add_child(hurt_transforms);
             }
         };
 
         hurt_closure(players.0, bones1);
-        hurt_closure(players.1, bones2);
-
-
+        //hurt_closure(players.1, bones2);
     }
 }
 
 pub(crate) mod components {
+    use std::sync::Arc;
+
     use bevy::{
         prelude::{AnimationClip, Component, Entity, Handle, Transform},
-        reflect::TypeUuid,
+        reflect::{GetTypeRegistration, TypeRegistration, TypeUuid},
         utils::HashMap,
     };
     use serde::{Deserialize, Serialize};
@@ -331,11 +356,17 @@ pub(crate) mod components {
         }
     }
 
-    #[derive(Component)]
-    pub struct BoneTransforms(pub HashMap<String, Vec<Transform>>);
+    #[derive(Debug, Component)]
+    pub struct BoneTransforms(pub HashMap<String, Arc<Vec<Transform>>>);
 
     #[derive(Component)]
-    pub struct TransformListRef<'a>(pub &'a [Transform]);
+    pub struct TransformListRef(pub Arc<Vec<Transform>>);
+
+    impl TransformListRef {
+        pub fn get_frame(&self, frame: u16) -> usize {
+            (frame as usize) % self.0.len()
+        }
+    }
 
     #[derive(Serialize, Deserialize, TypeUuid, Clone)]
     #[uuid = "9728bbfc-7beb-493a-b9a3-e4d63b5b0e81"]
@@ -349,10 +380,10 @@ pub mod rollback {
 
     use crate::fighter::Fighter;
 
-    use bevy::prelude::{With, Children};
+    use bevy::prelude::{Changed, Children, HierarchyQueryExt, Ref, Transform, With};
 
-    use super::super::state::{CurrentState, StateFrame};
-    use super::components::AnimEntity;
+    use super::super::state::{CurrentState, State as FightState, StateFrame};
+    use super::components::{AnimEntity, BoneTransforms, FullBoneTransformMap, TransformListRef};
 
     use bevy::prelude::{AnimationPlayer, Commands, Entity, Parent, Query};
 
@@ -378,11 +409,11 @@ pub mod rollback {
         parent_query: Query<&Parent>,
         state_query: Query<&Animation, With<State>>,
     ) {
-        for (entity, anim_entity, current, map, frame) in fighter_query.iter() {
+        for (entity, anim_entity, current, _map, frame) in fighter_query.iter() {
             if let Some(anim) = anim_entity {
                 if let Ok((_, _, mut player)) = animation_play.get_mut(anim.0) {
-                    let state = map.get(&current.0).expect("State doesn't exist");
-                    if let Ok(animation) = state_query.get(*state) {
+                    //let state = map.get(&current.0).expect("State doesn't exist");
+                    if let Ok(animation) = state_query.get(current.0) {
                         player.play(animation.0.clone_weak());
 
                         player.set_elapsed((frame.0 as f32 * FRAME) % animation.length());
@@ -401,15 +432,50 @@ pub mod rollback {
         }
     }
 
+    pub fn hurtbox_transform_system(
+        query: Query<(Entity, &StateFrame), With<Fighter>>,
+        children_query: Query<&Children>,
+        mut transform_query: Query<(&mut Transform, &TransformListRef)>,
+    ) {
+        for (entity, frame) in query.iter() {
+            for child in children_query.iter_descendants(entity) {
+                if let Ok((mut tf, list_ref)) = transform_query.get_mut(child) {
+                    //tf = list_ref.0.get(frame.0).expect("Transform doesn't exist for given frame");
+                    *tf = list_ref
+                        .0
+                        .get(list_ref.get_frame(frame.0))
+                        .expect("Transform doesn't exist for given frame")
+                        .clone();
+                }
+            }
+        }
+    }
 
-    // pub fn hurtbox_transform_system(
-    //     query: Query<(&Children, &StateFrame), With<Fighter>>,
-    //     transform_query: Query<&mut Transform>
+    pub fn on_change_state_system(
+        query: Query<(&CurrentState, Entity), Changed<CurrentState>>,
+        state_query: Query<&FightState>,
+        children_query: Query<&Children>,
+        mut child_query: Query<(&BoneTransforms, &mut TransformListRef)>,
+    ) {
+        for (current, entity) in query.iter() {
+            let name = &state_query
+                .get(current.0)
+                .expect("Couldn't get State component")
+                .name;
 
-    // ) {
-    //     for (children) in query.iter() {
-    //         for 
-    //     }
-
-    // }
+            for descendent in children_query.iter_descendants(entity) {
+                if let Ok((bone_tfs, mut list_ref)) = child_query.get_mut(descendent) {
+                    if let Some(r) = bone_tfs.0.get(name) {
+                        list_ref.0 = r.clone();
+                    }
+                    
+                    // list_ref.0 = bone_tfs
+                    //     .0
+                    //     .get(name)
+                    //     .expect("List with given name doesn't exist in HashMap")
+                    //     .clone();
+                }
+            }
+        }
+    }
 }

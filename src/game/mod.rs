@@ -223,6 +223,7 @@ impl Plugin for SetupPlugin {
                     fighter::animation::setup::set_position_entity,
                     extra_setup_system,
                     apply_system_buffers,
+                    fighter::animation::setup::reparent_hurtbox_system,
                 )
                     .chain()
                     .in_set(SetupSet::ExtraSetup),

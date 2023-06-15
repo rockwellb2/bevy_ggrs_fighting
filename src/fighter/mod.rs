@@ -8,7 +8,7 @@ use self::{
     data::{FighterData, HitEvent}, 
     state::{StateMap, CurrentState, State as FightState, StateFrame, Facing, Health, Direction, ProjectileReference, Exclude, Velocity, Hurtboxes}, 
     systems::InputBuffer, event::TransitionEvent,
-    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Velo, OnExitSetPos, InputWindowCheck, InputMet, OnExitZeroVelo}, hit::components::HitboxData
+    modifiers::{Movement, InputTransition, AdjustFacing, CreateObject, Velo, OnExitSetPos, InputWindowCheck, InputMet, OnExitZeroVelo}, hit::components::HitboxData, animation::components::{BoneTransforms, TransformListRef}
 };
 
 pub mod state;
@@ -58,6 +58,7 @@ impl Plugin for FighterPlugin {
             .register_type::<InputMet>()
             .register_type::<Velocity>()
             .register_type::<Hurtboxes>()
+            
 
         
             .register_type::<ProjectileReference>()

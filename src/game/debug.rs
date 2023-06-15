@@ -16,9 +16,9 @@ pub fn state_text_system(
 ) {
     if let Some(players) = players {
         if let Ok((current, map)) = query.get(players.get(1)) {
-            let s = map.get(&current.0).expect("State doesn't exist");
+            //let s = map.get(&current.0).expect("State doesn't exist");
 
-            let name = state_query.get(*s).expect("A state has no name");
+            let name = state_query.get(current.0).expect("A state has no name");
 
             if let Ok(mut text) = text_query.get_single_mut() {
                 text.sections[1].value = name.to_string();

@@ -99,9 +99,9 @@ pub fn movement_system(
 ) {
     for (map, current, mut tf, mut velocity, frame, data, facing, axis) in fighter_query.iter_mut()
     {
-        let s = map.get(&current.0).expect("State doesn't exist");
+        //let s = map.get(&current.0).expect("State doesn't exist");
 
-        if let Ok(velo) = query.get(*s) {
+        if let Ok(velo) = query.get(current.0) {
             if frame.0 == 1 {
                 if let Some(start) = &velo.start_velocity {
                     let mut start: Vec3 = match start {
@@ -161,7 +161,7 @@ pub fn movement_system(
 
         tf.translation.y = tf.translation.y.max(0.);
 
-        if facing_query.get(*s).is_ok() {
+        if facing_query.get(current.0).is_ok() {
             let mut opp_pos = axis.opponent_pos;
             opp_pos.y = tf.translation.y;
             tf.look_at(opp_pos, Vec3::Y);
@@ -183,6 +183,7 @@ pub fn hitstun_system(
     mut query: Query<
         (
             Entity,
+            &StateMap,
             &mut CurrentState,
             &mut StateFrame,
             &mut Velocity,
@@ -193,11 +194,11 @@ pub fn hitstun_system(
         With<Fighter>,
     >,
 ) {
-    for (fighter, mut current, mut frame, mut velo, hitstun, airborne, mut tf) in query.iter_mut() {
+    for (fighter, map, mut current, mut frame, mut velo, hitstun, airborne, mut tf) in query.iter_mut() {
         if let Some(hitstun) = hitstun {
             if frame.0 > hitstun.0 {
                 frame.0 = 1;
-                current.0 = 0;
+                current.0 = *map.get(&0).expect("State with ID 0 doesn't exist");
                 velo.0 = Vec3::ZERO;
                 commands.entity(fighter).remove::<GroundedHitstun>();
             }
@@ -207,7 +208,7 @@ pub fn hitstun_system(
             if tf.translation.y <= 0. && frame.0 != 1 {
                 frame.0 = 1;
                 tf.translation.y = 0.;
-                current.0 = 0;
+                current.0 = *map.get(&0).expect("State with ID 0 doesn't exist");
                 velo.0 = Vec3::ZERO;
                 commands.entity(fighter).remove::<AirborneHitstun>();
             }
@@ -237,27 +238,29 @@ pub fn process_input_system(
     input_met_mod_query: Query<&InputMet>,
 ) {
     'fighter: for (fighter, current, map, buffer, frame, player, facing, tf) in query.iter() {
-        let state: &Entity = map.get(&current.0).expect("State doesn't exist");
+        //let state: &Entity = map.get(&current.0).expect("State doesn't exist");
 
         // if current.0 == 250 {
         //     let q: StateInput = buffer.0.get(0).unwrap().into();
         //     println!("250 Input: {:?}", q);
         // }
 
-        if let Ok((_, s)) = state_query.get(*state) {
+        let current_id = state_query.get(current.0).expect("Entity doesn't contain State component").1.id;
+
+        if let Ok((_, s)) = state_query.get(current.0) {
             'transitions: for (to_state_entity, to_state) in state_query.iter_many(&s.transitions) {
                 if let Some(all) = &to_state.triggers.0 {
                     let mut meets_conditions = true;
                     'all: for condition in all.iter() {
                         match condition {
                             Conditions::In(n) => {
-                                if !n.contains(&current.0) {
+                                if !n.contains(&current_id) {
                                     meets_conditions = false;
                                     break 'all;
                                 }
                             }
                             Conditions::NotIn(n) => {
-                                if n == &current.0 {
+                                if n == &current_id {
                                     meets_conditions = false;
                                     break 'all;
                                 }
@@ -296,14 +299,7 @@ pub fn process_input_system(
                                 }
                             }
                             Conditions::InputWindowCon(enact_frame) => {
-                                let met_mod = input_met_mod_query
-                                    .get(*state)
-                                    .expect("State entity doesn't have InputMet component");
-
-                                if !met_mod.0 || *enact_frame != frame.0 {
-                                    meets_conditions = false;
-                                    break 'all;
-                                }
+                                panic!()
                             }
                             // Conditions::OnHit(id, range) => {
                             //     if let Some(id) = id {
@@ -326,13 +322,13 @@ pub fn process_input_system(
                     'conditions: for conditions in con_set.iter() {
                         match conditions {
                             Conditions::In(n) => {
-                                if !n.contains(&current.0) {
+                                if !n.contains(&current_id) {
                                     met = false;
                                     break 'conditions;
                                 }
                             }
                             Conditions::NotIn(n) => {
-                                if n == &current.0 {
+                                if n == &current_id {
                                     met = false;
                                     break 'conditions;
                                 }
@@ -372,15 +368,8 @@ pub fn process_input_system(
                                 }
                             }
                             Conditions::InputWindowCon(enact_frame) => {
-                                let met_mod = input_met_mod_query
-                                    .get(*state)
-                                    .expect("State entity doesn't have InputMet component");
-
-                                if !met_mod.0 || *enact_frame != frame.0 {
-                                    met = false;
-                                    break 'conditions;
-                                }
-                            } // Conditions::OnHit(_, _) => todo!(),
+                                panic!()
+                            } 
                         }
                     }
                     if met {
@@ -425,12 +414,12 @@ pub fn transition_system(
         if let Ok((fighter, mut current, map, mut frame, _buffer, bone_map, mut velo)) =
             fighter_query.get_mut(event.fighter)
         {
-            println!("Transition {} to {}", current.0, event.to_id);
+            //println!("Transition {} to {}", current.0, event.to_id);
 
-            let state = map.get(&current.0).expect("State doesn't exist");
+            //let state = map.get(&current.0).expect("State doesn't exist");
 
             // OnExitSetPos transition
-            if let Ok(set_pos) = set_pos_query.get(*state) {
+            if let Ok(set_pos) = set_pos_query.get(current.0) {
                 let bone = bone_map.0.get(&set_pos.bone).expect("Bone doesn't exist");
                 let query_global = transform_set.p0();
                 let global = query_global
@@ -448,16 +437,16 @@ pub fn transition_system(
             }
 
             // OnExitZeroVelo
-            if zero_velo_query.get(*state).is_ok() {
+            if zero_velo_query.get(current.0).is_ok() {
                 velo.0 = Vec3::ZERO;
             }
 
             // InputMet reset
-            if let Ok(mut met) = input_met_query.get_mut(*state) {
+            if let Ok(mut met) = input_met_query.get_mut(current.0) {
                 met.0 = false;
             }
 
-            current.0 = event.to_id;
+            current.0 = *map.get(&event.to_id).expect("State with given ID doesn't exist");
             frame.0 = 1;
         }
     }
@@ -496,9 +485,9 @@ pub fn hitbox_component_system(
     for (entity, current, map, tf, frame, _buffer, facing, axis, mut active_hits) in
         fighter_query.iter_mut()
     {
-        let state = map.get(&current.0).expect("State doesn't exist.");
+        //let state = map.get(&current.0).expect("State doesn't exist.");
 
-        if let Ok(s) = state_query.get(*state) {
+        if let Ok(s) = state_query.get(current.0) {
             if let Some(hitboxes) = &s.hitboxes {
                 if let Some(set) = hitboxes.get(&frame.0) {
                     for hitbox in set {
@@ -725,10 +714,10 @@ pub fn adjust_facing_system(
     if let Ok([(current1, map1, tf1, mut facing1), (current2, map2, tf2, mut facing2)]) =
         fighter_query.get_many_mut([player1, player2])
     {
-        let state1 = map1.get(&current1.0).unwrap();
-        let state2 = map2.get(&current2.0).unwrap();
+        //let state1 = map1.get(&current1.0).unwrap();
+        //let state2 = map2.get(&current2.0).unwrap();
 
-        if state_query.get(*state1).is_ok() {
+        if state_query.get(current1.0).is_ok() {
             facing1.0 = if tf1.translation.x > tf2.translation.x {
                 Direction::Left
             } else {
@@ -736,7 +725,7 @@ pub fn adjust_facing_system(
             };
         }
 
-        if state_query.get(*state2).is_ok() {
+        if state_query.get(current2.0).is_ok() {
             facing2.0 = if tf1.translation.x > tf2.translation.x {
                 Direction::Right
             } else {
@@ -771,9 +760,9 @@ pub fn object_system(
     let mut changes: Vec<(Entity, Vec3)> = Vec::new();
 
     for (_fighter, current, map, frame, tf, mut projectiles, facing, axis) in set.p1().iter_mut() {
-        let s = map.get(&current.0).expect("State does not exist");
+        //let s = map.get(&current.0).expect("State does not exist");
 
-        if let Ok((_state, create_object)) = state_query.get(*s) {
+        if let Ok((_state, create_object)) = state_query.get(current.0) {
             match &create_object.0 {
                 Object::Projectile(projectile) => {
                     if projectile.spawn_frame == frame.0 {
@@ -969,10 +958,10 @@ pub fn hit_event_system(
         {
             health.0 = health.0.saturating_sub(hit_event.0.attacker_box.damage);
 
-            let s = map.get(&current.0).expect("State doesn't exist");
+            //let s = map.get(&current.0).expect("State doesn't exist");
 
             let state = state_query
-                .get(*s)
+                .get(current.0)
                 .expect("Couldn't get query of State entity");
 
             match state.height {
@@ -981,7 +970,7 @@ pub fn hit_event_system(
                         commands.entity(fighter).insert(AirborneHitstun);
 
                         frame.0 = 1;
-                        current.0 = AIR_HITSTUN;
+                        current.0 = *map.get(&AIR_HITSTUN).expect("State with given ID doesn't exist");
 
                         let mut knockback = kb;
                         knockback.x *= facing.0.sign();
@@ -993,7 +982,7 @@ pub fn hit_event_system(
                         commands.entity(fighter).insert(GroundedHitstun(hitstun));
 
                         frame.0 = 1;
-                        current.0 = GRND_HITSTUN_KB;
+                        current.0 = *map.get(&GRND_HITSTUN_KB).expect("State with given ID doesn't exist");
 
                         let mut knockback = kb;
                         knockback.x *= facing.0.sign();
@@ -1005,7 +994,7 @@ pub fn hit_event_system(
                 StateHeight::Air => match hit_event.0.attacker_box.on_air_hit {
                     OnHit::Launch(kb) => {
                         frame.0 = 1;
-                        current.0 = AIR_HITSTUN;
+                        current.0 = *map.get(&AIR_HITSTUN).expect("State with given ID doesn't exist");
 
                         let mut knockback = kb;
                         knockback.x *= facing.0.sign();
@@ -1171,9 +1160,9 @@ pub fn modifier_input_check(
 ) {
     // TODO: Check and Met need to be on separate entities
     for (buffer, facing, frame, current, map) in fighter_query.iter() {
-        let s: &Entity = map.get(&current.0).expect("State doesn't exist");
+        //let s: &Entity = map.get(&current.0).expect("State doesn't exist");
 
-        if let Ok((_, state, mut met, check)) = query.get_mut(*s) {
+        if let Ok((_, state, mut met, check)) = query.get_mut(current.0) {
             if !met.0
                 && frame.0 >= check.window.get_start_frame()
                 && frame.0 <= check.window.get_end_frame()

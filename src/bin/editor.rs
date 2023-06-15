@@ -215,10 +215,10 @@ fn state_list_inspector(world: &mut World) {
     });
 
     if let Some(id) = transition {
-        let mut query = world.query::<(&mut CurrentState, &mut StateFrame)>();
+        let mut query = world.query::<(&mut CurrentState, &mut StateFrame, &StateMap)>();
 
-        for (mut s, mut frame) in query.iter_mut(world) {
-            s.0 = id;
+        for (mut s, mut frame, map) in query.iter_mut(world) {
+            s.0 = *map.get(&id).expect("State with given ID doesn't exist");
             frame.0 = 0;
         }
     }

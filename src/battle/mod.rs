@@ -122,11 +122,15 @@ pub fn load_fighters(
 
     let bone_list: Handle<FullBoneTransformMap> = 
         asset_server.load("data/fighters/ryo/ryo.hurt");
+    let b2: Handle<FullBoneTransformMap> = 
+        asset_server.load("data/fighters/ryo/ryo.hurt");
 
     let f2: Handle<FighterData> = asset_server.load("data/fighters/abe/fighter_data.json");
 
-    let p1 = PlayerHandles::new(state_list.clone(), fighter_data, model.clone(), bone_list.clone());
-    let p2 = PlayerHandles::new(state_list, f2, model, bone_list);
+
+
+    let p1 = PlayerHandles::new(state_list.clone(), fighter_data, model.clone(), bone_list);
+    let p2 = PlayerHandles::new(state_list, f2, model, b2);
     let access = PlayerHandleAccess::new(p1, p2);
 
     commands.insert_resource(access);
@@ -208,14 +212,15 @@ pub fn spawn_fighters(
                 translation: (-2., 0., 0.).into(),
                 ..default()
             }
-            .looking_at((2., 0., 0.).into(), Vec3::Y),
+            .looking_at((2., 0., 0.).into(), Vec3::Y)
+            ,
             ..default()
         })
         .insert(Name::new("Player 1"))
         .insert(Fighter)
         .insert(fighter1)
         //.insert(Rollback::new(rip.next_id()))
-        .insert(CurrentState(0))
+        //.insert(CurrentState::default())
         .insert(Player(1))
         .insert(Facing(Direction::Right))
         .insert(StateFrame(0))
@@ -264,7 +269,7 @@ pub fn spawn_fighters(
         .insert(Name::new("Player 2"))
         .insert(Fighter)
         .insert(fighter2)
-        .insert(CurrentState(0))
+        //.insert(CurrentState::default())
         .insert(Player(2))
         .insert(Facing(Direction::Left))
         .insert(StateFrame(0))
