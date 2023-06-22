@@ -149,7 +149,7 @@ pub(crate) mod setup {
                         }
                     }
 
-                    if extras.value.contains("fighterPosition") {
+                    if extras.value.contains("fighterPosition") || name.contains("POSITION") {
                         //if name.contains("GROUND") {
                         commands.entity(descendent).insert(FighterPosition);
                     }
@@ -281,7 +281,8 @@ pub(crate) mod setup {
                         .get(name.as_str())
                         .expect("FullBoneTransformMap doesn't contain bone name");
 
-                    let converted: HashMap<String, Arc<Vec<Transform>>> = trans_list
+                    //let converted: HashMap<String, Arc<Vec<Transform>>> = trans_list
+                    let converted: HashMap<String, Arc<[Transform]>> = trans_list
                         .into_iter()
                         .map(|(action, list)| {
                             let mut trans: Vec<Transform> = Vec::new();
@@ -289,11 +290,11 @@ pub(crate) mod setup {
                                 .into_iter()
                                 .map(|seq| Mat4::from_cols_array_2d(seq).transpose())
                             {
-                                let mut temp = Transform::from_matrix(matrix);
+                               
                                 trans.push(Transform::from_matrix(matrix));
                             }
 
-                            (action.to_string(), Arc::new(trans))
+                            (action.to_string(), trans.into())
                         })
                         .collect();
 
@@ -357,10 +358,12 @@ pub(crate) mod components {
     }
 
     #[derive(Debug, Component)]
-    pub struct BoneTransforms(pub HashMap<String, Arc<Vec<Transform>>>);
+    //pub struct BoneTransforms(pub HashMap<String, Arc<Vec<Transform>>>);
+    pub struct BoneTransforms(pub HashMap<String, Arc<[Transform]>>);
 
     #[derive(Component)]
-    pub struct TransformListRef(pub Arc<Vec<Transform>>);
+    //pub struct TransformListRef(pub Arc<Vec<Transform>>);
+    pub struct TransformListRef(pub Arc<[Transform]>);
 
     impl TransformListRef {
         pub fn get_frame(&self, frame: u16) -> usize {

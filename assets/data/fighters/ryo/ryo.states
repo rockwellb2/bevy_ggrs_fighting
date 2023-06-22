@@ -1,12 +1,13 @@
 [
     {
         "id": 0,
-        "debug_name": "Idle",
+        "name": "Idle",
         "transitions": [
             420,
             430,
             350,
             360,
+            320,
             300,
             210,
             240,
@@ -53,7 +54,7 @@
             { "in": [5, 6] }
         ],
         "trigger2": [
-            { "in": [29, 100, 120, 150, 160, 200, 210, 220, 230, 235, 240, 250, 251, 260, 300, 335, 350, 360, 410, 420, 430,    280] },
+            { "in": [29, 100, 120, 121, 125, 150, 160, 200, 210, 220, 221, 230, 235, 240, 250, 251, 260, 300, 320, 335, 350, 360, 410, 420, 430,    280] },
             { "endDuration": null }
         ],
         "trigger3": [
@@ -88,6 +89,7 @@
         "debug_name": "2",
         "transitions": [
             410,
+            320,
             210,
             230,
             220,
@@ -234,6 +236,8 @@
         "id": 20,
         "debug_name": "Crouch",
         "transitions": [
+            221,
+            121,
             4011,
             29
         ],
@@ -251,7 +255,7 @@
             }
         ],
         "trigger2": [
-            { "in": [120, 220] },
+            { "in": [120, 121, 220, 221, 320] },
             { "endDuration": null },
             { 
                 "command": {
@@ -270,8 +274,9 @@
     {
         "id": 29,
         "debug_name": "Crouch~Stand",
-        "duration": 20,
+        "duration": 29,
         "transitions": [
+            125,
             0
         ],
         "trigger3": [
@@ -491,7 +496,7 @@
     {
         "id": 120,
         "debug_name": "2A",
-        "duration": 56,
+        "duration": 51,
         "transitions": [
             20,
             0
@@ -509,6 +514,52 @@
                 }
             }
         ]
+    },
+    {
+        "id": 121,
+        "debug_name": "fc.2A",
+        "duration": 50,
+        "transitions": [
+            20,
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["a", "Press"],
+                            ["y", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                    
+                }
+            }
+        ]
+
+    },
+    {
+        "id": 125,
+        "debug_name": "wr.5A",
+        "duration": 44,
+        "transitions": [0],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["a", "Press"]
+                        ]
+                    ],
+                    "window": 1,
+                    "bufferTime": 19
+                }
+            },
+            { "frame": 20 },
+            { "in": [29] }
+        ]
+
     },
     {
         "id": 160,
@@ -633,7 +684,29 @@
     {
         "id": 220,
         "debug_name": "2B",
-        "duration": 54,
+        "duration": 49,
+        "transitions": [
+            20,
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["lk", "Press"],
+                            ["y", "Negative", false]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+    },
+    {
+        "id": 221,
+        "debug_name": "fc.2B",
+        "duration": 45,
         "transitions": [
             20,
             0
@@ -868,6 +941,28 @@
                     "list": [
                         [
                             ["b", "Press"]
+                        ]
+                    ],
+                    "window": 1
+                }
+            }
+        ]
+    },
+    {
+        "id": 320,
+        "debug_name": "2C",
+        "duration": 45,
+        "transitions": [
+            20,
+            0
+        ],
+        "triggerAll": [
+            {
+                "command": {
+                    "list": [
+                        [
+                            ["b", "Press"],
+                            ["y", "Negative", false]
                         ]
                     ],
                     "window": 1

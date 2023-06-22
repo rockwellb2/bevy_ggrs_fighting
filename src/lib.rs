@@ -15,7 +15,7 @@ use bevy_ggrs::{RollbackIdProvider, Rollback};
 use parry3d::shape::{Capsule, Cuboid};
 use ggrs::Config;
 
-use fighter::state::{State as FightState, CurrentState};
+use fighter::state::{State as FightState, CurrentState, ActiveState, PassiveState};
 use crate::fighter::state::{SerializedStateVec, SerializedState, StateMap, Owner, HBox};
 use crate:: fighter::hit::components::HitboxData;
 use crate::fighter::data::Collider;
@@ -93,6 +93,7 @@ fn populate_entities_with_states(
             let hurtbox_serialized = state.unsorted_hurtboxes.take();
             let mods_serialized = state.modifiers.take();
             let transitions_serialized = state.transitions.clone();
+            let active_or_passive = state.active_type.clone();
 
             transition_list.push((entity, transitions_serialized));
 
@@ -183,6 +184,16 @@ fn populate_entities_with_states(
                     reflect_component.insert(&mut e, &**&modifier);
                 }
             }
+
+            match active_or_passive {
+                fighter::state::ActiveOrPassive::Active => {
+                    world.entity_mut(entity).insert(ActiveState);
+                },
+                fighter::state::ActiveOrPassive::Passive => {
+                    world.entity_mut(entity).insert(PassiveState);
+                },
+            }
+
 
             world.entity_mut(entity).insert(state);
         }

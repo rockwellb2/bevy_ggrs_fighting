@@ -116,7 +116,7 @@ pub fn load_fighters(
     let fighter_data: Handle<FighterData> =
         asset_server.load("data/fighters/ryo/ryo.fighter");
     //let model: Handle<Gltf> = asset_server.load("models/sfv_ryu.glb");
-    let model: Handle<Gltf> = asset_server.load("models/ryo_PROBLEM.glb");
+    let model: Handle<Gltf> = asset_server.load("models/ryo_PROBLEM_2.glb");
     //let model: Handle<Gltf> = asset_server.load("models/Akira.glb");
 
 

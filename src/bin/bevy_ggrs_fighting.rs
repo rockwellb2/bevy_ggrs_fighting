@@ -90,7 +90,7 @@ struct Opt {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    //env::set_var("RUST_BACKTRACE", "1");
+    env::set_var("RUST_BACKTRACE", "1");
 
     // let config = aws_config::from_env().region(gamelift::Region::new("us-east-1")).load().await;
     // let client = cognito::Client::new(&config);

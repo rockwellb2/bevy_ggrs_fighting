@@ -9,18 +9,14 @@ use bevy::{
     ecs::reflect::ReflectComponent, math::Vec3, prelude::Component, reflect::ReflectDeserialize,
 };
 
-
-
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use serde_json::{from_value, Number};
 
-
-
 //use bevy_editor_pls::default_windows::inspector::InspectorWindow;
 
-use crate::input::{CommandInput, MatchExpression};
 use crate::fighter::hit::components::HitboxData;
+use crate::input::{CommandInput, MatchExpression};
 
 use super::modifiers::StateModifier;
 
@@ -62,7 +58,7 @@ pub struct State {
     pub hurtboxes: Option<HashMap<u16, HashSet<Entity>>>,
     pub transitions: Vec<Entity>,
     pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>),
-    pub height: StateHeight
+    pub height: StateHeight,
 }
 
 impl State {
@@ -75,7 +71,7 @@ impl State {
             hurtboxes: None,
             transitions: Vec::new(),
             triggers: serialized.triggers,
-            height: serialized.height
+            height: serialized.height,
         }
     }
 
@@ -102,7 +98,7 @@ pub enum Conditions {
     ReachGround,
     // hitbox id (optional), frame range cancel
     //OnHit(Option<usize>, u16)
-    InputWindowCon(u16)
+    InputWindowCon(u16),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect)]
@@ -113,7 +109,6 @@ impl StateList {
     pub fn contains(&self, value: &u16) -> bool {
         self.0.contains(value)
     }
-
 }
 
 impl From<u16> for StateList {
@@ -132,7 +127,7 @@ impl From<Vec<u16>> for StateList {
 #[serde(untagged)]
 enum StateListHelper {
     Unsigned(u16),
-    Seq(Vec<u16>)
+    Seq(Vec<u16>),
 }
 
 impl From<StateListHelper> for StateList {
@@ -144,12 +139,24 @@ impl From<StateListHelper> for StateList {
     }
 }
 
+#[derive(Component, Serialize, Deserialize, Clone, Debug, FromReflect, Reflect, Default)]
+pub struct ActiveState;
+#[derive(Component, Serialize, Deserialize, Clone, Debug, FromReflect, Reflect, Default)]
+pub struct PassiveState;
+
+#[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect, Default)]
+pub enum ActiveOrPassive {
+    #[default]
+    Active,
+    Passive,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect, Default)]
 pub enum StateHeight {
     #[default]
     Stand,
     Crouch,
-    Air
+    Air,
 }
 
 #[derive(Default, Serialize, Debug, Clone)]
@@ -162,7 +169,8 @@ pub struct SerializedState {
     pub modifiers: Option<Vec<Box<dyn StateModifier>>>,
     pub transitions: Vec<u16>,
     pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>),
-    pub height: StateHeight
+    pub height: StateHeight,
+    pub active_type: ActiveOrPassive,
 }
 
 impl<'de> Deserialize<'de> for SerializedState {
@@ -182,6 +190,7 @@ impl<'de> Deserialize<'de> for SerializedState {
         let mut transitions: Vec<u16> = vec![0];
         let mut triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>) = (None, Vec::new());
         let mut height: StateHeight = StateHeight::Stand;
+        let mut active_type: ActiveOrPassive = ActiveOrPassive::default();
 
         for (key, value) in object.into_iter() {
             let key = key.as_str();
@@ -209,6 +218,8 @@ impl<'de> Deserialize<'de> for SerializedState {
                 transitions = from_value(value.clone()).expect("Can't convert array to Vec<u16>");
             } else if key == "state_height" || key == "stateHeight" {
                 height = from_value(value.clone()).expect("Can't convert to StateHeight ")
+            } else if key == "active_type" || key == "activeType" {
+                active_type = from_value(value.clone()).expect("Can't convert to ActiveOrPassive");
             } else if key == "triggerAll" {
                 triggers.0 = Some(
                     from_value(value.clone()).expect("Can't convert array to Vec<Conditions>"),
@@ -229,7 +240,8 @@ impl<'de> Deserialize<'de> for SerializedState {
             modifiers,
             transitions,
             triggers,
-            height
+            height,
+            active_type,
         })
     }
 }
@@ -246,47 +258,43 @@ pub trait HBox: Component {
     fn set_id(&mut self, value: usize);
 }
 
-#[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
-)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
 pub enum HitLevel {
-    Low, 
-    Middle, 
+    Low,
+    Middle,
     #[default]
-    High
+    High,
 }
 
-
 pub fn deserialize_rotation<'de, D>(deserializer: D) -> Result<(f32, f32), D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        struct RotVisitor;
+where
+    D: de::Deserializer<'de>,
+{
+    struct RotVisitor;
 
-        impl<'de> Visitor<'de> for RotVisitor {
-            type Value = (f32, f32);
+    impl<'de> Visitor<'de> for RotVisitor {
+        type Value = (f32, f32);
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a tuple containing a the x and z rotations in radians")
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: de::SeqAccess<'de>,
-            {
-                let mut x: f32 = seq.next_element()?.expect("Couldn't convert to f32");
-                let mut z: f32 = seq.next_element()?.expect("Couldn't convert to f32");
-
-                x = x.to_radians();
-                z = z.to_radians();
-
-                Ok((x, z))
-            }
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a tuple containing a the x and z rotations in radians")
         }
 
-        deserializer.deserialize_seq(RotVisitor)
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: de::SeqAccess<'de>,
+        {
+            let mut x: f32 = seq.next_element()?.expect("Couldn't convert to f32");
+            let mut z: f32 = seq.next_element()?.expect("Couldn't convert to f32");
+
+            x = x.to_radians();
+            z = z.to_radians();
+
+            Ok((x, z))
+        }
     }
 
+    deserializer.deserialize_seq(RotVisitor)
+}
 
 #[derive(Component)]
 pub struct BoneMap(pub HashMap<String, Entity>);
@@ -294,9 +302,7 @@ pub struct BoneMap(pub HashMap<String, Entity>);
 #[derive(Component, Reflect, Default)]
 pub struct ActiveHitboxes(pub Vec<Entity>);
 
-#[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
-)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
 #[reflect(Component)]
 pub struct HurtboxData {
     #[serde(default)]
@@ -347,9 +353,7 @@ impl Hurtboxes {
     }
 }
 
-#[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
-)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
 #[reflect(Component)]
 pub struct ProjectileData {
     pub name: String,
@@ -376,9 +380,7 @@ impl ProjectileData {
     }
 }
 
-#[derive(
-    Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component,
-)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, FromReflect, Reflect, Component)]
 #[reflect(Component)]
 pub struct Velocity(pub Vec3);
 
@@ -475,7 +477,6 @@ pub struct Variables(HashMap<String, u32>);
 #[reflect(Component)]
 pub struct CurrentState(pub Entity);
 
-
 impl Default for CurrentState {
     fn default() -> Self {
         Self(Entity::from_raw(u32::MAX))
@@ -510,9 +511,7 @@ impl Default for Owner {
     }
 }
 
-#[derive(
-    Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Copy, PartialEq,
-)]
+#[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, Copy, PartialEq)]
 pub enum Direction {
     Left,
     #[default]
@@ -560,7 +559,6 @@ pub struct PlayerAxis {
     pub z: Vec3,
 }
 
-
 #[derive(Serialize, Deserialize, Default, Debug, Component, Reflect, Clone, FromReflect)]
 #[serde(from = "FrameWindowHelper")]
 
@@ -568,12 +566,13 @@ pub struct FrameWindow {
     #[serde(default)]
     pub start: Option<Frame>,
     #[serde(default)]
-    pub end: Option<Frame>
+    pub end: Option<Frame>,
 }
 
 impl FrameWindow {
     pub fn get_start_frame(&self) -> Frame {
-        self.start.expect("Start frame doesn't exist in FrameWindow")
+        self.start
+            .expect("Start frame doesn't exist in FrameWindow")
     }
 
     pub fn get_end_frame(&self) -> Frame {
@@ -588,44 +587,45 @@ impl FrameWindow {
         self.end.ok_or(())
     }
 
-
-
-
-
     pub fn from_end(end: Frame) -> FrameWindow {
         FrameWindow {
             start: None,
-            end: Some(end)
+            end: Some(end),
         }
     }
 
     pub fn from_start(start: Frame) -> FrameWindow {
         FrameWindow {
             start: Some(start),
-            end: None
+            end: None,
         }
     }
 
     pub fn new(start: Frame, end: Frame) -> FrameWindow {
         FrameWindow {
             start: Some(start),
-            end: Some(end)
+            end: Some(end),
         }
     }
 }
 
 impl From<[Frame; 2]> for FrameWindow {
     fn from(values: [Frame; 2]) -> Self {
-        FrameWindow { start: Some(values[0]), end: Some(values[1]) }
+        FrameWindow {
+            start: Some(values[0]),
+            end: Some(values[1]),
+        }
     }
 }
 
 impl From<Frame> for FrameWindow {
     fn from(value: Frame) -> Self {
-        FrameWindow { start: Some(value), end: Some(value) }
+        FrameWindow {
+            start: Some(value),
+            end: Some(value),
+        }
     }
 }
-
 
 #[derive(Deserialize)]
 #[serde(untagged)]
@@ -633,7 +633,7 @@ enum FrameWindowHelper {
     Seq([Frame; 2]),
     //Seq(Vec<Frame>),
     Map(HashMap<String, Frame>),
-    Unsigned(Frame)
+    Unsigned(Frame),
 }
 
 impl From<FrameWindowHelper> for FrameWindow {
@@ -643,10 +643,9 @@ impl From<FrameWindowHelper> for FrameWindow {
             FrameWindowHelper::Map(map) => {
                 let start = map.get("start").copied();
                 let end = map.get("end").copied();
-                FrameWindow {start, end }
-            },
+                FrameWindow { start, end }
+            }
             FrameWindowHelper::Unsigned(value) => value.into(),
-
         }
     }
 }

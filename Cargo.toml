@@ -17,9 +17,6 @@ opt-level = 3
 structopt = "0.3"
 bevy = {version = "0.10.1", features = ["serialize", "trace"]}
 bevy_ggrs = "0.12.0"
-#bevy_ggrs = { git = "https://github.com/gschup/bevy_ggrs"}
-
-#ggrs = { git = "https://github.com/gschup/ggrs", features=["sync-send"]}
 ggrs = { version = "0.9.4", features = ["sync-send"]}
 
 aws-sdk-gamelift = "0.21.0"
@@ -51,20 +48,18 @@ bevy_asset_loader = {version  ="0.16.0", features = ["standard_dynamic_assets"]}
 
 iyes_loopless = "0.9.1"
 iyes_progress = {version = "0.8.0", features = ["assets"]}
-#bevy_prototype_lyon = "0.7.2"
+
 leafwing-input-manager = "0.9.1"
-#bevy-scene-hook = "5.2.0"
+bevy_mod_scripting = { git = "https://github.com/makspll/bevy_mod_scripting", features = ["lua54","teal","lua_script_api"]}
+
 
 
 
 bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls" }
-#bevy_editor_pls = "0.2.0"
 bevy-inspector-egui = "0.18.3"
-#bevy_egui = "0.20.3"
 #bevy_prototype_frametime_display_plugin = { git = "https://github.com/IceSentry/bevy_prototype_frametime_display_plugin" }
 
-#required because above doesn't reimport Inspectable
-#bevy-inspector-egui = "0.8.0"
+
 
 [[bin]]
 name = "hitbox_editor"
