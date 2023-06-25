@@ -12,6 +12,8 @@ use bevy::{
 };
 
 use bevy_ggrs::{RollbackIdProvider, Rollback};
+use bevy_mod_scripting::lua::lua_path;
+use bevy_mod_scripting::prelude::{ScriptCollection, Script, LuaFile};
 use parry3d::shape::{Capsule, Cuboid};
 use ggrs::Config;
 
@@ -94,6 +96,7 @@ fn populate_entities_with_states(
             let mods_serialized = state.modifiers.take();
             let transitions_serialized = state.transitions.clone();
             let active_or_passive = state.active_type.clone();
+            let scripts_serialized = state.scripts.take();
 
             transition_list.push((entity, transitions_serialized));
 
@@ -192,6 +195,24 @@ fn populate_entities_with_states(
                 fighter::state::ActiveOrPassive::Passive => {
                     world.entity_mut(entity).insert(PassiveState);
                 },
+            }
+
+            if let Some(scripts) = scripts_serialized {
+                let collection = ScriptCollection::<LuaFile> {
+                    scripts: scripts.iter().map(|file_name| {
+                        let file_name = format!("scripts/{}.lua", file_name);
+
+
+                        Script::new(
+                            //path.to_string(), 
+                            file_name.clone(),
+                            world.get_resource::<AssetServer>().expect("Couldn't get AssetServer resource").load(file_name)
+
+                        )
+                    }).collect()
+                };
+
+                world.entity_mut(entity).insert(collection);
             }
 
 

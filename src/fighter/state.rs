@@ -171,6 +171,7 @@ pub struct SerializedState {
     pub triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>),
     pub height: StateHeight,
     pub active_type: ActiveOrPassive,
+    pub scripts: Option<Vec<String>>,
 }
 
 impl<'de> Deserialize<'de> for SerializedState {
@@ -191,6 +192,7 @@ impl<'de> Deserialize<'de> for SerializedState {
         let mut triggers: (Option<Vec<Conditions>>, Vec<Vec<Conditions>>) = (None, Vec::new());
         let mut height: StateHeight = StateHeight::Stand;
         let mut active_type: ActiveOrPassive = ActiveOrPassive::default();
+        let mut scripts: Option<Vec<String>> = None;
 
         for (key, value) in object.into_iter() {
             let key = key.as_str();
@@ -220,6 +222,9 @@ impl<'de> Deserialize<'de> for SerializedState {
                 height = from_value(value.clone()).expect("Can't convert to StateHeight ")
             } else if key == "active_type" || key == "activeType" {
                 active_type = from_value(value.clone()).expect("Can't convert to ActiveOrPassive");
+            } else if key == "scripts" {
+                scripts =
+                    Some(from_value(value.clone()).expect("Can't convert array to Vec<String>"));
             } else if key == "triggerAll" {
                 triggers.0 = Some(
                     from_value(value.clone()).expect("Can't convert array to Vec<Conditions>"),
@@ -242,6 +247,7 @@ impl<'de> Deserialize<'de> for SerializedState {
             triggers,
             height,
             active_type,
+            scripts
         })
     }
 }

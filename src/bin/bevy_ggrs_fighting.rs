@@ -1,5 +1,6 @@
 use bevy_fighting_lib::battle::{create_battle_ui, extra_setup_system, load_fighters, loading_wait, spawn_fighters};
-use bevy_fighting_lib::{GGRSConfig, FPS, GameDebug, Player};
+use bevy_fighting_lib::util::scripting::{LuaAPIProvider, PlayerEntityArg};
+use bevy_fighting_lib::{GGRSConfig, FPS, GameDebug, Player, util};
 use bevy_fighting_lib::fighter;
 
 
@@ -33,6 +34,7 @@ use bevy_fighting_lib::game::{
     INPUT_BUFFER, MOD_INPUT_CHECK, MOVEMENT, PROCESS, PROJECTILE, REMOVE_HITBOX, REMOVE_HURTBOX,
     TRANSITION, UPDATE_HIT_POS, UPDATE_HURT_POS, SetupPlugin,
 };
+use bevy_mod_scripting::prelude::{ScriptingPlugin, AddScriptHostHandler, AddScriptHost, LuaScriptHost, script_event_handler, AddScriptApiProvider, GenDocumentation, LuaBevyAPIProvider};
 use ggrs::Config;
 //use bevy_editor_pls::prelude::*;
 
@@ -295,6 +297,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_plugin(EditorPlugin::default())
         //.add_plugin(WorldInspectorPlugin::new())
         .add_plugin(FrameTimeDiagnosticsPlugin)
+
+
+        .add_plugin(ScriptingPlugin)
+        .add_script_host_to_set::<LuaScriptHost<PlayerEntityArg>, _>(RollbackSet::Stage0)
+        .add_api_provider::<LuaScriptHost<PlayerEntityArg>>(Box::new(LuaAPIProvider))
+        .add_api_provider::<LuaScriptHost<PlayerEntityArg>>(Box::new(LuaBevyAPIProvider))
+
+        //.update_documentation::<LuaScriptHost<PlayerEntityArg>>()
+     
+
+
+
+
+
+
         .edit_schedule(GGRSSchedule, |schedule| {
             schedule.configure_sets((
                 SetupSet::Setup.run_if(on_enter_loading),
@@ -336,6 +353,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .add_systems(
             (
+                //util::scripting::testing_this,
+                //script_event_handler::<LuaScriptHost<PlayerEntityArg>, 0, 1>,
+                
+
                 hitbox_component_system,
                 hurtbox_component_system,
                 hitbox_removal_system,
@@ -359,60 +380,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             state_text_system,
             fighter::animation::rollback::animation_system
         ).in_set(NonRollbackSet))
-        // Non-rollback Systems
-        // .add_system_set(
-        //     SystemSet::new()
-        //         .with_run_criteria(on_round)
-        //         .with_system(ui_lifebar_system)
-        //         .with_system(camera_system)
-        //         .with_system(state_text_system), //.with_system(animation_system)
-        // )
-        // .add_stage(
-        //     "Setup Stage",
-        //     SystemStage::parallel()
-        //         .with_run_criteria(on_enter_loading)
-        //         .with_system(load_fighters.label("load_fighters"))
-        //         .with_system(create_battle_ui.after("load_fighters")),
-        // )
-        // .add_stage_after(
-        //     "Setup Stage",
-        //     "Loading Stage",
-        //     SystemStage::parallel()
-        //         .with_run_criteria(on_loading)
-        //         .with_system(loading_wait),
-        // )
-        // .add_stage_after(
-        //     "Loading Stage",
-        //     "Exit Loading Stage",
-        //     SystemStage::parallel()
-        //         .with_run_criteria(on_exit_loading)
-        //         .with_system(spawn_fighters),
-        // )
-        // .add_stage_after(
-        //     "Exit Loading Stage",
-        //     "Armature Stage",
-        //     SystemStage::parallel()
-        //         .with_run_criteria(on_armature)
-        //         .with_system(fighter::animation::setup::insert_hurtbox_data.label("insert_hdata"))
-        //         .with_system(fighter::animation::setup::armature_system.after("insert_hdata")),
-        // )
-        // .add_stage_after(
-        //     "Armature Stage",
-        //     "Enter Round Stage",
-        //     SystemStage::parallel()
-        //         .with_run_criteria(on_enter_round)
-        //         .with_system(startup.label("startup"))
-        //         .with_system(fighter::animation::setup::insert_animations.label("insert_anim"))
-        //         .with_system(insert_meshes.after("insert_anim")),
-        // )
-        // .add_stage_after(
-        //     "Enter Round Stage",
-        //     "Extra Setup Stage",
-        //     SystemStage::parallel()
-        //         .with_run_criteria(on_extra_setup)
-        //         .with_system(fighter::animation::setup::add_animation_player_system.before("extra"))
-        //         .with_system(extra_setup_system.label("extra")),
-        // )
+       
+
+        
+
+
         // Debug Systems
         .add_system(bevy::window::close_on_esc)
         .add_system(pause_system.run_if(paused_advance_or_round))
