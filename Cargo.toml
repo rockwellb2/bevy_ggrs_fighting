@@ -53,6 +53,7 @@ leafwing-input-manager = "0.9.1"
 bevy_mod_scripting = { git = "https://github.com/makspll/bevy_mod_scripting", features = ["lua54","teal","lua_script_api", "doc_always"]}
 
 
+youme = { git = "https://github.com/leonskidev/youme" }
 
 
 bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls" }
