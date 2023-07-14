@@ -14,7 +14,7 @@ use crate::fighter::systems::InputBuffer;
 use crate::util::Buffer;
 
 pub const BUFFER_SIZE: usize = 60;
-pub const BUFFER_TIME: Frame = 3;
+pub const BUFFER_TIME: Frame = 0;
 
 
 pub const LEFT_HELD: u32 = 2048;

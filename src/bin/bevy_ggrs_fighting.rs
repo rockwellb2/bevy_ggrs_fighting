@@ -1,5 +1,5 @@
 use bevy_fighting_lib::battle::{create_battle_ui, extra_setup_system, load_fighters, loading_wait, spawn_fighters};
-use bevy_fighting_lib::util::scripting::{LuaAPIProvider, PlayerEntityArg};
+use bevy_fighting_lib::util::scripting::{LuaAPIProvider, PlayerEntityArg };
 use bevy_fighting_lib::{GGRSConfig, FPS, GameDebug, Player, util};
 use bevy_fighting_lib::fighter;
 
@@ -150,7 +150,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let sess = sess_build.start_synctest_session()?;
 
     GGRSPlugin::<GGRSConfig>::new()
-        .with_update_frequency(FPS)
+        .with_update_frequency(20)
         .with_input_system(bevy_fighting_lib::input::input)
         .register_rollback_component::<Transform>()
         .register_rollback_component::<CurrentState>()
@@ -328,6 +328,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 RollbackSet::Stage2
                     .after(RollbackSet::Stage1)
                     .run_if(on_round),
+                RollbackSet::Stage3
+                    .after(RollbackSet::Stage2)
+                    .run_if(on_round),
+                RollbackSet::Stage4
+                    .after(RollbackSet::Stage3)
+                    .run_if(on_round),
+                RollbackSet::Stage5
+                    .after(RollbackSet::Stage4)
+                    .run_if(on_round),
             ));
         })
         .add_systems(
@@ -339,6 +348,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 modifier_input_check,
                 process_input_system,
                 transition_system,
+                util::scripting::send_process_event_system,
+                //script_event_handler::<LuaScriptHost<PlayerEntityArg>, 0, 0>,
+
+                // movement_system,
+                // axis_system,
+                // object_system,
+                // //fighter::animation::rollback::animation_system,
+                // fighter::animation::rollback::on_change_state_system,
+                // fighter::animation::rollback::hurtbox_transform_system, 
+                // apply_system_buffers,
+            )
+                .chain()
+                .in_set(RollbackSet::Stage0)
+                .in_schedule(GGRSSchedule),
+        )
+        .add_system(
+            script_event_handler::<LuaScriptHost<PlayerEntityArg>, 0, 0>
+            .in_set(RollbackSet::Stage1)
+            .in_schedule(GGRSSchedule)
+
+        )
+        .add_system(
+            script_event_handler::<LuaScriptHost<PlayerEntityArg>, 1, 1>
+            .in_set(RollbackSet::Stage2)
+            .in_schedule(GGRSSchedule)
+
+        )
+        .add_system(
+            script_event_handler::<LuaScriptHost<PlayerEntityArg>, 2, 2>
+            .in_set(RollbackSet::Stage3)
+            .in_schedule(GGRSSchedule)
+
+        )
+        .add_systems(
+            (
                 movement_system,
                 axis_system,
                 object_system,
@@ -346,10 +390,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 fighter::animation::rollback::on_change_state_system,
                 fighter::animation::rollback::hurtbox_transform_system, 
                 apply_system_buffers,
+
             )
-                .chain()
-                .in_set(RollbackSet::Stage0)
-                .in_schedule(GGRSSchedule),
+            .chain()
+            .in_set(RollbackSet::Stage4)
+            .in_schedule(GGRSSchedule),
         )
         .add_systems(
             (
@@ -370,7 +415,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 apply_system_buffers
             )
                 .chain()
-                .in_set(RollbackSet::Stage1)
+                .in_set(RollbackSet::Stage5)
                 .in_schedule(GGRSSchedule),
         )
         // Non-rollback Systems

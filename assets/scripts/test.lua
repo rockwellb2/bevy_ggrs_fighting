@@ -7,7 +7,8 @@ function help(player)
 
  end
 
-local function update()
+function process()
+    print("Process")
 end
 
 local function init()

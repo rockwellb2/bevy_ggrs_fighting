@@ -1,18 +1,14 @@
 use bevy::prelude::{Component, ReflectComponent};
-use bevy::reflect::Reflect;
+use bevy::reflect::{FromReflect, Reflect, ReflectOwned};
 
-
-
-pub mod scripting;
 pub mod pickle_asset_loader;
-
-
+pub mod scripting;
 
 #[derive(Reflect, Default, Debug, Component)]
 #[reflect(Component)]
 pub struct Buffer {
     pub vec: Vec<u32>,
-    head: usize, 
+    head: usize,
 }
 
 impl Buffer {
@@ -25,23 +21,13 @@ impl Buffer {
 
     pub fn get(&self, index: usize) -> Option<&u32> {
         let raw = self.head + index;
-        let new_index = if raw > (self.vec.len() - 1) {
-            0
-        }
-        else {
-            raw
-        };
+        let new_index = if raw > (self.vec.len() - 1) { 0 } else { raw };
         self.vec.get(new_index)
     }
 
     pub fn get_mut(&mut self, index: usize) -> Option<&mut u32> {
         let raw = self.head + index;
-        let new_index = if raw > (self.vec.len() - 1) {
-            0
-        }
-        else {
-            raw
-        };
+        let new_index = if raw > (self.vec.len() - 1) { 0 } else { raw };
         self.vec.get_mut(new_index)
     }
 
@@ -49,8 +35,7 @@ impl Buffer {
         self.head = self.head.checked_sub(1).unwrap_or(self.vec.len() - 1);
         if let Some(head) = self.get_mut(0) {
             *head = value;
-        }
-        else {
+        } else {
             panic!()
         }
     }
@@ -64,18 +49,21 @@ impl Buffer {
     }
 }
 
-
-
 pub struct BufferIter<'a> {
-    ring: &'a[u32],
+    ring: &'a [u32],
     tail: usize,
     head: usize,
-    check: bool
+    check: bool,
 }
 
 impl<'a> BufferIter<'a> {
-    pub fn new(ring: &'a[u32], tail: usize, head: usize) -> Self {
-        Self { ring, tail, head, check: false }
+    pub fn new(ring: &'a [u32], tail: usize, head: usize) -> Self {
+        Self {
+            ring,
+            tail,
+            head,
+            check: false,
+        }
     }
 }
 
@@ -84,20 +72,40 @@ impl<'a> Iterator for BufferIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.check {
-            return None
+            return None;
         }
-        if self.tail == self.head  {
+        if self.tail == self.head {
             self.check = true;
         }
 
         let head = self.head;
         self.head = if self.head < self.ring.len() - 1 {
             self.head + 1
-        }
-        else {
-           0
+        } else {
+            0
         };
 
         self.ring.get(head)
+    }
+}
+
+pub fn convert_json_value_to_reflect(a: serde_json::Value) -> ReflectOwned {
+
+    
+    match a {
+        serde_json::Value::Null => todo!(),
+        serde_json::Value::Bool(b) => ReflectOwned::Value(Box::new(b)),
+        serde_json::Value::Number(num) => num.as_u64().map_or_else(
+            || {
+                num.as_i64().map_or_else(
+                    || ReflectOwned::Value(Box::new(num.as_f64().unwrap())),
+                    |x| ReflectOwned::Value(Box::new(x)),
+                )
+            },
+            |x| ReflectOwned::Value(Box::new(x)),
+        ),
+        serde_json::Value::String(s) => ReflectOwned::Value(Box::new(s)),
+        serde_json::Value::Array(_) => todo!(),
+        serde_json::Value::Object(_) => todo!(),
     }
 }

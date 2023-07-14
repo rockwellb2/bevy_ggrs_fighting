@@ -2,13 +2,14 @@ use std::fmt::Debug;
 
 use bevy::ecs::reflect;
 use bevy::prelude::{Entity, Handle, Mesh};
-use bevy::reflect::{FromReflect, Reflect, TypeUuid};
+use bevy::reflect::{FromReflect, Reflect, TypeUuid, DynamicStruct, ReflectRef, DynamicTupleStruct, TupleStruct, Struct};
 use bevy::utils;
 use bevy::utils::hashbrown::{HashMap, HashSet};
 use bevy::{
     ecs::reflect::ReflectComponent, math::Vec3, prelude::Component, reflect::ReflectDeserialize,
 };
 
+use bevy_mod_scripting::prelude::ReflectLuaProxyable;
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use serde_json::{from_value, Number};
@@ -92,13 +93,15 @@ pub enum Conditions {
     Command(CommandInput),
     // when current state is at the end of its duration
     EndDuration,
-    // current frame of the stat
+    // current frame of the state
     Frame(FrameWindow),
     // if the fighter just touched the ground
     ReachGround,
     // hitbox id (optional), frame range cancel
     //OnHit(Option<usize>, u16)
     InputWindowCon(u16),
+    // always returns true
+    True
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, FromReflect, Reflect)]
@@ -172,6 +175,7 @@ pub struct SerializedState {
     pub height: StateHeight,
     pub active_type: ActiveOrPassive,
     pub scripts: Option<Vec<String>>,
+    pub on_enter: Vec<Option<Box<dyn StateModifier>>>,
 }
 
 impl<'de> Deserialize<'de> for SerializedState {
@@ -179,8 +183,9 @@ impl<'de> Deserialize<'de> for SerializedState {
     where
         D: serde::Deserializer<'de>,
     {
-        let json: serde_json::value::Value = serde_json::value::Value::deserialize(deserializer)?;
-        let object = json.as_object().expect("Not an object");
+        let mut json: serde_json::value::Value =
+            serde_json::value::Value::deserialize(deserializer)?;
+        let object = json.as_object_mut().expect("Not an object");
 
         let mut id: u16 = 0;
         let mut debug_name: Option<String> = None;
@@ -193,9 +198,13 @@ impl<'de> Deserialize<'de> for SerializedState {
         let mut height: StateHeight = StateHeight::Stand;
         let mut active_type: ActiveOrPassive = ActiveOrPassive::default();
         let mut scripts: Option<Vec<String>> = None;
+        let mut on_enter: Vec<Option<Box<dyn StateModifier>>> = vec![];
 
-        for (key, value) in object.into_iter() {
+        for (key, value) in object.iter_mut() {
             let key = key.as_str();
+
+
+            
 
             if key == "id" {
                 id = value.as_u64().expect("u64") as u16;
@@ -213,7 +222,7 @@ impl<'de> Deserialize<'de> for SerializedState {
                 );
             } else if key == "modifiers" {
                 modifiers = Some(
-                    from_value(value.clone())
+                    from_value(value.take())
                         .expect("Can't convert array to Vec<Box<dyn StateModifier>>"),
                 );
             } else if key == "transitions" {
@@ -225,13 +234,16 @@ impl<'de> Deserialize<'de> for SerializedState {
             } else if key == "scripts" {
                 scripts =
                     Some(from_value(value.clone()).expect("Can't convert array to Vec<String>"));
+            } else if key == "onEnter" {
+                on_enter = from_value(value.take())
+                    .expect("Can't convert array to Vec<Option<Box<dyn StateModifier>>>")
             } else if key == "triggerAll" {
                 triggers.0 = Some(
-                    from_value(value.clone()).expect("Can't convert array to Vec<Conditions>"),
+                    from_value(value.take()).expect("Can't convert array to Vec<Conditions>"),
                 );
             } else if key.contains("trigger") {
                 triggers.1.push(
-                    from_value(value.clone()).expect("Can't convert array to Vec<Conditions>"),
+                    from_value(value.take()).expect("Can't convert array to Vec<Conditions>"),
                 )
             }
         }
@@ -247,7 +259,8 @@ impl<'de> Deserialize<'de> for SerializedState {
             triggers,
             height,
             active_type,
-            scripts
+            scripts,
+            on_enter,
         })
     }
 }
@@ -476,8 +489,38 @@ impl ProjectileReference {
     }
 }
 
+// #[derive(Component, Reflect, Default)]
+// pub struct Variables(HashMap<String, DynValue>);
+
 #[derive(Component, Reflect, Default)]
-pub struct Variables(HashMap<String, u32>);
+pub struct Variables(DynamicStruct);
+
+
+impl Variables {
+    pub fn get(&self, name: &str) -> Option<Box<dyn Reflect>> {
+        //self.0.get(key).map(|v| v.0.field(0).expect("No field at index 0").clone_value())
+        self.0.field(name).map(|v| v.clone_value())
+    }
+
+    pub fn add_variable(&mut self, name: &str, value: Box<dyn Reflect>) {
+        self.0.insert_boxed(name, value);
+    }
+}
+
+
+#[derive(Reflect, Default, Debug)]
+pub struct DynValue(DynamicTupleStruct);
+
+impl FromReflect for DynValue {
+    fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
+        if let ReflectRef::TupleStruct(value) = reflect.reflect_ref() {
+            Some(Self(value.clone_dynamic()))
+        }
+        else {
+            None
+        }
+    }
+}
 
 #[derive(Component, Reflect)]
 #[reflect(Component)]

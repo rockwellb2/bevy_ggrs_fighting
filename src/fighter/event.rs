@@ -51,6 +51,7 @@ pub fn resolve_state_system<S: ScheduleTiming>(
 }
 
 
+
 pub fn state_event_writer_system<T: StateModifier + Component + Clone, S: ScheduleTiming>(
     player_query: Query<&CurrentState>,
     state_query: Query<&ModifierEntityList>,

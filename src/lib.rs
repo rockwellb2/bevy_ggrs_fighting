@@ -4,8 +4,10 @@ pub mod game;
 pub mod input;
 pub mod util;
 
+use std::path::Path;
 use std::{env, net::SocketAddr};
 
+use bevy::asset::{FileAssetIo, AssetIo};
 use bevy::{
     diagnostic::FrameTimeDiagnosticsPlugin, ecs::reflect::ReflectComponent, prelude::*,
     reflect::TypeRegistry, utils::HashMap,
@@ -14,6 +16,7 @@ use bevy::{
 use bevy_ggrs::{RollbackIdProvider, Rollback};
 use bevy_mod_scripting::lua::lua_path;
 use bevy_mod_scripting::prelude::{ScriptCollection, Script, LuaFile};
+use fighter::data::FighterData;
 use parry3d::shape::{Capsule, Cuboid};
 use ggrs::Config;
 
@@ -71,6 +74,9 @@ fn populate_entities_with_states(
 
     let mut global_hitbox_id: u32 = 0;
 
+    let data = world.entity(player).get::<FighterData>().expect("Couldn't retrieve FighterData component").clone();
+    let directory = format!("data/fighters/{}/scripts/", data.name);
+
     world.resource_scope(|world, mut rip: Mut<RollbackIdProvider>| {
         for mut state in deserialized {
             let name = state
@@ -97,6 +103,7 @@ fn populate_entities_with_states(
             let transitions_serialized = state.transitions.clone();
             let active_or_passive = state.active_type.clone();
             let scripts_serialized = state.scripts.take();
+            //let raw_name = state.debug_name.take().unwrap_or("State".to_string());
 
             transition_list.push((entity, transitions_serialized));
 
@@ -181,6 +188,7 @@ fn populate_entities_with_states(
                     let registration = type_registry.get_with_name(modifier.type_name()).unwrap();
 
                     let reflect_component = registration.data::<ReflectComponent>().unwrap();
+                    
 
                     let mut e = world.entity_mut(entity);
                     //reflect_component.insert(world, entity, &**&modifier);
@@ -197,23 +205,46 @@ fn populate_entities_with_states(
                 },
             }
 
-            if let Some(scripts) = scripts_serialized {
-                let collection = ScriptCollection::<LuaFile> {
-                    scripts: scripts.iter().map(|file_name| {
-                        let file_name = format!("scripts/{}.lua", file_name);
+            // if let Some(scripts) = scripts_serialized {
+            //     let collection = ScriptCollection::<LuaFile> {
+            //         scripts: scripts.iter().map(|file_name| {
+            //             let file_name = format!("scripts/{}.lua", file_name);
 
+            //             if std::path::Path::is_file(std::path::Path::new("assets/scripts/test.lua")) {
+            //                 println!("I guess this is a file");
+            //             }
+            //             else {
+            //                 println!("Not a file");
+            //             }
 
-                        Script::new(
-                            //path.to_string(), 
-                            file_name.clone(),
-                            world.get_resource::<AssetServer>().expect("Couldn't get AssetServer resource").load(file_name)
+                        
+ 
+            //             Script::new(
+            //                 //path.to_string(), 
+            //                 file_name.clone(),
+            //                 world.get_resource::<AssetServer>().expect("Couldn't get AssetServer resource").load(file_name)
 
-                        )
-                    }).collect()
-                };
+            //             )
+            //         }).collect()
+            //     };
+
+            //     world.entity_mut(entity).insert(collection);
+            // }
+
+            let file_name = format!("{}/{}.lua", directory, state.name);
+            if Path::new(&format!("assets/{}", file_name)).is_file() {
+                let script: Script<LuaFile> = Script::new(
+                    file_name.clone(),
+                    world.get_resource::<AssetServer>().expect("Couldn't get AssetServer resource").load(file_name)
+                );
+
+                let collection = ScriptCollection { scripts: vec![script] };
 
                 world.entity_mut(entity).insert(collection);
+                
             }
+
+
 
 
             world.entity_mut(entity).insert(state);

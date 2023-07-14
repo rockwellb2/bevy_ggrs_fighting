@@ -1,9 +1,9 @@
 use crate::input::CommandInput;
-use bevy::prelude::{Vec3, default};
+use bevy::prelude::{Vec3, default, Query, Transform};
 use bevy::{reflect::Reflect, prelude::Component};
 use serde::{Serialize, Deserialize};
 use std::fmt::Debug;
-use bevy::reflect::{reflect_trait, ReflectDeserialize, FromReflect};
+use bevy::reflect::{reflect_trait, ReflectDeserialize, FromReflect, ReflectRef, ReflectOwned};
 use bevy::ecs::reflect::ReflectComponent;
 
 use super::state::{ProjectileData, FrameWindow, Frame};
@@ -31,16 +31,7 @@ impl StateModifier for Movement {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
-#[reflect(Component, Deserialize, StateModifier)]
-pub struct InputTransition(pub Vec<(CommandInput, u16)>);
 
-#[typetag::serde]
-impl StateModifier for InputTransition {
-    fn dyn_clone(&self) -> Box<dyn StateModifier> {
-        Box::new(self.clone())
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, Default, Reflect, Component, Clone)]
 #[reflect(Component, Deserialize, StateModifier)]
@@ -147,5 +138,32 @@ pub enum VectorType {
 impl StateModifier for Velo {
     fn dyn_clone(&self) -> Box<dyn StateModifier>  {
         Box::new(self.clone())
+    }
+}
+
+#[derive(Component)]
+pub struct SetVariable {
+    value: ReflectOwned,
+    target: Target
+}
+
+pub enum Target {
+    Component
+}
+
+
+enum ReflectProxy {
+    Vec(Vec3),
+    Float(f32),
+    Integer(i32)
+}
+
+impl From<ReflectProxy> for ReflectOwned {
+    fn from(value: ReflectProxy) -> Self {
+        match value {
+            ReflectProxy::Vec(_) => todo!(),
+            ReflectProxy::Float(_) => todo!(),
+            ReflectProxy::Integer(_) => todo!(),
+        }
     }
 }

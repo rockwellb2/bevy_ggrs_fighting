@@ -32,6 +32,7 @@ use bevy::{
 };
 use bevy_ggrs::{PlayerInputs, Rollback, RollbackIdProvider};
 
+use bevy_mod_scripting::prelude::{LuaEvent, PriorityEventWriter, Recipients};
 use nalgebra::Isometry3;
 use parry3d::{
     bounding_volume::{Aabb, BoundingVolume},
@@ -46,7 +47,7 @@ use crate::{
     battle::{HitboxMaterial, Lifebar, MatchCamera, MatchCameraRoot, PlayerEntities},
     fighter::hit::components::HitboxData,
     game::{Paused, RoundState},
-    util::Buffer,
+    util::{scripting::{PlayerEntityArg}, Buffer},
     GGRSConfig, HitboxMap, Player, FPS,
 };
 
@@ -55,6 +56,10 @@ pub enum RollbackSet {
     Stage0,
     Stage1,
     Stage2,
+    Stage3,
+    Stage4,
+    Stage5,
+    Stage6
 }
 
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
@@ -99,65 +104,51 @@ pub fn movement_system(
 ) {
     for (map, current, mut tf, mut velocity, frame, data, facing, axis) in fighter_query.iter_mut()
     {
-        //let s = map.get(&current.0).expect("State doesn't exist");
 
-        if let Ok(velo) = query.get(current.0) {
-            if frame.0 == 1 {
-                if let Some(start) = &velo.start_velocity {
-                    let mut start: Vec3 = match start {
-                        VectorType::Vec(vector) => *vector,
-                        VectorType::Variable(var_name) => {
-                            let raw = data
-                                .field(var_name)
-                                .expect("Couldn't get value for field of this name");
-                            let variable = f32::from_reflect(raw)
-                                .expect("Couldn't create f32 from reflected value");
+        // if let Ok(velo) = query.get(current.0) {
+        //     if frame.0 == 1 {
+        //         if let Some(start) = &velo.start_velocity {
+        //             let mut start: Vec3 = match start {
+        //                 VectorType::Vec(vector) => *vector,
+        //                 VectorType::Variable(var_name) => {
+        //                     let raw = data
+        //                         .field(var_name)
+        //                         .expect("Couldn't get value for field of this name");
+        //                     let variable = f32::from_reflect(raw)
+        //                         .expect("Couldn't create f32 from reflected value");
 
-                            Vec3::new(variable, 0., 0.)
-                        }
-                        VectorType::Warning => panic!(),
-                    };
+        //                     Vec3::new(variable, 0., 0.)
+        //                 }
+        //                 VectorType::Warning => panic!(),
+        //             };
 
-                    start.x *= facing.0.sign();
-                    velocity.0 = start;
-                }
-            } else {
-                if let Some(accel) = &velo.acceleration {
-                    let mut accel: Vec3 = match accel {
-                        VectorType::Vec(vector) => *vector,
-                        VectorType::Variable(var_name) => {
-                            let raw = data
-                                .field(var_name)
-                                .expect("Couldn't get value for field of this name");
-                            let variable = f32::from_reflect(raw)
-                                .expect("Couldn't create f32 from reflected value");
+        //             start.x *= facing.0.sign();
+        //             velocity.0 = start;
+        //         }
+        //     } else {
+        //         if let Some(accel) = &velo.acceleration {
+        //             let mut accel: Vec3 = match accel {
+        //                 VectorType::Vec(vector) => *vector,
+        //                 VectorType::Variable(var_name) => {
+        //                     let raw = data
+        //                         .field(var_name)
+        //                         .expect("Couldn't get value for field of this name");
+        //                     let variable = f32::from_reflect(raw)
+        //                         .expect("Couldn't create f32 from reflected value");
 
-                            Vec3::new(variable, 0., 0.)
-                        }
-                        VectorType::Warning => panic!(),
-                    };
-                    accel.x *= facing.0.sign();
-                    velocity.0 += accel;
-                }
-            }
-
-            // tf.translation += (velocity.0.x / FPS as f32) * axis.x;
-            // tf.translation.y += velocity.0.y / FPS as f32;
-            // tf.translation += (velocity.0.z / FPS as f32) * axis.z;
-
-            // //tf.translation += velocity.0 / FPS as f32;
-
-            // tf.translation.y = tf.translation.y.max(0.);
-
-            // tf.look_at(axis.opponent_pos, Vec3::Y);
-            // //tf.rotate_axis(Vec3::Y, FRAC_PI_2);
-        }
+        //                     Vec3::new(variable, 0., 0.)
+        //                 }
+        //                 VectorType::Warning => panic!(),
+        //             };
+        //             accel.x *= facing.0.sign();
+        //             velocity.0 += accel;
+        //         }
+        //     }
+        // }
 
         tf.translation += (velocity.0.x / FPS as f32) * axis.x;
         tf.translation.y += velocity.0.y / FPS as f32;
         tf.translation += (velocity.0.z / FPS as f32) * axis.z;
-
-        //tf.translation += velocity.0 / FPS as f32;
 
         tf.translation.y = tf.translation.y.max(0.);
 
@@ -166,7 +157,6 @@ pub fn movement_system(
             opp_pos.y = tf.translation.y;
             tf.look_at(opp_pos, Vec3::Y);
         }
-        //tf.rotate_axis(Vec3::Y, FRAC_PI_2);
     }
 }
 
@@ -194,7 +184,9 @@ pub fn hitstun_system(
         With<Fighter>,
     >,
 ) {
-    for (fighter, map, mut current, mut frame, mut velo, hitstun, airborne, mut tf) in query.iter_mut() {
+    for (fighter, map, mut current, mut frame, mut velo, hitstun, airborne, mut tf) in
+        query.iter_mut()
+    {
         if let Some(hitstun) = hitstun {
             if frame.0 > hitstun.0 {
                 frame.0 = 1;
@@ -235,6 +227,8 @@ pub fn process_input_system(
     state_query: Query<(Entity, &State)>,
     mut trans_writer: EventWriter<TransitionEvent>,
 
+    mut lua_writer: PriorityEventWriter<LuaEvent<PlayerEntityArg>>,
+
     input_met_mod_query: Query<&InputMet>,
 ) {
     'fighter: for (fighter, current, map, buffer, frame, player, facing, tf) in query.iter() {
@@ -245,7 +239,11 @@ pub fn process_input_system(
         //     println!("250 Input: {:?}", q);
         // }
 
-        let current_id = state_query.get(current.0).expect("Entity doesn't contain State component").1.id;
+        let current_id = state_query
+            .get(current.0)
+            .expect("Entity doesn't contain State component")
+            .1
+            .id;
 
         if let Ok((_, s)) = state_query.get(current.0) {
             'transitions: for (to_state_entity, to_state) in state_query.iter_many(&s.transitions) {
@@ -301,6 +299,7 @@ pub fn process_input_system(
                             Conditions::InputWindowCon(enact_frame) => {
                                 panic!()
                             }
+                            Conditions::True => {},
                             // Conditions::OnHit(id, range) => {
                             //     if let Some(id) = id {
                             //         todo!()
@@ -369,17 +368,74 @@ pub fn process_input_system(
                             }
                             Conditions::InputWindowCon(enact_frame) => {
                                 panic!()
-                            } 
+                            }
+                            Conditions::True => {},
                         }
                     }
                     if met {
                         trans_writer.send(TransitionEvent::new(fighter, to_state.id));
+
+                        lua_writer.send(
+                            LuaEvent {
+                                hook_name: "exit".to_owned(),
+                                args: PlayerEntityArg::new(fighter),
+                                recipients: Recipients::Entity(current.0),
+                            },
+                            0,
+                        );
+
+                        lua_writer.send(
+                            LuaEvent { 
+                                hook_name: "enter".to_owned(), 
+                                args: PlayerEntityArg::new(fighter), 
+                                recipients: Recipients::Entity(to_state_entity)
+                            },
+                            1
+                        );
+
+                        // lua_writer.send(
+                        //     LuaEvent { 
+                        //         hook_name: "process".to_owned(), 
+                        //         args: PlayerEntityArg(fighter), 
+                        //         recipients: Recipients::Entity(to_state_entity)
+                        //     },
+                        //     2
+                        // );
+
                         break 'transitions;
                     }
                 }
 
                 if others {
                     trans_writer.send(TransitionEvent::new(fighter, to_state.id));
+
+                    lua_writer.send(
+                        LuaEvent {
+                            hook_name: "exit".to_owned(),
+                            args: PlayerEntityArg::new(fighter),
+                            recipients: Recipients::Entity(current.0),
+                        },
+                        0,
+                    );
+
+                    lua_writer.send(
+                        LuaEvent { 
+                            hook_name: "enter".to_owned(), 
+                            args: PlayerEntityArg::new(fighter), 
+                            recipients: Recipients::Entity(to_state_entity)
+                        },
+                        1
+                    );
+
+                    // lua_writer.send(
+                    //     LuaEvent { 
+                    //         hook_name: "process".to_owned(), 
+                    //         args: PlayerEntityArg(fighter), 
+                    //         recipients: Recipients::Entity(to_state_entity)
+                    //     },
+                    //     2
+                    // );
+                    
                     break 'transitions;
                 }
             }
@@ -437,16 +493,18 @@ pub fn transition_system(
             }
 
             // OnExitZeroVelo
-            if zero_velo_query.get(current.0).is_ok() {
-                velo.0 = Vec3::ZERO;
-            }
+            // if zero_velo_query.get(current.0).is_ok() {
+            //     velo.0 = Vec3::ZERO;
+            // }
 
             // InputMet reset
             if let Ok(mut met) = input_met_query.get_mut(current.0) {
                 met.0 = false;
             }
 
-            current.0 = *map.get(&event.to_id).expect("State with given ID doesn't exist");
+            current.0 = *map
+                .get(&event.to_id)
+                .expect("State with given ID doesn't exist");
             frame.0 = 1;
         }
     }
@@ -970,7 +1028,9 @@ pub fn hit_event_system(
                         commands.entity(fighter).insert(AirborneHitstun);
 
                         frame.0 = 1;
-                        current.0 = *map.get(&AIR_HITSTUN).expect("State with given ID doesn't exist");
+                        current.0 = *map
+                            .get(&AIR_HITSTUN)
+                            .expect("State with given ID doesn't exist");
 
                         let mut knockback = kb;
                         knockback.x *= facing.0.sign();
@@ -982,7 +1042,9 @@ pub fn hit_event_system(
                         commands.entity(fighter).insert(GroundedHitstun(hitstun));
 
                         frame.0 = 1;
-                        current.0 = *map.get(&GRND_HITSTUN_KB).expect("State with given ID doesn't exist");
+                        current.0 = *map
+                            .get(&GRND_HITSTUN_KB)
+                            .expect("State with given ID doesn't exist");
 
                         let mut knockback = kb;
                         knockback.x *= facing.0.sign();
@@ -994,13 +1056,14 @@ pub fn hit_event_system(
                 StateHeight::Air => match hit_event.0.attacker_box.on_air_hit {
                     OnHit::Launch(kb) => {
                         frame.0 = 1;
-                        current.0 = *map.get(&AIR_HITSTUN).expect("State with given ID doesn't exist");
+                        current.0 = *map
+                            .get(&AIR_HITSTUN)
+                            .expect("State with given ID doesn't exist");
 
                         let mut knockback = kb;
                         knockback.x *= facing.0.sign();
                         velo.0 = knockback;
-                        
-                    },
+                    }
                     OnHit::Grounded { kb: _, hitstun: _ } => panic!(),
                     OnHit::Stun(_) => panic!(),
                 },
